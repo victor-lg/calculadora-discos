@@ -30,3 +30,5 @@ documental
 ## Cómo se trabaja aquí
 
 Este proyecto sigue el workflow SDD + IA. Las reglas para agentes están en `AGENTS.md`.
+
+Primer recorrido del workflow SDD + IA.
