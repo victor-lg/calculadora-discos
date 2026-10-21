@@ -36,15 +36,18 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
 
 test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ page, context, baseURL }) => {
   const origen = new URL(baseURL).origin;
-  // Se captura todo en el momento: tras cerrar la página ya no se pueden leer las cabeceras.
-  const capturas = [];
+  // Se captura todo en el momento, con headers() y no con allHeaders(): este
+  // espera a cabeceras que, en peticiones del service worker, pueden no llegar
+  // antes de cerrar la página. headers() no incluye las cabeceras de cookies;
+  // por eso se comprueba aparte que la app no guarda ninguna cookie.
+  const peticiones = [];
   context.on('request', (r) => {
-    capturas.push(r.allHeaders().then((cabeceras) => ({
+    peticiones.push({
       url: r.url(),
       cuerpo: r.postData(),
-      cabeceras: JSON.stringify(cabeceras),
+      cabeceras: JSON.stringify(r.headers()),
       delServiceWorker: r.serviceWorker() !== null,
-    })));
+    });
   });
 
   // Uso completo: primera carga, calcular, cambiar porcentajes y cerrar.
@@ -61,7 +64,7 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   await expect(series(page)).toHaveCount(3);
   await page.reload();
   await page.close();
-  const peticiones = await Promise.all(capturas);
+  expect(await context.cookies()).toEqual([]);
 
   const introducidos = ['7,35', '7.35', '7%2C35', '487', '487,35', '487.35', '487%2C35',
     'dos-lados', 'un-punto', 'recta'];
