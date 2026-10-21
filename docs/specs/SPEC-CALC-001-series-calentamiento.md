@@ -13,8 +13,8 @@ transversales: []
 Redactada con sdd-spec a partir de discovery/notas-descubrimiento.md
 (rondas 1–4, revisión del borrador y cierre, 2026-10-20). Todas las reglas
 de negocio las decidió Víctor; las que eran propuesta de Claude y él aceptó
-están marcadas en las notas. La versión 0.2 incorpora sus decisiones sobre la
-revisión G4 (2026-10-21), registradas en el PR #2.
+están marcadas en las notas. La versión 0.2 incorpora sus decisiones sobre las
+rondas 1 y 2 de la revisión G4 (2026-10-21), registradas en el PR #2.
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -66,13 +66,14 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - la persona puede añadir y quitar porcentajes en cualquier momento;
   - cada uno es un número entero del 1 al 99;
   - se muestran en el orden en que la persona los introduce, sin reordenar;
-  - se puede repetir un porcentaje: cada repetición es una serie más y se muestran todas.
-- **FR-05:** para cada porcentaje, el peso objetivo es el peso de trabajo × porcentaje / 100. En el modo Barra, ese objetivo incluye la barra.
+  - se puede repetir un porcentaje: cada repetición es una serie más y se muestran todas;
+  - si la persona intenta añadir un porcentaje no válido, la app muestra un mensaje que dice qué falla y no lo añade.
+- **FR-05:** para cada porcentaje, el peso objetivo es el peso de trabajo × porcentaje / 100, redondeado a dos decimales con la mitad hacia arriba. Ese objetivo redondeado es el que se usa en todo lo demás: el cálculo de la carga, el aviso de redondeo, la diferencia y lo que se muestra. En el modo Barra, el objetivo incluye la barra.
 - **FR-06:** el peso cargado es el mayor peso cargable que no supera el objetivo:
   - **modos Barra y Dos lados:** el peso de cada lado se redondea hacia abajo a un múltiplo de 1,25 kg;
   - **modo Un punto:** el peso total de discos se redondea hacia abajo a un múltiplo de 1,25 kg.
 
-  Si la diferencia entre el peso cargado y el objetivo, redondeada a dos decimales (FR-14), no es 0, la serie muestra el objetivo y la diferencia. Si es 0, no hay aviso de redondeo.
+  Si el peso cargado no coincide con el objetivo, la serie muestra un aviso de redondeo con el objetivo y la diferencia.
 - **FR-07:** los discos se eligen entre 25, 20, 15, 10, 5, 2,5 y 1,25 kg, con existencias ilimitadas. Se toman de mayor a menor, tantos de cada uno como quepan, y se muestran en ese orden.
 - **FR-08:** cada serie muestra:
   - el porcentaje;
@@ -89,13 +90,12 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 
   En los modos Dos lados y Un punto, la serie no muestra peso total.
 - **FR-10:** cualquier cambio de modo, barra, peso o porcentajes recalcula las series al momento, sin un botón de calcular.
-- **FR-11:** la lista de porcentajes se guarda en el dispositivo y se recupera al volver a abrir la app. La primera vez es 40 %, 70 % y 90 %. El modo, la barra, el peso de la barra y el peso de trabajo no se guardan: al abrir, el modo es Barra con la barra de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin error (FR-03).
+- **FR-11:** la lista de porcentajes se guarda en el dispositivo y se recupera al volver a abrir la app. Al volver a abrirla se recupera la lista guardada, aunque esté vacía. La lista 40 %, 70 % y 90 % se usa solo la primera vez o si los datos guardados faltan o no se pueden leer. El modo, la barra, el peso de la barra y el peso de trabajo no se guardan: al abrir, el modo es Barra con la barra de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin error (FR-03).
 - **FR-12:** en el modo Barra, si el peso de trabajo es menor que el peso de la barra elegida, la app muestra un aviso general: el peso de trabajo es inferior a la barra, conviene elegir una barra más ligera o revisar el peso. Las series se calculan igualmente según FR-09.
 - **FR-13:** cuando la lista de porcentajes está vacía, la app no muestra ninguna serie y muestra una indicación para añadir porcentajes.
 - **FR-14:** formato de los números:
   - al escribir un peso, la app acepta como separador decimal tanto la coma como el punto;
-  - los pesos se muestran con coma decimal y como máximo dos decimales;
-  - el objetivo y la diferencia se muestran redondeados a dos decimales.
+  - los pesos, el objetivo y la diferencia se muestran con coma decimal, como máximo dos decimales y sin ceros finales (por ejemplo, "73,5" y "40", nunca "73,50" ni "40,00").
 
 ## 5. Criterios de aceptación
 
@@ -116,23 +116,25 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - con un peso de trabajo de 0, de 500,01 o de 100,123, la app muestra un mensaje que dice qué falla y no muestra series;
   - si la persona borra el peso de trabajo, la app no muestra series ni ningún mensaje de error, solo la indicación de rellenarlo.
 - **AC-09 → FR-04:** la lista respeta los límites, el orden y los duplicados:
-  - no se pueden añadir los porcentajes 0, 100 ni 40,5;
+  - al intentar añadir los porcentajes 0, 100 o 40,5, la app muestra un mensaje que dice qué falla y no los añade;
   - si la persona introduce 90 y después 40, se muestran en ese orden;
   - con la barra de 20 kg, 100 kg y los porcentajes 70 y 70, se muestran dos series iguales del 70 % (70 kg, 25 por lado);
   - con la barra de 20 kg, 100 kg y los porcentajes 85 y 87, se muestran las dos series aunque ambas carguen 85 kg (la del 87 % con aviso de redondeo).
 - **AC-10 → FR-10:** al cambiar el peso de trabajo, añadir o quitar un porcentaje, o cambiar de modo o de barra, las series se actualizan sin ninguna otra acción.
-- **AC-11 → FR-11:** la primera vez que se abre, la lista es 40, 70 y 90. Si la persona la cambia a 50 y 75, cierra la app y la vuelve a abrir, la lista es 50 y 75. El modo es Barra, la barra es la de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin ningún mensaje de error.
+- **AC-11 → FR-11:** la primera vez que se abre, la lista es 40, 70 y 90. Si la persona la cambia a 50 y 75, cierra la app y la vuelve a abrir, la lista es 50 y 75. Si la persona quita todos los porcentajes, cierra la app y la vuelve a abrir, la lista sigue vacía. Si los datos guardados faltan o no se pueden leer, la lista es 40, 70 y 90. En todos los casos, al abrir, el modo es Barra, la barra es la de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin ningún mensaje de error.
 - **AC-12 → NFR-01:** con la app ya instalada en el iPhone y el teléfono en modo avión, la app se abre y reproduce el resultado de AC-01.
 - **AC-13 → NFR-02:** durante un uso completo, incluida la primera carga (abrir, calcular, cambiar porcentajes y cerrar), todas las peticiones de red van al propio origen de la app, y ninguna contiene datos que haya introducido la persona: pesos, porcentajes, modo o barra.
 - **AC-14 → FR-12:** con la barra de 20 kg y un peso de trabajo de 15 kg, la app muestra el aviso de que el peso de trabajo es inferior a la barra, y las series 40, 70 y 90 aparecen como "Solo barra (20 kg) · 0 kg por lado" con sus objetivos (6, 10,5 y 13,5 kg).
 - **AC-15 → FR-13:** si la persona quita todos los porcentajes, con la barra de 20 kg y 100 kg, la app no muestra ninguna serie y muestra la indicación de añadir porcentajes.
-- **AC-16 → FR-14, FR-06:** con la barra de 20 kg, 101,11 kg y el 70 % (objetivo 70,777 kg), la app carga 70 kg (25 por lado) y avisa: objetivo 70,78 kg, diferencia −0,78 kg.
-- **AC-17 → FR-06, FR-14:** con la barra de 20 kg, 100,01 kg y el 40 % (objetivo 40,004 kg), la app carga 40 kg (10 por lado) sin aviso de redondeo, porque la diferencia redondeada es 0.
+- **AC-16 → FR-05, FR-06:** con la barra de 20 kg, 101,11 kg y el 70 % (70,777 kg, que se redondea a un objetivo de 70,78 kg), la app carga 70 kg (25 por lado) y avisa: objetivo 70,78 kg, diferencia −0,78 kg.
+- **AC-17 → FR-05, FR-06:** con la barra de 20 kg, 100,01 kg y el 40 % (40,004 kg, que se redondea a un objetivo de 40 kg), la app carga 40 kg (10 por lado) sin aviso de redondeo, porque el peso cargado coincide con el objetivo.
 - **AC-18 → FR-14:** con la barra de 20 kg y el 70 %, escribir el peso de trabajo como "102,5" o como "102.5" da el mismo resultado: 70 kg (25 por lado), con aviso de objetivo 71,75 kg y diferencia −1,75 kg.
 - **AC-19 → FR-02:** con la barra Z o con la recta pequeña:
   - un peso de barra de 0, de 500,01 o de 100,123 muestra un mensaje que dice qué falla y no muestra series;
   - un peso de barra vacío no muestra series ni ningún mensaje de error, solo la indicación de rellenarlo;
   - con la recta pequeña, un peso de barra escrito como "7,5", 60 kg y el 70 % (objetivo 42 kg), la app carga 40 kg (15 + 1,25 por lado, 16,25 kg por lado) y avisa de la diferencia de −2 kg.
+- **AC-20 → FR-05, FR-06:** en el modo Un punto, con 2,51 kg y el 50 % (1,255 kg, que se redondea con la mitad hacia arriba a un objetivo de 1,26 kg), la app carga 1,25 kg (un disco de 1,25) y avisa: objetivo 1,26 kg, diferencia −0,01 kg.
+- **AC-21 → FR-05, FR-06, FR-14:** con la barra de 20 kg, 99,99 kg y el 40 % (39,996 kg, que se redondea a un objetivo de 40 kg), la app carga 40 kg (10 por lado) sin aviso de redondeo. El peso cargado se muestra como "40 kg", sin ceros finales.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
@@ -143,7 +145,10 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - lista de porcentajes vacía: no se muestra ninguna serie, solo la indicación de añadir porcentajes (FR-13);
   - campo de peso vacío: estado neutro, sin series ni error (FR-03, FR-02);
   - datos no válidos: mensaje y sin series (FR-03, FR-02);
-  - formato de números: entrada con coma o punto, presentación con coma decimal y hasta dos decimales (FR-14).
+  - porcentaje no válido: mensaje y no se añade (FR-04);
+  - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan o no se pueden leer (FR-11);
+  - objetivo con más de dos decimales: se redondea con la mitad hacia arriba antes de calcular la carga (FR-05);
+  - formato de números: entrada con coma o punto, presentación con coma decimal, hasta dos decimales y sin ceros finales (FR-14).
 - **Decisiones pendientes:** ninguna. El peso real de la barra recta pequeña y de la Z no hace falta para la spec, porque se introduce en cada uso.
 
 ---
