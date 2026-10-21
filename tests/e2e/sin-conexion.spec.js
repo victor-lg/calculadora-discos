@@ -31,8 +31,9 @@ const CABECERAS_DEL_NAVEGADOR = new Set([
 ]);
 
 // Valores introducidos en el recorrido de AC-13, completos y en sus formas
-// codificadas. No se buscan fragmentos cortos, que podrían coincidir con el
-// puerto efímero o con la versión del navegador.
+// codificadas. El puerto efímero solo aparece en Host, Origin y Referer, que se
+// comprueban aparte y no se escanean. No se buscan fragmentos cortos porque
+// podrían coincidir con la versión del navegador en user-agent o sec-ch-ua.
 const INTRODUCIDOS = ['7,35', '7.35', '7%2C35', '487,35', '487.35', '487%2C35', '48735',
   'dos-lados', 'un-punto', 'recta'];
 
