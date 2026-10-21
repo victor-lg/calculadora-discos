@@ -75,11 +75,11 @@ AGENTS.md pide además el mínimo de dependencias (cada una nueva es R2) y un te
    - Con un **subdominio propio verificado en GitHub y sin DNS comodín** [F12]. La verificación evita que otro usuario reclame el subdominio. El subdominio aísla además el origen de los demás sitios `victor-lg.github.io`.
    - Pages da HTTPS también con dominio propio [F13].
 6. **Publicación manual.**
-   - El workflow de publicación solo se lanza a mano (`workflow_dispatch`), nunca al fusionar en `main`. Fusionar no es publicar (D25).
+   - El workflow de publicación solo se lanza a mano (`workflow_dispatch`), nunca al fusionar en `main`. Fusionar no es publicar (D25 del workflow SDD [F19]).
    - Publicar es una decisión de Víctor sobre una versión concreta de `main`. Aceptar un cambio y ponerlo en el iPhone son pasos distintos, y el agente no despliega (AGENTS.md).
    - **Lo impone GitHub, no la buena fe.** Lanzar un `workflow_dispatch` solo exige permiso de escritura [F17], y la cuenta del agente lo tiene. Con GitHub Pro, en un repositorio privado, los entornos no admiten aprobadores obligatorios, pero sí limitar las ramas que despliegan [F18]. Por eso:
      - el entorno `github-pages` solo admite `main`;
-     - el job de publicación solo se ejecuta si lo lanza la cuenta `victor-lg`.
+     - el job de publicación solo se ejecuta si tanto quien lo lanzó como quien lo relanza es la cuenta `victor-lg` (`github.actor` y `github.triggering_actor`), de modo que relanzar una ejecución tampoco publica desde otra cuenta.
 
      El agente no puede cambiar el workflow, porque su token no tiene el permiso `workflow`.
 7. **Tests.**
@@ -111,7 +111,7 @@ AGENTS.md pide además el mínimo de dependencias (cada una nueva es R2) y un te
   | Un cambio de iOS altera las web apps | Repetir la prueba manual tras cada versión mayor de iOS. |
   | Se cuela una petición a terceros | CSP en `<meta>` para el documento, y el test de AC-13 y la revisión de código para el service worker. |
   | El iPhone se queda con una versión vieja | Versión nueva en cada publicación, sin mezclar ficheros de versiones distintas. Solo entra cuando no hay un uso en curso (§3.3), lo que en iOS puede tardar. |
-  | Alguien que no es Víctor publica | Entorno limitado a `main` y job condicionado a la cuenta `victor-lg` (§3.6). |
+  | Alguien que no es Víctor publica | Entorno limitado a `main` y job condicionado a que lo lance y lo relance la cuenta `victor-lg` (§3.6). |
   | Alguien reclama el subdominio | Verificación en GitHub, sin DNS comodín, y borrar el registro DNS si se deja Pages [F12]. |
 
 - **Impacto:** el proyecto pasa a la etapa técnica, con PR propios posteriores:
@@ -161,3 +161,4 @@ Consultadas el 2026-10-21.
 - [F16] Playwright, "Browsers": <https://playwright.dev/docs/browsers>
 - [F17] GitHub Docs, "Manually running a workflow" ("Write access to the repository is required"): <https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow>
 - [F18] GitHub Docs, "Deployments and environments" (en Pro/Team, aprobadores obligatorios solo en repositorios públicos; ramas de despliegue también en privados): <https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments>
+- [F19] Workflow SDD (`victor-lg/sdd-workflow`): `historial/registro-D00-D59.md`, "D25 — Separar integración, publicación y recuperación"; aplicada en `docs/linea-base-v1.md` §7 ("Fusionar no es desplegar… un paso aparte (D25)").
