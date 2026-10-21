@@ -20,9 +20,17 @@ test('FR-03: análisis del peso escrito', () => {
   assert.deepEqual(analizarPeso('0,01'), { estado: 'ok', cent: 1 });
   assert.deepEqual(analizarPeso('500'), { estado: 'ok', cent: 50000 });
   assert.deepEqual(analizarPeso(''), { estado: 'vacio' });
-  for (const t of ['0', '0,00', '500,01', '100,123', '1.000', '1,000', 'abc', '-5', '1e2',
-    ' 100', '100 ', '100,', ',5', '1.000,5', '100kg']) {
-    assert.equal(analizarPeso(t).estado, 'invalido', t);
+  // v0.4: espacios alrededor y separador suelto al principio o al final.
+  assert.deepEqual(analizarPeso(' 100 '), { estado: 'ok', cent: 10000 });
+  assert.deepEqual(analizarPeso('100.'), { estado: 'ok', cent: 10000 });
+  assert.deepEqual(analizarPeso('.5'), { estado: 'ok', cent: 50 });
+  assert.deepEqual(analizarPeso(' ,25 '), { estado: 'ok', cent: 25 });
+  for (const t of [' ', ',', '.', ' . ', '\t', ' ', '\n']) {
+    assert.deepEqual(analizarPeso(t), { estado: 'vacio' }, JSON.stringify(t));
+  }
+  for (const t of ['0', '0,00', '0,', ',0', ',00', '500,01', '100,123', '1.000', '1,000', 'abc',
+    '-5', '1e2', '1.000,5', '100kg', '10 0', '100,5,', '100,,', ',,', '.,', ',5,', '1 ,5', '1, 5']) {
+    assert.equal(analizarPeso(t).estado, 'invalido', JSON.stringify(t));
   }
 });
 

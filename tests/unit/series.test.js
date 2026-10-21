@@ -299,3 +299,98 @@ test('SPEC-CALC-001/AC-26 frontera de "Solo barra" con la barra de 20 kg y el 50
   assert.equal(debajo.objetivo, 'Objetivo: 22,49 kg');
   assert.equal(debajo.aviso, null);
 });
+
+const AC01 = (v) => v.series.map((s) => [s.porcentaje, s.total, s.discos, s.pesoDiscos, s.aviso]);
+const SERIES_AC01 = AC01(vista({ trabajo: '100', porcentajes: [40, 70, 90] }));
+
+test('SPEC-CALC-001/AC-27 espacios y separador al final: las mismas series que AC-01', () => {
+  for (const trabajo of [' 100 ', '100 ', '100,', '100.']) {
+    const v = vista({ trabajo, porcentajes: [40, 70, 90] });
+    assert.equal(v.errorTrabajo, null, JSON.stringify(trabajo));
+    assert.deepEqual(AC01(v), SERIES_AC01, JSON.stringify(trabajo));
+  }
+});
+
+test('SPEC-CALC-001/AC-27 ",5" y ".5" valen 0,5 kg en el modo Un punto', () => {
+  for (const trabajo of [',5', '.5']) {
+    const v = vista({ modo: 'un-punto', trabajo, porcentajes: [50] });
+    assert.equal(v.errorTrabajo, null, trabajo);
+    assert.equal(v.series[0].mensaje, TEXTOS.minimoUnPunto, trabajo);
+    assert.equal(v.series[0].objetivo, 'Objetivo: 0,25 kg', trabajo);
+  }
+});
+
+test('SPEC-CALC-001/AC-27 solo el separador o solo espacios: campo vacío, sin error', () => {
+  for (const trabajo of [',', '.', ' , ', '   ']) {
+    const v = vista({ trabajo, porcentajes: [40, 70, 90] });
+    assert.equal(v.series.length, 0, JSON.stringify(trabajo));
+    assert.equal(v.errorTrabajo, null, JSON.stringify(trabajo));
+    assert.equal(v.indicacionTrabajo, TEXTOS.rellenarTrabajo, JSON.stringify(trabajo));
+  }
+});
+
+test('SPEC-CALC-001/AC-27 ",0", ",123", "10 0", "100,5," y "100,,": mensaje y sin series', () => {
+  for (const trabajo of [',0', ',123', '10 0', '100,5,', '100,,']) {
+    const v = vista({ trabajo, porcentajes: [40, 70, 90] });
+    assert.match(v.errorTrabajo ?? '', /^El peso de trabajo .+\.$/, trabajo);
+    assert.equal(v.indicacionTrabajo, null, trabajo);
+    assert.equal(v.series.length, 0, trabajo);
+  }
+  assert.match(vista({ trabajo: ',0', porcentajes: [40] }).errorTrabajo, /mayor que 0/);
+  assert.match(vista({ trabajo: ',123', porcentajes: [40] }).errorTrabajo, /dos decimales/);
+  assert.match(vista({ trabajo: '100,5,', porcentajes: [40] }).errorTrabajo, /un separador/);
+});
+
+test('SPEC-CALC-001/AC-28 barra Z escrita como " 8,5 ": el resultado de AC-04', () => {
+  const s = serie({ barra: 'z', pesoBarra: { z: ' 8,5 ' }, trabajo: '50', porcentajes: [70] });
+  assert.deepEqual(s, serie({ barra: 'z', pesoBarra: { z: '8,5' }, trabajo: '50', porcentajes: [70] }));
+  assert.equal(s.total, '33,5 kg');
+});
+
+test('SPEC-CALC-001/AC-28 recta pequeña escrita como "7,": 42 kg sin aviso', () => {
+  const v = vista({ barra: 'recta', pesoBarra: { recta: '7,' }, trabajo: '60', porcentajes: [70] });
+  assert.equal(v.errorBarra, null);
+  const s = v.series[0];
+  assert.equal(s.total, '42 kg');
+  assert.equal(s.discos, '15 + 2,5');
+  assert.equal(s.pesoDiscos, '17,5 kg por lado');
+  assert.equal(s.aviso, null);
+});
+
+test('SPEC-CALC-001/AC-28 recta pequeña escrita como ",5": 3 kg y diferencia de −2 kg', () => {
+  const s = serie({ barra: 'recta', pesoBarra: { recta: ',5' }, trabajo: '10', porcentajes: [50] });
+  assert.equal(s.total, '3 kg');
+  assert.equal(s.discos, '1,25');
+  assert.equal(s.pesoDiscos, '1,25 kg por lado');
+  assert.equal(s.aviso, 'Redondeo: objetivo 5 kg, diferencia −2 kg');
+});
+
+test('SPEC-CALC-001/AC-28 peso de barra "," o solo espacios: indicación, sin error', () => {
+  for (const barra of ['recta', 'z']) {
+    for (const peso of [',', '  ']) {
+      const v = vista({ barra, pesoBarra: { [barra]: peso }, trabajo: '100', porcentajes: [70] });
+      assert.equal(v.series.length, 0, `${barra} ${JSON.stringify(peso)}`);
+      assert.equal(v.errorBarra, null, `${barra} ${JSON.stringify(peso)}`);
+      assert.equal(v.indicacionBarra, TEXTOS.rellenarBarra, `${barra} ${JSON.stringify(peso)}`);
+    }
+  }
+});
+
+test('SPEC-CALC-001/AC-31 tabulador, espacio duro o salto de línea alrededor del peso', () => {
+  for (const trabajo of ['\t100\t', ' 100 ', '\n100\n', '\r\n100\r\n']) {
+    const v = vista({ trabajo, porcentajes: [40, 70, 90] });
+    assert.equal(v.errorTrabajo, null, JSON.stringify(trabajo));
+    assert.deepEqual(AC01(v), SERIES_AC01, JSON.stringify(trabajo));
+  }
+});
+
+test('SPEC-CALC-001/AC-32 el modelo de vista conserva exactamente lo tecleado', () => {
+  const v = vista({ trabajo: '102.5', porcentajes: [70] });
+  assert.equal(v.trabajo, '102.5');
+  assert.equal(v.series[0].aviso, 'Redondeo: objetivo 71,75 kg, diferencia −1,75 kg');
+  for (const trabajo of [' 100 ', '100,', ',5']) {
+    assert.equal(vista({ trabajo, porcentajes: [70] }).trabajo, trabajo);
+  }
+  const z = vista({ barra: 'z', pesoBarra: { z: ' 8,5 ' }, trabajo: '50', porcentajes: [70] });
+  assert.equal(z.pesoBarraTexto, ' 8,5 ');
+});

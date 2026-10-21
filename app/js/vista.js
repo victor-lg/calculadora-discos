@@ -44,7 +44,9 @@ export function estadoInicial(porcentajes) {
 // FR-04: añade al final si es válido; si no, deja la lista como estaba y guarda el mensaje.
 export function anadirPorcentaje(estado) {
   const r = analizarPorcentaje(estado.textoPorcentaje);
-  if (!r.ok) return { ...estado, errorPorcentaje: r.mensaje };
+  // Vacío o solo espacios: la lista no cambia y no hay mensaje.
+  if (r.estado === 'vacio') return { ...estado, errorPorcentaje: null };
+  if (r.estado === 'invalido') return { ...estado, errorPorcentaje: r.mensaje };
   return {
     ...estado,
     porcentajes: [...estado.porcentajes, r.valor],

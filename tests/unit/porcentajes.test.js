@@ -99,3 +99,36 @@ test('guardar no rompe la app si el almacenamiento falla', () => {
   const lleno = { setItem() { throw new Error('QuotaExceededError'); } };
   assert.doesNotThrow(() => guardarPorcentajes(lleno, [40]));
 });
+
+test('SPEC-CALC-001/AC-29 " 40 " se añade como 40 % sin mensaje', () => {
+  const e = anadir(estadoInicial([]), ' 40 ');
+  assert.deepEqual(e.porcentajes, [40]);
+  assert.equal(e.errorPorcentaje, null);
+});
+
+test('SPEC-CALC-001/AC-29 "40,", ",5" y "4 0" no se añaden y se explica qué falla', () => {
+  for (const texto of ['40,', ',5', '4 0']) {
+    const e = anadir(estadoInicial([70]), texto);
+    assert.deepEqual(e.porcentajes, [70], texto);
+    assert.match(e.errorPorcentaje ?? '', /entero/, texto);
+  }
+});
+
+test('SPEC-CALC-001/AC-30 porcentaje vacío o solo con espacios: nada cambia y sin mensaje', () => {
+  for (const texto of ['', ' ', '   ', '\t', ' ']) {
+    const e = anadir(estadoInicial([40, 70]), texto);
+    assert.deepEqual(e.porcentajes, [40, 70], JSON.stringify(texto));
+    assert.equal(e.errorPorcentaje, null, JSON.stringify(texto));
+  }
+  // Tampoco queda el mensaje de un intento fallido anterior.
+  const tras = anadir(anadir(estadoInicial([]), '0'), ' ');
+  assert.equal(tras.errorPorcentaje, null);
+});
+
+test('SPEC-CALC-001/AC-31 40 con un tabulador o un espacio duro detrás se añade como 40 %', () => {
+  for (const texto of ['40\t', '40 ']) {
+    const e = anadir(estadoInicial([]), texto);
+    assert.deepEqual(e.porcentajes, [40], JSON.stringify(texto));
+    assert.equal(e.errorPorcentaje, null, JSON.stringify(texto));
+  }
+});
