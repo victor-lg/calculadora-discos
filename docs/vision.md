@@ -1,33 +1,27 @@
-<!--
-BORRADOR de plantilla del workflow SDD + IA v0.7 (D04).
-
-- Una página como máximo. Si crece más, el detalle pertenece a una spec.
-- Se crea al terminar el primer descubrimiento (F1) y se actualiza solo
-  cuando cambia el rumbo del producto, mediante PR como cualquier otro
-  documento.
-- No contiene requisitos con ID: esos viven en docs/specs/.
--->
-
-# Visión de <producto>
+# Visión de la calculadora de discos
 
 ## Objetivo
 
-Qué problema resuelve y por qué merece la pena, en dos o tres frases.
+Calcular al instante qué discos cargar en cada serie de aproximación, a partir del peso de trabajo y de unos porcentajes, para no hacer cuentas entre series ni equivocarse con la carga.
 
 ## Usuarios
 
-Quiénes lo usan y qué necesitan conseguir.
+Solo Víctor, en el gimnasio y desde su iPhone, muchas veces sin cobertura.
 
 ## Límites
 
-Qué no es ni va a ser este producto, al menos por ahora.
+- No es una app de entrenamiento: no registra sesiones, ni repeticiones, ni progresión.
+- No es multiusuario ni sincroniza nada: todo vive en el iPhone.
+- No se publica en la App Store.
 
 ## Capacidades
 
-Lista de capacidades previstas, cada una con su spec cuando exista.
-
-- <capacidad> — `docs/specs/SPEC-<AREA>-<NNN>.md` (o "pendiente")
+- **Series de calentamiento con cálculo de discos** (barra, dos lados sin barra, un punto): `docs/specs/SPEC-CALC-001-series-calentamiento.md`.
+- **Máquinas de placas y poleas:** pendiente, para una funcionalidad futura.
+- **Mancuernas:** pendiente, para una funcionalidad futura.
 
 ## Restricciones conocidas
 
-Plataformas, plazos, normativa, datos u otras condiciones que afectan a todo el producto.
+- iPhone, sin Mac y sin App Store.
+- 100 % sin conexión.
+- Solo kilogramos.
