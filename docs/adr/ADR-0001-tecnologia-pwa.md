@@ -1,7 +1,7 @@
 ---
 id: ADR-0001
 titulo: Tecnología de la calculadora de discos — PWA sin framework, alojada en GitHub Pages
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-10-21
 sustituye: null
 sustituido_por: null
@@ -13,6 +13,7 @@ Redactado por Claude a partir de SPEC-CALC-001 v0.2 y docs/vision.md, con las
 decisiones de Víctor durante la revisión del PR #3. Recoge solo decisiones y su
 porqué; los detalles de implementación están en la descripción del PR #3.
 Fuentes externas consultadas el 2026-10-21 (§7).
+Aceptado el 2026-10-21 con el merge del PR #3.
 -->
 
 # ADR-0001 — Tecnología de la calculadora de discos

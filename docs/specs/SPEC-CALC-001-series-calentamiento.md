@@ -1,11 +1,11 @@
 ---
 id: SPEC-CALC-001
 titulo: Series de calentamiento con cálculo de discos
-estado: aprobada
-version: 0.2
+estado: en-revision
+version: 0.3
 riesgo: R1
 sustituye: null
-adr: []
+adr: [ADR-0001]
 transversales: []
 ---
 
@@ -14,7 +14,8 @@ Redactada con sdd-spec a partir de discovery/notas-descubrimiento.md
 (rondas 1–4, revisión del borrador y cierre, 2026-10-20). Todas las reglas
 de negocio las decidió Víctor; las que eran propuesta de Claude y él aceptó
 están marcadas en las notas. La versión 0.2 incorpora sus decisiones sobre las
-rondas 1, 2 y 3 de la revisión G4 (2026-10-21), registradas en el PR #2.
+rondas 1, 2 y 3 de la revisión G4 (2026-10-21), registradas en el PR #2. La
+versión 0.3 enlaza ADR-0001 sin cambiar el comportamiento.
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -93,7 +94,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 - **FR-10:** cualquier cambio de modo, barra, peso o porcentajes recalcula las series al momento, sin un botón de calcular.
 - **FR-11:** la lista de porcentajes se guarda en el dispositivo y se recupera cuando la app arranca de cero. Al arrancar de cero se recupera la lista guardada, aunque esté vacía. La lista 40 %, 70 % y 90 % se usa solo la primera vez o si los datos guardados faltan o no se pueden leer. Los datos guardados que se leen pero no son válidos (por ejemplo, una lista con un porcentaje que no cumple FR-04) se tratan igual que los que no se pueden leer. El modo, la barra, el peso de la barra y el peso de trabajo no se guardan: al arrancar de cero, el modo es Barra con la barra de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin error (FR-03).
 
-  Esta regla se aplica solo al arranque de cero. Cuando la app vuelve de segundo plano, conserva todo su estado: modo, barra, peso de la barra, peso de trabajo y porcentajes.
+  Esta regla se aplica solo al arranque de cero. Cuando la app vuelve de segundo plano sin haberse cerrado, conserva todo su estado: modo, barra, peso de la barra, peso de trabajo y porcentajes. Si iOS la cerró mientras estaba en segundo plano, la vuelta es un arranque de cero (ADR-0001).
 - **FR-12:** en el modo Barra, si el peso de trabajo es menor que el peso de la barra elegida, la app muestra un aviso general: el peso de trabajo es inferior a la barra, conviene elegir una barra más ligera o revisar el peso. Las series se calculan igualmente según FR-09.
 - **FR-13:** cuando la lista de porcentajes está vacía, la app no muestra ninguna serie y muestra una indicación para añadir porcentajes.
 - **FR-14:** formato de los números:
@@ -177,5 +178,5 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 
 ## 11. Dependencias y restricciones
 
-- Solo iPhone (iOS). Sin Mac y sin publicar en la App Store: la tecnología la decidirá un ADR técnico. La candidata es una PWA instalable, que encaja con NFR-01.
+- Solo iPhone (iOS). Sin Mac y sin publicar en la App Store. La tecnología la fija ADR-0001: una PWA sin framework, instalable en la pantalla de inicio y publicada en GitHub Pages, que encaja con NFR-01.
 - Juego de discos del gimnasio de Víctor, fijo: 25, 20, 15, 10, 5, 2,5 y 1,25 kg.
