@@ -6,7 +6,7 @@ Calcular al instante qué discos cargar en cada serie de aproximación, a partir
 
 ## Usuarios
 
-Solo Víctor, en el gimnasio y desde su iPhone, muchas veces sin cobertura.
+Solo Víctor, en el gimnasio y desde su iPhone, debe funcionar sin conexión.
 
 ## Límites
 
