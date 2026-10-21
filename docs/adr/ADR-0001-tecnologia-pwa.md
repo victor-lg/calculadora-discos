@@ -1,0 +1,227 @@
+---
+id: ADR-0001
+titulo: Tecnología de la calculadora de discos — PWA sin framework, alojada en GitHub Pages
+estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+fecha: 2026-10-21
+sustituye: null
+sustituido_por: null
+referencias: [SPEC-CALC-001, docs/vision.md]
+---
+
+<!--
+Redactado por Claude a partir de SPEC-CALC-001 v0.2 (en `main`), docs/vision.md
+y AGENTS.md. Las fuentes externas se consultaron el 2026-10-21 y se citan en el
+apartado 7. Se distinguen los hechos (con fuente), las hipótesis (sin verificar
+en el iPhone de Víctor) y las propuestas. Nada de esto es norma hasta que una
+persona fusione el PR.
+-->
+
+# ADR-0001 — Tecnología de la calculadora de discos
+
+## 1. Contexto
+
+- **Problema.** SPEC-CALC-001 (§11) deja la tecnología a un ADR técnico. Sin él no se puede pasar a la etapa técnica: no hay `src/`, ni tests del stack, ni CI de tests, y los AC de la spec no se pueden cubrir (G3).
+- **Restricciones del producto** (`docs/vision.md`, SPEC-CALC-001 §3 y §11):
+  - un solo usuario, en su iPhone;
+  - sin Mac y sin publicar en la App Store;
+  - 100 % sin conexión después de la primera carga (NFR-01, AC-12);
+  - ninguna petición de red sale del propio origen de la app, y ninguna lleva datos de la persona (NFR-02, AC-13);
+  - la lista de porcentajes se guarda en el dispositivo y se recupera al arrancar de cero; el resto del estado no se guarda (FR-11, AC-11); al volver de segundo plano se conserva todo (AC-22);
+  - el cálculo se rehace al momento, sin botón (FR-10).
+- **Restricciones del workflow** (AGENTS.md): el mínimo de dependencias, porque una dependencia nueva es R2, y cada AC con al menos un test que lo cite como `SPEC-CALC-001/AC-NN`.
+- **Si no se decide**, no se puede implementar SPEC-CALC-001.
+
+## 2. Alternativas consideradas
+
+Solo se comparan las que se pueden instalar en un iPhone sin Mac y sin App Store.
+
+### Opción A: PWA (web instalada en la pantalla de inicio)
+
+HTML, CSS y JavaScript servidos por HTTPS, con un service worker que guarda la app en caché. Se instala con Safari → Compartir → "Añadir a pantalla de inicio".
+
+- **Ventajas:**
+  - No necesita Mac, cuenta de desarrollador ni firma. Desde iOS 26, cualquier web añadida a la pantalla de inicio se abre por defecto como web app, y basta un HTML y una URL [F1][F2].
+  - El service worker y la Cache API permiten arrancar sin red después de la primera carga [F3], que es justo lo que piden NFR-01 y AC-12.
+  - El origen de la web app de la pantalla de inicio está exento del límite de 7 días de ITP, y sus datos se guardan aparte de los de Safari [F4].
+  - Se actualiza sola al publicar, sin reinstalar ni volver a firmar.
+  - Se puede probar entera en Linux y en la CI: Node para la lógica y un navegador sin interfaz para la parte web.
+- **Inconvenientes:**
+  - La instalación es manual (Compartir → Añadir a pantalla de inicio). No hay aviso de instalación.
+  - En Safari, el almacenamiento es "best-effort" por defecto: puede borrarse si falta espacio o si el origen lleva tiempo sin usarse [F5][F6]. `navigator.storage.persist()` no garantiza nada: WebKit lo concede según heurísticas, entre ellas si la web se usa como app de la pantalla de inicio [F5], y hay un error abierto que dice que en Safari 17 siempre devuelve `false` [F7].
+  - Necesita HTTPS: el service worker solo funciona en un contexto seguro [F3].
+- **Riesgos:**
+  - Que iOS borre la lista guardada. El impacto es bajo: FR-11 ya define qué pasa si faltan los datos (vuelve a 40/70/90).
+  - Apple puede cambiar el comportamiento de las web apps entre versiones de iOS. Ya lo hizo, en sentido favorable, en iOS 26 [F1].
+
+### Opción B: app nativa en Swift, instalada sin App Store
+
+Se compila en la nube, en un runner macOS de GitHub Actions, y se instala por *sideloading* (AltStore, SideStore o Sideloadly) o por distribución ad hoc.
+
+- **Ventajas:** acceso total a iOS, almacenamiento nativo (`UserDefaults`) sin desalojo y funcionamiento sin conexión de serie.
+- **Inconvenientes:**
+  - Con un Apple ID gratuito, la app firmada caduca a los 7 días y hay que volver a firmarla desde un ordenador o con SideStore [F8].
+  - Con la cuenta de pago (Apple Developer Program, de pago anual) la firma dura más (no lo he verificado en una fuente primaria), pero sigue haciendo falta firmar, gestionar perfiles y compilar en macOS (en la nube, porque no hay Mac).
+  - La CI con runner macOS y la firma son mucha infraestructura para una pantalla.
+- **Riesgos:** que la app deje de abrirse en el gimnasio porque ha caducado la firma, lo que rompe de hecho NFR-01. Además, dependeríamos de herramientas de *sideloading* de terceros.
+
+### Opción C: React Native con Expo
+
+- **Ventajas:** un ecosistema conocido y desarrollo desde Windows o Linux.
+- **Inconvenientes:**
+  - Expo Go carga el código desde un servidor de desarrollo, así que no sirve como app independiente sin conexión [F9].
+  - Una build instalable fuera de la App Store (distribución interna ad hoc con EAS) exige cuenta de pago de Apple y registrar el UDID del dispositivo [F10].
+  - Añade decenas de dependencias, todas R2 según AGENTS.md.
+- **Riesgos:** los mismos que B (firma y caducidad), más el coste de mantener el árbol de dependencias.
+
+### Opción D: Atajos de Apple o Scriptable
+
+Un atajo, o un script de Scriptable, que pida el peso y muestre los discos.
+
+- **Ventajas:** nada que alojar ni firmar; funciona sin red; Scriptable ejecuta JavaScript [F11].
+- **Inconvenientes:**
+  - La interfaz es una secuencia de diálogos, así que no puede cumplir FR-10 (recálculo al momento al cambiar cualquier dato) ni mostrar todas las series a la vez con avisos (FR-08, FR-12).
+  - No hay forma razonable de probarlo en la CI ni de cumplir G3.
+  - Scriptable es una app de terceros (gratuita, de la App Store) de la que dependeríamos.
+- **Riesgos:** quedarse fuera de la spec aprobada.
+
+### Con framework o sin él (dentro de la opción A)
+
+- **Sin framework (JavaScript con módulos ES, sin paso de compilación):**
+  - cero dependencias en tiempo de ejecución;
+  - lo que se publica es exactamente lo que hay en el repositorio;
+  - nada que actualizar por seguridad.
+
+  La interfaz es una sola pantalla con unos pocos campos y una lista, y FR-10 se resuelve con un único `render()` que se llama en cada evento `input`.
+- **Con un framework ligero (Preact, Lit o Svelte):** daría un estado reactivo más cómodo, pero añade al menos una dependencia R2 y, en Svelte, un paso de compilación. No compensa para una sola pantalla.
+
+## 3. Decisión
+
+Se propone la **opción A, una PWA sin framework**, con estas reglas.
+
+### 3.1 Tecnología y estructura
+
+- HTML, CSS y JavaScript estándar con módulos ES, **sin framework, sin bundler y sin paso de compilación**. Cero dependencias en tiempo de ejecución.
+- La lógica (análisis de la entrada, cálculo de objetivos y discos, formato de números y validación de la lista guardada) va en módulos puros, sin DOM, que se prueban con Node. La interfaz es una capa fina que lee el estado, llama a la lógica y pinta.
+- Un `manifest.webmanifest` con nombre, iconos y `display: standalone`. iOS 26 no lo exige [F2], pero sus iconos y ajustes se usan si existe.
+
+### 3.2 Almacenamiento local (FR-11, AC-11, AC-22)
+
+- La lista de porcentajes se guarda en **`localStorage`**, bajo una clave con versión (por ejemplo, `calculadora-discos:v1:porcentajes`), como JSON.
+  - Es síncrono y basta para unos pocos bytes.
+  - Para Safari, IndexedDB no es más duradero: el desalojo borra todos los datos del origen a la vez [F6].
+- Se guarda en cada cambio de la lista. Al arrancar de cero se lee y se valida con las reglas de FR-04. Si falta, no se puede leer o no es válida, la lista es 40/70/90 (FR-11). Todo acceso a `localStorage` va en `try/catch`, y un fallo cuenta como "no se puede leer".
+- **No se guardan** el modo, la barra, el peso de la barra ni el peso de trabajo (FR-11). Viven solo en memoria.
+  - Cuando la app vuelve de segundo plano sin haber terminado, el estado en memoria se conserva solo (AC-22).
+  - Si iOS termina el proceso mientras está en segundo plano, la vuelta es un arranque de cero y se aplica FR-11. Es lo que prevé AC-22 ("sin que la app haya arrancado de cero").
+- Se llama a `navigator.storage.persist()` en cada arranque, como mejora sin garantía [F5][F12]. La app no depende de su resultado.
+- **Hecho:** los datos de la web app de la pantalla de inicio están aislados de los de Safari [F4]. La lista que se edite en una pestaña de Safari no aparece en la app instalada, y al revés. Se instala primero y se usa siempre desde el icono.
+
+### 3.3 Funcionamiento sin conexión (NFR-01, AC-12)
+
+- Un service worker propio, sin librerías (Workbox no hace falta), que:
+  - en `install`, precarga en una caché versionada (`calculadora-discos-<versión>`) **todos** los ficheros de la app: HTML, CSS, JS, manifiesto e iconos;
+  - en `activate`, borra las cachés de versiones anteriores;
+  - en `fetch`, responde **primero desde la caché** y solo va a la red si el recurso no está [F3].
+- La versión de la caché cambia en cada publicación. El navegador detecta el service worker nuevo al abrir la app con conexión. Sin conexión, la app sigue con la versión instalada.
+- La app no hace ninguna petición en tiempo de ejecución: no hay API, fuentes externas, analítica ni CDN. Todo lo que necesita está en la caché desde la primera carga.
+
+### 3.4 Origen único y privacidad (NFR-02, AC-13)
+
+- Todos los recursos se sirven desde el propio origen. No se usan CDN, fuentes de Google, analítica ni ningún tercero.
+- Una política CSP en una etiqueta `<meta http-equiv="Content-Security-Policy">` (`default-src 'self'; connect-src 'self'; …`) hace que el navegador bloquee cualquier petición a otro origen, aunque se cuele por error. Va en `<meta>` porque GitHub Pages no permite cabeceras HTTP propias.
+- La app no envía nada: no hay formularios con `action`, `fetch` con datos ni *beacons*. Las únicas peticiones son la descarga y la actualización de los ficheros estáticos.
+
+### 3.5 Alojamiento: GitHub Pages (HTTPS)
+
+- Se publica con **GitHub Pages**, desde un workflow de GitHub Actions (`actions/deploy-pages`) que sube solo la carpeta de la app al fusionar en `main`.
+  - Los sitios `github.io` se sirven por HTTPS de forma automática [F13], que es lo que necesita el service worker.
+  - Los límites (1 GB por sitio y 100 GB al mes de tráfico como límite blando) quedan muy lejos de lo que usa una app de pocos KB [F14].
+- **Relación con NFR-02:** el "propio origen" es el de Pages (`https://victor-lg.github.io`) o un dominio propio (§6). GitHub recibe las peticiones de descarga y actualización, como cualquier servidor, pero nunca datos de la persona, porque la app no los envía (§3.4).
+- **Hecho:** en GitHub Free, Pages solo está disponible en repositorios públicos. En repositorios privados exige GitHub Pro, Team o Enterprise [F15]. Este repositorio es privado. Ver §6.
+- **Hecho:** todos los proyectos de Pages de una misma cuenta comparten el origen `victor-lg.github.io`, y por tanto comparten `localStorage` (el almacenamiento es por origen). En los repositorios públicos de `victor-lg` no hay ninguno con Pages activo; los privados no los he podido comprobar. La clave con prefijo (§3.2) evita choques, y un dominio propio lo eliminaría (§6).
+
+### 3.6 Tests y CI
+
+- **Tests unitarios: el runner integrado de Node (`node:test`).** Es estable desde Node 20 [F16] y añade **cero dependencias**. Cubre la lógica pura y la mayoría de los AC: AC-01 a AC-09, AC-11 (con un almacenamiento simulado), AC-14 a AC-21 y AC-23 a AC-26. Los nombres de los tests citan `SPEC-CALC-001/AC-NN`.
+- **E2E: Playwright, solo para lo que no se puede probar sin navegador.** Hace falta para AC-10 (recálculo en la interfaz), AC-12 (sin conexión tras la primera carga), AC-13 (origen de todas las peticiones) y AC-22 (conservar el estado al pasar a segundo plano y volver). Es la única dependencia de desarrollo (R2 cuando se añada).
+  - AC-12 y AC-13 se prueban en **Chromium**, porque Playwright solo intercepta el tráfico del service worker en navegadores basados en Chromium [F17].
+  - Los AC de interfaz se prueban también en **WebKit** de Playwright, que es lo más cercano a Safari que corre en Linux [F18]. No es Safari de iOS.
+- **Comprobación manual en el iPhone**, registrada en el PR de la entrega: instalar desde Safari, poner el modo avión y reproducir AC-01 (AC-12 en el dispositivo real), y pasar a otra app y volver (AC-22). Ningún test automático sustituye a esto en iOS.
+- **CI:** un workflow nuevo, `.github/workflows/tests.yml`, en cada PR contra `main`, con las acciones fijadas por SHA, como en `sdd.yml`:
+  1. `actions/setup-node` con Node LTS;
+  2. `node --test`;
+  3. `npx playwright install --with-deps chromium webkit` y `npx playwright test`.
+
+  Su job se marca como check requerido en la regla de `main`. Lo añade una persona, porque el token del agente no tiene el permiso `workflow`.
+
+## 4. Consecuencias
+
+- **Beneficios:**
+  - sin coste de firma ni caducidades;
+  - actualización automática;
+  - cero dependencias en tiempo de ejecución y una sola de desarrollo;
+  - casi toda la spec se prueba en Linux.
+- **Costes y compromisos aceptados:**
+  - instalación manual desde Safari;
+  - el almacenamiento puede borrarse en casos extremos (falta de espacio o mucho tiempo sin usarse), y entonces la lista vuelve a 40/70/90 (comportamiento ya definido en FR-11);
+  - las pruebas de iOS real son manuales.
+- **Riesgos y mitigaciones:**
+
+  | Riesgo | Mitigación |
+  | --- | --- |
+  | iOS borra la lista guardada | Llamar a `persist()` en cada arranque. Si se borra, el comportamiento lo define FR-11. Es una lista corta. |
+  | Una actualización de iOS cambia el comportamiento de las web apps | Repetir la comprobación manual de AC-12 tras cada actualización mayor de iOS. |
+  | Una petición a terceros se cuela (NFR-02) | CSP `default-src 'self'` en `<meta>` y el test E2E de AC-13. |
+  | El service worker sirve una versión vieja | Caché versionada y limpieza en `activate`. Con conexión, la versión nueva entra al volver a abrir la app. |
+
+- **Impacto en lo existente:** el proyecto pasa a la etapa técnica. Los cambios siguientes se hacen en PR propios, después de aceptar este ADR, y varios son R2:
+  - `src/` y `tests/`;
+  - `package.json` con Playwright como dependencia de desarrollo (R2);
+  - el workflow de tests y el de publicación en Pages (R2, los añade una persona);
+  - el README con la etapa "técnica" (R2);
+  - revisar `CARPETAS_TEST` en `.github/sdd/checks.py`, si la estructura de tests lo necesita (R2).
+
+## 5. Validación
+
+- La CI ejecuta en verde los tests unitarios y E2E, y la matriz AC ↔ tests de `checks-sdd` no deja ningún AC de SPEC-CALC-001 sin test.
+- La comprobación manual en el iPhone de Víctor pasa: app instalada desde el icono, modo avión, AC-01 reproducido (AC-12), estado conservado al volver de otra app (AC-22) y lista recuperada tras cerrar la app desde el selector de apps (AC-11).
+- **Hipótesis por verificar en el dispositivo:** que la lista guardada sobreviva varias semanas de uso normal. Las fuentes (§7) describen el comportamiento hasta iOS 26. No he encontrado documentación de Apple específica de versiones posteriores.
+
+## 6. Seguimiento
+
+- **Decisiones pendientes (de Víctor):**
+  1. **Repositorio privado y Pages.** Con GitHub Free, Pages no publica desde un repositorio privado [F15]. Opciones:
+     - (a) hacer público el repositorio: no contiene secretos, pero quedan públicos también la spec, `discovery/` y el workflow;
+     - (b) contratar GitHub Pro;
+     - (c) otro alojamiento estático con HTTPS que publique desde un repositorio privado (por ejemplo, Cloudflare Workers/Pages o Netlify). Eso cambiaría §3.5 y añadiría un tercero con su propia cuenta.
+
+     Mientras no se decida, no se puede publicar.
+  2. **Dominio propio** (por ejemplo, un subdominio de un dominio de Víctor) frente a `victor-lg.github.io`. Es opcional: aísla el origen (§3.5) y no cambia nada más.
+- **Condiciones para revisar este ADR:**
+  - Apple deja de exentar las web apps de la pantalla de inicio del límite de ITP, o empieza a borrar sus datos con frecuencia;
+  - el producto necesita algo que una PWA en iOS no da (por ejemplo, integración con Salud o widgets);
+  - la app crece hasta el punto de que un framework compense su dependencia;
+  - cambian los límites o condiciones de GitHub Pages.
+
+## 7. Fuentes
+
+Consultadas el 2026-10-21.
+
+- **[F1]** WebKit, "News from WWDC25: Web technology coming this fall in Safari 26 beta" (2025-06-09): "By default, every website added to the Home Screen opens as a web app". <https://webkit.org/blog/16993/news-from-wwdc25-web-technology-coming-this-fall-in-safari-26-beta/>
+- **[F2]** El mismo artículo: "nothing is required beyond the basics of an HTML file and a URL"; el manifiesto se usa si existe. Guía de usuario de Apple (no he podido leer su texto; solo enlace): <https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios>
+- **[F3]** MDN, "Using Service Workers" (requisito de HTTPS y patrón *cache-first* con la Cache API): <https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers>
+- **[F4]** WebKit, "Tracking Prevention in WebKit": "The first-party domain of home screen web applications is exempt from ITP's 7-day cap", y los datos de esas apps se guardan aparte de los de Safari. <https://webkit.org/tracking-prevention/>. Antecedente: WebKit, "Full Third-Party Cookie Blocking and More" (2020-03-24): <https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/>
+- **[F5]** WebKit, "Updates to Storage Policy" (2023-08-10, Safari 17 / iOS 17): cuotas, desalojo LRU por origen, modo persistente y "WebKit currently grants a request based on heuristics like whether the website is opened as a Home Screen Web App". <https://webkit.org/blog/14403/updates-to-storage-policy/>
+- **[F6]** MDN, "Storage quotas and eviction criteria" (Safari: cuotas, desalojo de 7 días en Safari y desalojo de todos los datos del origen a la vez): <https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria>
+- **[F7]** WebKit Bugzilla 271401, "navigator.storage.persist() always return false" (2024-03-21, abierto, en pestañas de Safari 17): <https://bugs.webkit.org/show_bug.cgi?id=271401>
+- **[F8]** Guía de *sideloading* en iOS 26 con SideStore : "Apps expire every 7 days" con Apple ID gratuito, como mucho 3 apps activas a la vez, y la instalación inicial necesita un ordenador. <https://fr0stb1rd.is-a.dev/posts/ios-26-unlimited-sideload-sidestore-livecontainer/>. Es una fuente secundaria.
+- **[F9]** Expo CLI (Expo Go abre el proyecto desde el servidor de desarrollo que lanza `npx expo start`): <https://docs.expo.dev/more/expo-cli/>
+- **[F10]** Expo, "Internal distribution": "This method requires a paid Apple Developer account". <https://docs.expo.dev/build/internal-distribution/>
+- **[F11]** Scriptable en la App Store: <https://apps.apple.com/app/scriptable/id1405459188>
+- **[F12]** Apple Developer Forums, "Safari iOS PWA Data Persistence Beyond 7 Days" (2022–2023, sin respuesta de Apple). Hay experiencia de desarrolladores de que `persist()` hay que pedirlo en cada arranque. <https://developer.apple.com/forums/thread/710157>
+- **[F13]** GitHub Docs, "Securing your GitHub Pages site with HTTPS": <https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https>
+- **[F14]** GitHub Docs, "GitHub Pages limits": <https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits>
+- **[F15]** GitHub Docs, "Creating a GitHub Pages site": "If the account that owns the repository uses GitHub Free or GitHub Free for organizations, the repository must be public." <https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site>
+- **[F16]** Node.js, "Test runner" (estable desde Node 20): <https://nodejs.org/api/test.html>
+- **[F17]** Playwright, "Service Workers": "Service workers are only supported on Chromium-based browsers". <https://playwright.dev/docs/service-workers>
+- **[F18]** Playwright, "Browsers" (WebKit de Playwright, no Safari de marca; WebKit en Linux para la CI): <https://playwright.dev/docs/browsers>
