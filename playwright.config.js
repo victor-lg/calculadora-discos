@@ -1,7 +1,7 @@
 // E2E de SPEC-CALC-001 (ADR-0001 §3.7): en la CI siempre Chromium y WebKit.
 import { defineConfig, devices } from '@playwright/test';
 
-const PUERTO = 4173;
+const PUERTO = 4791;
 
 export default defineConfig({
   testDir: 'tests/e2e',

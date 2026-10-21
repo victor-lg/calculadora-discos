@@ -43,7 +43,9 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Solo responde a peticiones GET del propio origen (ADR-0001 §3.4).
   if (event.request.method !== 'GET') return;
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.open(CACHE)
       .then((cache) => cache.match(event.request))

@@ -23,12 +23,35 @@ test('el service worker no llama a skipWaiting() ni a clients.claim()', () => {
   assert.doesNotMatch(sw, /clients\.claim\s*\(/);
 });
 
+const FICHEROS_DE_TEXTO = readdirSync(APP, { recursive: true })
+  .filter((f) => /\.(js|html|css|webmanifest)$/.test(f));
+
 test('la app no usa innerHTML ni recursos de terceros', () => {
-  const ficheros = readdirSync(APP, { recursive: true })
-    .filter((f) => /\.(js|html|css|webmanifest)$/.test(f));
-  for (const f of ficheros) {
+  for (const f of FICHEROS_DE_TEXTO) {
     const texto = readFileSync(`${APP}${f}`, 'utf8');
     assert.doesNotMatch(texto, /\.innerHTML\b|insertAdjacentHTML|outerHTML\s*=/, f);
-    assert.doesNotMatch(texto, /(src|href)=["']?(https?:)?\/\//i, f);
+    // Ninguna URL absoluta ni relativa al protocolo, en ningún contexto.
+    assert.doesNotMatch(texto, /[a-z][a-z0-9+.-]*:\/\/|["'(=\s]\/\/[a-z0-9]/i, f);
   }
+});
+
+// SPEC-CALC-001/AC-13 (NFR-02): la app no tiene otra vía para sacar datos.
+test('SPEC-CALC-001/AC-13 la app no usa cookies ni otras API de red', () => {
+  const prohibidas = /document\.cookie|cookieStore|sendBeacon|WebSocket|EventSource|XMLHttpRequest|RTCPeerConnection|\bimport\s*\(/;
+  for (const f of FICHEROS_DE_TEXTO.filter((f) => f.endsWith('.js'))) {
+    assert.doesNotMatch(readFileSync(`${APP}${f}`, 'utf8'), prohibidas, f);
+  }
+});
+
+// ADR-0001 §3.4: la CSP del documento, exacta y como primer elemento del head.
+test('SPEC-CALC-001/AC-13 la CSP es la acordada y va la primera en el head', () => {
+  const html = readFileSync(`${APP}index.html`, 'utf8');
+  const head = html.match(/<head>\s*(<[^>]+>)/)[1];
+  assert.equal(
+    head,
+    '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; connect-src \'self\'; '
+      + 'script-src \'self\'; style-src \'self\'; img-src \'self\'; manifest-src \'self\'; '
+      + 'worker-src \'self\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'">',
+  );
+  assert.equal(html.match(/Content-Security-Policy/g).length, 1);
 });

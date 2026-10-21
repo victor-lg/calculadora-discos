@@ -1,12 +1,37 @@
 // Service worker y red (NFR-01, NFR-02). Solo en Chromium: es el único
 // navegador donde Playwright ve el tráfico del service worker (ADR-0001 §3.7).
+// Cada test arranca su propio servidor, que registra todo lo que llega al
+// origen tal cual: método, URL, cabeceras en crudo (cookies incluidas) y cuerpo.
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { arrancar } from './servidor.js';
 
 test.use({ serviceWorkers: 'allow' });
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'El tráfico del service worker solo se ve en Chromium');
 
 const series = (page) => page.locator('#series > li');
+
+// NFR-02: las únicas peticiones son para descargar o actualizar la app, es
+// decir, los ficheros que precarga el service worker y el propio sw.js.
+const sw = readFileSync(new URL('../../app/sw.js', import.meta.url), 'utf8');
+const RUTAS_DE_LA_APP = new Set([
+  '/sw.js',
+  ...[...sw.match(/const FICHEROS = \[([^\]]*)\]/)[1].matchAll(/'([^']+)'/g)]
+    .map((m) => (m[1] === './' ? '/' : `/${m[1]}`)),
+]);
+
+let servidor;
+let llegadas;
+
+test.beforeEach(async () => {
+  llegadas = [];
+  servidor = await arrancar((p) => llegadas.push(p));
+});
+
+test.afterEach(async () => {
+  await servidor.cerrar();
+});
 
 async function esperarServiceWorker(page) {
   await page.evaluate(async () => {
@@ -15,12 +40,17 @@ async function esperarServiceWorker(page) {
   });
 }
 
-test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', async ({ page, context }) => {
-  await page.goto('./');
-  await esperarServiceWorker(page);
+test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', async ({ context }) => {
+  const primera = await context.newPage();
+  await primera.goto(servidor.base);
+  await esperarServiceWorker(primera);
+  await primera.close();
 
+  // Arranque de cero sin conexión: página nueva, y nada debe llegar al origen.
   await context.setOffline(true);
-  await page.reload();
+  const antes = llegadas.length;
+  const page = await context.newPage();
+  await page.goto(servidor.base);
   await expect(page.getByRole('heading', { name: 'Series de calentamiento' })).toBeVisible();
   expect(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
 
@@ -32,26 +62,28 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
     '10 kg por lado', '25 kg por lado', '35 kg por lado',
   ]);
   await expect(series(page).locator('.redondeo')).toHaveCount(0);
+  expect(llegadas.slice(antes)).toEqual([]);
 });
 
-test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ page, context, baseURL }) => {
-  const origen = new URL(baseURL).origin;
-  // Se captura todo en el momento, con headers() y no con allHeaders(): este
-  // espera a cabeceras que, en peticiones del service worker, pueden no llegar
-  // antes de cerrar la página. headers() no incluye las cabeceras de cookies;
-  // por eso se comprueba aparte que la app no guarda ninguna cookie.
-  const peticiones = [];
+test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ context }) => {
+  const origen = new URL(servidor.base).origin;
+  // Lo que ve el navegador: sirve para detectar peticiones a otros orígenes,
+  // que nunca llegarían a nuestro servidor.
+  const vistas = [];
   context.on('request', (r) => {
-    peticiones.push({
+    vistas.push({
       url: r.url(),
+      metodo: r.method(),
       cuerpo: r.postData(),
-      cabeceras: JSON.stringify(r.headers()),
       delServiceWorker: r.serviceWorker() !== null,
     });
   });
+  const sockets = [];
 
   // Uso completo: primera carga, calcular, cambiar porcentajes y cerrar.
-  await page.goto('./');
+  const page = await context.newPage();
+  page.on('websocket', (ws) => sockets.push(ws.url()));
+  await page.goto(servidor.base);
   await esperarServiceWorker(page);
   await page.getByLabel('Recta pequeña').check();
   await page.getByLabel('Peso de la barra (kg)').fill('7,35');
@@ -64,21 +96,37 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   await expect(series(page)).toHaveCount(3);
   await page.reload();
   await page.close();
-  expect(await context.cookies()).toEqual([]);
+  await context.close();
 
-  const introducidos = ['7,35', '7.35', '7%2C35', '487', '487,35', '487.35', '487%2C35',
-    'dos-lados', 'un-punto', 'recta'];
-  expect(peticiones.length).toBeGreaterThan(0);
-  for (const r of peticiones) {
-    const url = new URL(r.url);
-    expect(url.origin, r.url).toBe(origen);
+  expect(sockets).toEqual([]);
+
+  // Navegador: todo al propio origen, solo GET y sin cuerpo.
+  expect(vistas.length).toBeGreaterThan(0);
+  for (const r of vistas) {
+    expect(new URL(r.url).origin, r.url).toBe(origen);
+    expect(r.metodo, r.url).toBe('GET');
     expect(r.cuerpo, r.url).toBeNull();
-    for (const dato of introducidos) {
-      expect(r.url, dato).not.toContain(dato);
-      expect(r.cabeceras, `${r.url} ${dato}`).not.toContain(dato);
-    }
-    expect(url.search, r.url).not.toMatch(/\b47\b/);
   }
-  // Las peticiones de precarga del service worker también se han comprobado.
-  expect(peticiones.some((r) => r.delServiceWorker)).toBe(true);
+  // Las peticiones de precarga del service worker también se han visto.
+  expect(vistas.some((r) => r.delServiceWorker)).toBe(true);
+
+  // Origen: lista cerrada de ficheros de la app, sin consulta, sin cuerpo, sin
+  // cookies y sin ningún dato introducido en las cabeceras.
+  const introducidos = ['7,35', '7.35', '7%2C35', '735', '487', '48735',
+    'dos-lados', 'un-punto', 'recta'];
+  expect(llegadas.length).toBeGreaterThan(0);
+  for (const p of llegadas) {
+    const url = new URL(p.url, origen);
+    expect(p.metodo, p.url).toBe('GET');
+    expect(url.search, p.url).toBe('');
+    expect(RUTAS_DE_LA_APP.has(url.pathname), p.url).toBe(true);
+    expect(p.cuerpo, p.url).toBe('');
+    const nombres = p.cabeceras.filter((_, i) => i % 2 === 0).map((n) => n.toLowerCase());
+    expect(nombres, p.url).not.toContain('cookie');
+    const cabeceras = p.cabeceras.join('\n');
+    for (const dato of introducidos) {
+      expect(cabeceras, `${p.url} ${dato}`).not.toContain(dato);
+    }
+    expect(cabeceras, p.url).not.toMatch(/\b47\b/);
+  }
 });
