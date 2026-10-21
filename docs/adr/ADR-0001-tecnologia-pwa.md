@@ -59,7 +59,7 @@ Se compila en la nube, en un runner macOS de GitHub Actions, y se instala por *s
 
 - **Ventajas:** acceso total a iOS, almacenamiento nativo (`UserDefaults`) sin desalojo y funcionamiento sin conexión de serie.
 - **Inconvenientes:**
-  - Con un Apple ID gratuito, la app firmada caduca a los 7 días y hay que volver a firmarla desde un ordenador o con SideStore [F8].
+  - Con un Apple ID gratuito, la app firmada caduca a los 7 días y hay que volver a firmarla desde un ordenador o con SideStore [F8]. La fuente es secundaria y no la he contrastado con documentación de Apple.
   - Con la cuenta de pago (Apple Developer Program, de pago anual) la firma dura más (no lo he verificado en una fuente primaria), pero sigue haciendo falta firmar, gestionar perfiles y compilar en macOS (en la nube, porque no hay Mac).
   - La CI con runner macOS y la firma son mucha infraestructura para una pantalla.
 - **Riesgos:** que la app deje de abrirse en el gimnasio porque ha caducado la firma, lo que rompe de hecho NFR-01. Además, dependeríamos de herramientas de *sideloading* de terceros.
@@ -79,8 +79,9 @@ Un atajo, o un script de Scriptable, que pida el peso y muestre los discos.
 
 - **Ventajas:** nada que alojar ni firmar; funciona sin red; Scriptable ejecuta JavaScript [F11].
 - **Inconvenientes:**
-  - La interfaz es una secuencia de diálogos, así que no puede cumplir FR-10 (recálculo al momento al cambiar cualquier dato) ni mostrar todas las series a la vez con avisos (FR-08, FR-12).
-  - No hay forma razonable de probarlo en la CI ni de cumplir G3.
+  - En Atajos, la interfaz es una secuencia de diálogos, así que no puede cumplir FR-10 (recálculo al momento al cambiar cualquier dato) ni mostrar todas las series a la vez con avisos (FR-08, FR-12).
+  - Scriptable sí puede mostrar una vista web con HTML y JavaScript propios. Eso no lo he verificado en su documentación. Si es así, cumpliría FR-10, pero entonces sería la opción A metida dentro de una app de terceros, y sin la ventaja de poder probarla.
+  - En ninguno de los dos hay una forma razonable de probarlo en la CI ni de cumplir G3.
   - Scriptable es una app de terceros (gratuita, de la App Store) de la que dependeríamos.
 - **Riesgos:** quedarse fuera de la spec aprobada.
 
@@ -98,59 +99,114 @@ Un atajo, o un script de Scriptable, que pida el peso y muestre los discos.
 
 Se propone la **opción A, una PWA sin framework**, con estas reglas.
 
+**Cuándo se aplica:** a toda la app, incluidas las capacidades futuras de `docs/vision.md` (máquinas de placas y poleas, y mancuernas), mientras sigan siendo de un solo usuario, sin conexión y sin servidor. Si alguna de esas condiciones cambia, hay que revisar este ADR (§6).
+
 ### 3.1 Tecnología y estructura
 
 - HTML, CSS y JavaScript estándar con módulos ES, **sin framework, sin bundler y sin paso de compilación**. Cero dependencias en tiempo de ejecución.
-- La lógica (análisis de la entrada, cálculo de objetivos y discos, formato de números y validación de la lista guardada) va en módulos puros, sin DOM, que se prueban con Node. La interfaz es una capa fina que lee el estado, llama a la lógica y pinta.
-- Un `manifest.webmanifest` con nombre, iconos y `display: standalone`. iOS 26 no lo exige [F2], pero sus iconos y ajustes se usan si existe.
+- La lógica va en módulos puros, sin DOM, que se prueban con Node:
+  - el análisis de la entrada;
+  - el cálculo de objetivos y discos;
+  - el formato de números;
+  - la validación de la lista guardada;
+  - un **modelo de vista** completo, a partir del estado: las series, y todos los textos que se muestran (mensajes de error, indicaciones, "Solo barra (X kg) · 0 kg por lado", avisos) y qué campos se pueden editar.
+
+  La interfaz es una capa fina que lee el estado, pide el modelo de vista y lo pinta tal cual, sin decidir nada. Así los tests unitarios prueban también los textos que exigen los AC.
+- Un `manifest.webmanifest` con nombre, iconos y `display: standalone`. iOS 26 no lo exige [F2], pero sus iconos y ajustes se usan si existe. `start_url` y `scope` son la ruta de la app en su origen (por ejemplo, `/calculadora-discos/` en Pages, o `/` con un dominio propio).
+- Todo el JavaScript y el CSS van en ficheros propios, nunca en línea, para que la CSP de §3.4 no tenga que relajarse.
 
 ### 3.2 Almacenamiento local (FR-11, AC-11, AC-22)
 
 - La lista de porcentajes se guarda en **`localStorage`**, bajo una clave con versión (por ejemplo, `calculadora-discos:v1:porcentajes`), como JSON.
   - Es síncrono y basta para unos pocos bytes.
   - Para Safari, IndexedDB no es más duradero: el desalojo borra todos los datos del origen a la vez [F6].
-- Se guarda en cada cambio de la lista. Al arrancar de cero se lee y se valida con las reglas de FR-04. Si falta, no se puede leer o no es válida, la lista es 40/70/90 (FR-11). Todo acceso a `localStorage` va en `try/catch`, y un fallo cuenta como "no se puede leer".
-- **No se guardan** el modo, la barra, el peso de la barra ni el peso de trabajo (FR-11). Viven solo en memoria.
-  - Cuando la app vuelve de segundo plano sin haber terminado, el estado en memoria se conserva solo (AC-22).
-  - Si iOS termina el proceso mientras está en segundo plano, la vuelta es un arranque de cero y se aplica FR-11. Es lo que prevé AC-22 ("sin que la app haya arrancado de cero").
-- Se llama a `navigator.storage.persist()` en cada arranque, como mejora sin garantía [F5][F12]. La app no depende de su resultado.
-- **Hecho:** los datos de la web app de la pantalla de inicio están aislados de los de Safari [F4]. La lista que se edite en una pestaña de Safari no aparece en la app instalada, y al revés. Se instala primero y se usa siempre desde el icono.
+- Se guarda en cada cambio de la lista. Al arrancar de cero se lee y se valida. Si falta, no se puede leer o no es válida, la lista es 40/70/90 (FR-11). Todo acceso a `localStorage` va en `try/catch`, y un fallo cuenta como "no se puede leer".
+- Lo guardado es válido solo si es un array JSON de números enteros (tipo número, no cadenas) del 1 al 99, que es la traducción de FR-04 al dato guardado. Cualquier otra cosa no es válida: JSON roto, un objeto, `"40"`, `40.5`, `0`, `150`, `null`… Un array vacío sí es válido (FR-11).
+- **No se guardan** el modo, la barra, el peso de la barra ni el peso de trabajo (FR-11). Viven solo en memoria. Cuando la app vuelve de segundo plano sin haber terminado, el estado en memoria se conserva solo (AC-22).
+- **Sin resolver:** qué pasa si iOS termina el proceso mientras la app está en segundo plano. La spec no dice si eso cuenta como arranque de cero. Si cuenta, se pierde el peso de trabajo. Si no cuenta, habría que guardar el estado de la sesión (por ejemplo, en `sessionStorage`), y FR-11 dice que esos datos "no se guardan". Es una regla de negocio y la decide Víctor (§6). Si la respuesta cambia la spec, se aclara antes, en un PR de spec propio. Este ADR no elige.
+- Se llama a `navigator.storage.persist()` en cada arranque, como mejora sin garantía [F5]. La recomendación de pedirlo en cada arranque es una hipótesis: viene de un foro sin respuesta de Apple [F12]. No tiene coste, y la app no depende de su resultado.
+- **Hecho:** los datos de la web app de la pantalla de inicio están aislados de los de Safari [F4]. La lista que se edite en una pestaña de Safari no aparece en la app instalada, y al revés.
+  - Lo mismo vale, por deducción, para la caché del service worker: la caché que se llena en la pestaña no tiene por qué servirle a la app instalada.
+  - Por eso, en la práctica, la "primera carga" de NFR-01 es la primera vez que se abre la app **desde el icono y con conexión**. Se instala primero y se usa siempre desde el icono.
 
 ### 3.3 Funcionamiento sin conexión (NFR-01, AC-12)
 
 - Un service worker propio, sin librerías (Workbox no hace falta), que:
-  - en `install`, precarga en una caché versionada (`calculadora-discos-<versión>`) **todos** los ficheros de la app: HTML, CSS, JS, manifiesto e iconos;
+  - en `install`, precarga en una caché versionada (`calculadora-discos-<versión>`) **todos** los ficheros de la app: HTML, CSS, JS, manifiesto e iconos. La raíz de la app (`./`) y `index.html` se precargan los dos, y `start_url` coincide con una de esas claves; si no, la app no abre sin conexión;
   - en `activate`, borra las cachés de versiones anteriores;
   - en `fetch`, responde **primero desde la caché** y solo va a la red si el recurso no está [F3].
-- La versión de la caché cambia en cada publicación. El navegador detecta el service worker nuevo al abrir la app con conexión. Sin conexión, la app sigue con la versión instalada.
+- **La versión no se cambia a mano.** El workflow de publicación sustituye un marcador de `sw.js` por el SHA del commit publicado. Es una sustitución de texto en el despliegue, no un paso de compilación: el repositorio sigue siendo lo que se sirve, salvo ese valor. Así, cada publicación cambia `sw.js` byte a byte y el navegador instala el service worker nuevo.
+- **Activación:** sin `skipWaiting()` ni `clients.claim()`, que es el ciclo de vida estándar.
+  1. Con conexión, la versión nueva se descarga e instala en una apertura de la app.
+  2. Se activa cuando ya no queda ninguna ventana de la app abierta, normalmente en la apertura siguiente.
+
+  Así una actualización nunca cambia el código a mitad de un uso. Sin conexión, la app sigue con la versión instalada.
 - La app no hace ninguna petición en tiempo de ejecución: no hay API, fuentes externas, analítica ni CDN. Todo lo que necesita está en la caché desde la primera carga.
 
 ### 3.4 Origen único y privacidad (NFR-02, AC-13)
 
 - Todos los recursos se sirven desde el propio origen. No se usan CDN, fuentes de Google, analítica ni ningún tercero.
-- Una política CSP en una etiqueta `<meta http-equiv="Content-Security-Policy">` (`default-src 'self'; connect-src 'self'; …`) hace que el navegador bloquee cualquier petición a otro origen, aunque se cuele por error. Va en `<meta>` porque GitHub Pages no permite cabeceras HTTP propias.
+- Una política CSP en una etiqueta `<meta http-equiv="Content-Security-Policy">` (`default-src 'self'; connect-src 'self'; …`), como primer elemento del `<head>`, hace que el navegador bloquee las peticiones **del documento** a otro origen, aunque se cuele una por error. Va en `<meta>` porque GitHub Pages no permite cabeceras HTTP propias.
+- Esa CSP **no cubre el service worker**: el service worker tomaría su CSP de las cabeceras de la respuesta de `sw.js`, y Pages no las envía. Las peticiones del service worker las controlan:
+  - el test E2E de AC-13 en Chromium, que sí ve su tráfico [F17];
+  - la revisión de código: `sw.js` solo pide rutas relativas de la propia app.
 - La app no envía nada: no hay formularios con `action`, `fetch` con datos ni *beacons*. Las únicas peticiones son la descarga y la actualización de los ficheros estáticos.
 
-### 3.5 Alojamiento: GitHub Pages (HTTPS)
+### 3.5 Alojamiento (HTTPS)
+
+**Requisitos del alojamiento, sea cual sea:**
+- sirve ficheros estáticos;
+- usa HTTPS, que necesita el service worker [F3];
+- publica desde este repositorio sin exponer secretos;
+- no exige cabeceras propias (la app no depende de ellas, §3.4);
+- su origen pasa a ser el "propio origen" de NFR-02.
+
+**Opción preferida: GitHub Pages, condicionada a la decisión §6.1.** Este ADR no se fusiona hasta que Víctor elija una opción en §6.1 y esta sección la recoja. Así no hay que sustituir el ADR nada más aceptarlo.
 
 - Se publica con **GitHub Pages**, desde un workflow de GitHub Actions (`actions/deploy-pages`) que sube solo la carpeta de la app al fusionar en `main`.
   - Los sitios `github.io` se sirven por HTTPS de forma automática [F13], que es lo que necesita el service worker.
   - Los límites (1 GB por sitio y 100 GB al mes de tráfico como límite blando) quedan muy lejos de lo que usa una app de pocos KB [F14].
 - **Relación con NFR-02:** el "propio origen" es el de Pages (`https://victor-lg.github.io`) o un dominio propio (§6). GitHub recibe las peticiones de descarga y actualización, como cualquier servidor, pero nunca datos de la persona, porque la app no los envía (§3.4).
-- **Hecho:** en GitHub Free, Pages solo está disponible en repositorios públicos. En repositorios privados exige GitHub Pro, Team o Enterprise [F15]. Este repositorio es privado. Ver §6.
-- **Hecho:** todos los proyectos de Pages de una misma cuenta comparten el origen `victor-lg.github.io`, y por tanto comparten `localStorage` (el almacenamiento es por origen). En los repositorios públicos de `victor-lg` no hay ninguno con Pages activo; los privados no los he podido comprobar. La clave con prefijo (§3.2) evita choques, y un dominio propio lo eliminaría (§6).
+- **Hecho:** en GitHub Free, Pages solo está disponible en repositorios públicos. En repositorios privados exige GitHub Pro, Team o Enterprise [F15]. Lo comprobé el 2026-10-21 con `gh repo view`: este repositorio es privado. Ver §6.
+- **Hecho:** todos los proyectos de Pages de una misma cuenta comparten el origen `victor-lg.github.io`. De ahí salen dos riesgos:
+  - comparten `localStorage`, porque el almacenamiento es por origen. La clave con prefijo (§3.2) evita choques;
+  - un sitio de usuario (un repositorio `victor-lg.github.io`) podría registrar un service worker con alcance `/` y controlar también las peticiones de `/calculadora-discos/`.
+
+  El 2026-10-21 consulté con `gh api` los repositorios públicos de `victor-lg`: ninguno tenía Pages activo. Los privados no los pude comprobar con la cuenta del agente. Un dominio propio elimina los dos riesgos (§6.2).
 
 ### 3.6 Tests y CI
 
-- **Tests unitarios: el runner integrado de Node (`node:test`).** Es estable desde Node 20 [F16] y añade **cero dependencias**. Cubre la lógica pura y la mayoría de los AC: AC-01 a AC-09, AC-11 (con un almacenamiento simulado), AC-14 a AC-21 y AC-23 a AC-26. Los nombres de los tests citan `SPEC-CALC-001/AC-NN`.
-- **E2E: Playwright, solo para lo que no se puede probar sin navegador.** Hace falta para AC-10 (recálculo en la interfaz), AC-12 (sin conexión tras la primera carga), AC-13 (origen de todas las peticiones) y AC-22 (conservar el estado al pasar a segundo plano y volver). Es la única dependencia de desarrollo (R2 cuando se añada).
-  - AC-12 y AC-13 se prueban en **Chromium**, porque Playwright solo intercepta el tráfico del service worker en navegadores basados en Chromium [F17].
-  - Los AC de interfaz se prueban también en **WebKit** de Playwright, que es lo más cercano a Safari que corre en Linux [F18]. No es Safari de iOS.
-- **Comprobación manual en el iPhone**, registrada en el PR de la entrega: instalar desde Safari, poner el modo avión y reproducir AC-01 (AC-12 en el dispositivo real), y pasar a otra app y volver (AC-22). Ningún test automático sustituye a esto en iOS.
+- **Ubicación y nombres de los tests:**
+  - unitarios en `tests/unit/*.test.js`;
+  - E2E en `tests/e2e/*.spec.js`.
+
+  Encajan con `CARPETAS_TEST` y `RE_FICHERO_TEST` de `.github/sdd/checks.py` sin tocarlos. Cada runner recibe su patrón de forma explícita, para que uno no ejecute los tests del otro.
+- **Tests unitarios: el runner integrado de Node (`node --test "tests/unit/**/*.test.js"`).**
+  - Es estable desde Node 20 [F16] y añade **cero dependencias**.
+  - Cubre el modelo de vista (§3.1), y con él la mayoría de los AC: AC-01 a AC-09, AC-11 (con un almacenamiento simulado), AC-14 a AC-21 y AC-23 a AC-26, incluidos sus textos.
+  - Los nombres de los tests citan `SPEC-CALC-001/AC-NN`.
+- **E2E: Playwright, solo para lo que no se puede probar sin navegador.** Es la única dependencia de desarrollo (R2 cuando se añada). Cubre:
+  - **AC-10:** el recálculo en la interfaz.
+  - **AC-11:** la lista recuperada tras recargar la página con `localStorage` real, y el estado inicial de la interfaz. Complementa el test unitario.
+  - **AC-04:** las barras de 20 y 15 kg no permiten editar su peso en la interfaz.
+  - **AC-12:** sin conexión tras la primera carga.
+  - **AC-13:** el origen de todas las peticiones.
+  - **AC-22:** solo demuestra que la app no recarga la página ni reinicia los campos con `visibilitychange`, `pagehide` o `pageshow`. No demuestra el comportamiento de iOS: la evidencia de AC-22 es la comprobación manual.
+
+  AC-12 y AC-13 se prueban en **Chromium**, porque Playwright solo intercepta el tráfico del service worker en navegadores basados en Chromium [F17]. Los AC de interfaz se prueban también en **WebKit** de Playwright, que es lo más cercano a Safari que corre en Linux [F18]. No es Safari de iOS.
+- **Comprobación manual en el iPhone**, como punto fijo del PR de la entrega, que registra la versión de iOS:
+  1. Abrir la URL en Safari y añadirla a la pantalla de inicio.
+  2. Abrir la app **desde el icono, con conexión**, y cerrarla desde el selector de apps.
+  3. Poner el modo avión, abrirla desde el icono y reproducir AC-01 (AC-12).
+  4. Pasar a otra app y volver: primero a los pocos segundos y luego tras varios minutos (AC-22 y la hipótesis de §5).
+  5. Cambiar la lista, cerrar desde el selector de apps y volver a abrir (AC-11).
+
+  Ningún test automático sustituye a esto en iOS.
 - **CI:** un workflow nuevo, `.github/workflows/tests.yml`, en cada PR contra `main`, con las acciones fijadas por SHA, como en `sdd.yml`:
-  1. `actions/setup-node` con Node LTS;
-  2. `node --test`;
-  3. `npx playwright install --with-deps chromium webkit` y `npx playwright test`.
+  1. `actions/setup-node`, con la versión mayor de Node LTS fijada en `.nvmrc` (sin "LTS" flotante);
+  2. `npm ci`, que instala desde `package-lock.json` exactamente la versión de Playwright fijada;
+  3. `node --test "tests/unit/**/*.test.js"`;
+  4. `npx playwright install --with-deps chromium webkit` y `npx playwright test`, ambos con el Playwright instalado en el paso 2.
 
   Su job se marca como check requerido en la regla de `main`. Lo añade una persona, porque el token del agente no tiene el permiso `workflow`.
 
@@ -170,22 +226,28 @@ Se propone la **opción A, una PWA sin framework**, con estas reglas.
   | Riesgo | Mitigación |
   | --- | --- |
   | iOS borra la lista guardada | Llamar a `persist()` en cada arranque. Si se borra, el comportamiento lo define FR-11. Es una lista corta. |
-  | Una actualización de iOS cambia el comportamiento de las web apps | Repetir la comprobación manual de AC-12 tras cada actualización mayor de iOS. |
-  | Una petición a terceros se cuela (NFR-02) | CSP `default-src 'self'` en `<meta>` y el test E2E de AC-13. |
-  | El service worker sirve una versión vieja | Caché versionada y limpieza en `activate`. Con conexión, la versión nueva entra al volver a abrir la app. |
+  | iOS termina la app en segundo plano y se pierde el peso de trabajo | Pendiente de la decisión de Víctor (§6.3). La comprobación manual mide con qué frecuencia pasa. |
+  | Una actualización de iOS cambia el comportamiento de las web apps | Repetir la comprobación manual tras cada actualización mayor de iOS. |
+  | Una petición a terceros se cuela (NFR-02) | CSP `default-src 'self'` en `<meta>` para el documento. Para el service worker, el test E2E de AC-13 y la revisión de código. |
+  | El service worker sirve una versión vieja | SHA del commit inyectado en `sw.js` al publicar, caché versionada y limpieza en `activate`. Con conexión, la versión nueva se instala en una apertura y se activa en la siguiente. |
 
 - **Impacto en lo existente:** el proyecto pasa a la etapa técnica. Los cambios siguientes se hacen en PR propios, después de aceptar este ADR, y varios son R2:
   - `src/` y `tests/`;
-  - `package.json` con Playwright como dependencia de desarrollo (R2);
-  - el workflow de tests y el de publicación en Pages (R2, los añade una persona);
-  - el README con la etapa "técnica" (R2);
-  - revisar `CARPETAS_TEST` en `.github/sdd/checks.py`, si la estructura de tests lo necesita (R2).
+  - `package.json`, `package-lock.json` y `.nvmrc`, con Playwright como dependencia de desarrollo (R2);
+  - el workflow de tests y el de publicación (R2, los añade una persona);
+  - el README con la etapa "técnica". Por sí solo no sube el nivel: `checks.py` solo lo sube a R2 si cambia la lista de rutas sensibles;
+  - SPEC-CALC-001: enlazar ADR-0001 en `adr:` y actualizar §11 ("la candidata es una PWA"). Va en un PR de spec propio, después de aceptar este ADR;
+  - `CARPETAS_TEST` en `.github/sdd/checks.py` no necesita cambios con los nombres de §3.6.
 
 ## 5. Validación
 
 - La CI ejecuta en verde los tests unitarios y E2E, y la matriz AC ↔ tests de `checks-sdd` no deja ningún AC de SPEC-CALC-001 sin test.
-- La comprobación manual en el iPhone de Víctor pasa: app instalada desde el icono, modo avión, AC-01 reproducido (AC-12), estado conservado al volver de otra app (AC-22) y lista recuperada tras cerrar la app desde el selector de apps (AC-11).
-- **Hipótesis por verificar en el dispositivo:** que la lista guardada sobreviva varias semanas de uso normal. Las fuentes (§7) describen el comportamiento hasta iOS 26. No he encontrado documentación de Apple específica de versiones posteriores.
+- La comprobación manual de §3.6 pasa en el iPhone de Víctor, con la versión de iOS anotada.
+- **Hipótesis por verificar en el dispositivo:**
+  - que la lista guardada sobreviva varias semanas de uso normal;
+  - con qué frecuencia iOS termina la app tras unos minutos en segundo plano (§3.2, §6.3).
+
+  Las fuentes (§7) describen el comportamiento hasta iOS 26. No he encontrado documentación de Apple específica de versiones posteriores, y el iPhone puede tener ya una versión más reciente.
 
 ## 6. Seguimiento
 
@@ -195,8 +257,9 @@ Se propone la **opción A, una PWA sin framework**, con estas reglas.
      - (b) contratar GitHub Pro;
      - (c) otro alojamiento estático con HTTPS que publique desde un repositorio privado (por ejemplo, Cloudflare Workers/Pages o Netlify). Eso cambiaría §3.5 y añadiría un tercero con su propia cuenta.
 
-     Mientras no se decida, no se puede publicar.
-  2. **Dominio propio** (por ejemplo, un subdominio de un dominio de Víctor) frente a `victor-lg.github.io`. Es opcional: aísla el origen (§3.5) y no cambia nada más.
+     Hay que decidirlo antes de fusionar este ADR (§3.5).
+  2. **Dominio propio** (por ejemplo, un subdominio de un dominio de Víctor) frente a `victor-lg.github.io`. Es opcional: aísla el origen, es decir, el `localStorage` y el alcance de los service workers (§3.5), y no cambia nada más.
+  3. **App terminada por iOS en segundo plano** (§3.2). Si iOS termina el proceso mientras la app está en segundo plano y Víctor vuelve a ella, ¿es un arranque de cero, en el que se pierden modo, barra y peso de trabajo (FR-11), o hay que restaurar el estado de la sesión? Es una regla de negocio que la spec no define. Si la respuesta es restaurar, primero hay que aclarar FR-11 y AC-22 en un PR de spec. No bloquea la tecnología elegida, pero sí la implementación de AC-22.
 - **Condiciones para revisar este ADR:**
   - Apple deja de exentar las web apps de la pantalla de inicio del límite de ITP, o empieza a borrar sus datos con frecuencia;
   - el producto necesita algo que una PWA en iOS no da (por ejemplo, integración con Salud o widgets);
@@ -218,7 +281,7 @@ Consultadas el 2026-10-21.
 - **[F9]** Expo CLI (Expo Go abre el proyecto desde el servidor de desarrollo que lanza `npx expo start`): <https://docs.expo.dev/more/expo-cli/>
 - **[F10]** Expo, "Internal distribution": "This method requires a paid Apple Developer account". <https://docs.expo.dev/build/internal-distribution/>
 - **[F11]** Scriptable en la App Store: <https://apps.apple.com/app/scriptable/id1405459188>
-- **[F12]** Apple Developer Forums, "Safari iOS PWA Data Persistence Beyond 7 Days" (2022–2023, sin respuesta de Apple). Hay experiencia de desarrolladores de que `persist()` hay que pedirlo en cada arranque. <https://developer.apple.com/forums/thread/710157>
+- **[F12]** Apple Developer Forums, "Safari iOS PWA Data Persistence Beyond 7 Days" (2022–2023, sin respuesta de Apple; anecdótico). Hay experiencia de desarrolladores de que `persist()` hay que pedirlo en cada arranque. <https://developer.apple.com/forums/thread/710157>
 - **[F13]** GitHub Docs, "Securing your GitHub Pages site with HTTPS": <https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https>
 - **[F14]** GitHub Docs, "GitHub Pages limits": <https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits>
 - **[F15]** GitHub Docs, "Creating a GitHub Pages site": "If the account that owns the repository uses GitHub Free or GitHub Free for organizations, the repository must be public." <https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site>
