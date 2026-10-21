@@ -5,3 +5,8 @@
 
 # Ajustes locales de Claude Code
 .claude/settings.local.json
+
+# Dependencias y salidas de Playwright
+node_modules/
+test-results/
+playwright-report/
