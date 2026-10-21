@@ -66,11 +66,13 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   El peso de la barra Z y el de la recta pequeña cumplen las mismas reglas que el peso de trabajo (FR-03): rango, decimales, forma de escribirlo, campo vacío como estado neutro y mensaje si el valor escrito no es válido.
 - **FR-03:** el peso de trabajo es mayor que 0 y como máximo 500 kg, con hasta dos decimales.
   - Se escribe solo con cifras y, si lleva decimales, un separador decimal (coma o punto) seguido como mucho de dos cifras escritas. No se admite separador de miles. Por ejemplo, "100,10" vale (equivale a 100,1); "100,120" y "1.000" se rechazan.
-  - Para que el recálculo al momento (FR-10) no muestre errores a mitad de escribir:
+  - Antes de validar, y para que el recálculo al momento (FR-10) no muestre errores a mitad de escribir en los casos habituales:
     - los espacios al principio y al final se ignoran: " 100 " equivale a 100;
     - un separador al final sin cifras detrás vale como si no estuviera: "100," equivale a 100;
     - un separador al principio sin cifras delante vale como si llevara un 0 delante: ",5" equivale a 0,5;
     - si, tras ignorar los espacios, no queda nada o solo queda el separador ("," o "."), el campo se trata como vacío.
+
+    Estas reglas no cambian que el valor lleva como mucho un separador: "100,5," y "100,," se rechazan. Un valor que vale 0 sigue sin ser válido aunque sea un paso intermedio ("0," o ",0" al escribir ",05").
   - Mientras el campo está vacío, la app no muestra series ni ningún error: muestra una indicación para rellenarlo.
   - Si el valor escrito no es válido, la app indica cuál y por qué, y no muestra series.
 - **FR-04:** los porcentajes de calentamiento forman una lista:
@@ -165,11 +167,12 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - con la barra de 20 kg y los porcentajes 40, 70 y 90, " 100 ", "100 ", "100," y "100." muestran las mismas series que AC-01, sin ningún mensaje de error;
   - en el modo Un punto y con el 50 %, ",5" y ".5" se aceptan como 0,5 kg, sin ningún mensaje de error: la serie indica que el peso es demasiado pequeño y que el objetivo era 0,25 kg;
   - ",", ".", " , " o solo espacios no muestran series ni ningún mensaje de error, solo la indicación de rellenarlo;
-  - ",0", ",123" y "10 0" muestran un mensaje que dice qué falla y no muestran series.
+  - ",0", ",123", "10 0", "100,5," y "100,," muestran un mensaje que dice qué falla y no muestran series.
 - **AC-28 → FR-02:** las mismas reglas de escritura valen para el peso de barra:
   - con la barra Z, un peso de barra escrito como " 8,5 ", 50 kg y el 70 % da el resultado de AC-04;
   - con la recta pequeña, un peso de barra escrito como "7,", 60 kg y el 70 % (objetivo 42 kg), la app carga 42 kg (15 + 2,5 por lado, 17,5 kg por lado), sin aviso de redondeo;
-  - con la barra Z o la recta pequeña, un peso de barra escrito como "," no muestra series ni ningún mensaje de error, solo la indicación de rellenarlo.
+  - con la recta pequeña, un peso de barra escrito como ",5", 10 kg y el 50 % (objetivo 5 kg), la app carga 3 kg (1,25 por lado, 1,25 kg por lado) y avisa de la diferencia de −2 kg;
+  - con la barra Z o la recta pequeña, un peso de barra escrito como "," o solo con espacios no muestra series ni ningún mensaje de error, solo la indicación de rellenarlo.
 - **AC-29 → FR-04:** al añadir el porcentaje " 40 ", la app lo añade como 40 %, sin ningún mensaje de error. Al intentar añadir "40,", ",5" o "4 0", la app muestra un mensaje que dice qué falla y no lo añade.
 
 ## 6. Casos límite, errores y decisiones pendientes
@@ -184,7 +187,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - porcentaje no válido: mensaje y no se añade (FR-04);
   - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan, no se pueden leer o no son válidos (FR-11);
   - vuelta de segundo plano: se conserva todo el estado; FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
-  - pesos o porcentajes con espacios al principio o al final, y pesos con un separador al final o al principio sin cifras ("100,", ",5"): se aceptan, y un peso que solo tiene espacios o el separador se trata como vacío (FR-03, FR-04);
+  - pesos o porcentajes con espacios al principio o al final, y pesos con un separador al final o al principio sin cifras ("100,", ",5"): se aceptan, y un peso que solo tiene espacios o el separador se trata como vacío; un peso con más de un separador o que vale 0 se sigue rechazando, también como paso intermedio (FR-03, FR-04);
   - pesos con más de dos cifras tras el separador o con separador de miles, y porcentajes con separador decimal: se rechazan con mensaje (FR-03, FR-04);
   - objetivo con más de dos decimales: se redondea con la mitad hacia arriba antes de calcular la carga (FR-05);
   - formato de números: entrada con coma o punto, presentación con coma decimal, hasta dos decimales y sin ceros finales (FR-14).
