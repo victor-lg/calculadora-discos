@@ -1,7 +1,7 @@
 ---
 id: SPEC-CALC-001
 titulo: Series de calentamiento con cálculo de discos
-estado: en-revision
+estado: aprobada
 version: 0.4
 riesgo: R1
 sustituye: null
