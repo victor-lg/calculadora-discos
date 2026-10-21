@@ -1,7 +1,7 @@
 ---
 id: SPEC-CALC-001
 titulo: Series de calentamiento con cálculo de discos
-estado: aprobada
+estado: en-revision
 version: 0.4
 riesgo: R1
 sustituye: null
@@ -19,7 +19,8 @@ versión 0.3 enlaza ADR-0001 y aclara en FR-11 que, si iOS cierra la app en
 segundo plano, la vuelta es un arranque de cero (decisión de Víctor). La
 versión 0.4 hace más tolerante la escritura de pesos y porcentajes (FR-03,
 FR-04) para que el recálculo al momento (FR-10) no muestre errores a mitad de
-escribir (decisión de Víctor, 2026-10-21).
+escribir, y aclara qué cuenta como espacio, qué pasa al añadir un porcentaje
+vacío y que la app no reescribe lo tecleado (decisiones de Víctor, 2026-10-21).
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -67,7 +68,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 - **FR-03:** el peso de trabajo es mayor que 0 y como máximo 500 kg, con hasta dos decimales.
   - Se escribe solo con cifras y, si lleva decimales, un separador decimal (coma o punto) seguido como mucho de dos cifras escritas. No se admite separador de miles. Por ejemplo, "100,10" vale (equivale a 100,1); "100,120" y "1.000" se rechazan.
   - Antes de validar, y para que el recálculo al momento (FR-10) no muestre errores a mitad de escribir en los casos habituales:
-    - los espacios al principio y al final se ignoran: " 100 " equivale a 100;
+    - los espacios al principio y al final se ignoran: " 100 " equivale a 100. Cuentan como espacios todos los espacios en blanco, incluidos el tabulador, el espacio duro y los saltos de línea;
     - un separador al final sin cifras detrás vale como si no estuviera: "100," equivale a 100;
     - un separador al principio sin cifras delante vale como si llevara un 0 delante: ",5" equivale a 0,5;
     - si, tras ignorar los espacios, no queda nada o solo queda el separador ("," o "."), el campo se trata como vacío.
@@ -78,7 +79,8 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 - **FR-04:** los porcentajes de calentamiento forman una lista:
   - la persona puede añadir y quitar porcentajes en cualquier momento;
   - cada uno es un número entero del 1 al 99, escrito solo con cifras: "40,0" se rechaza;
-  - los espacios al principio y al final se ignoran: " 40 " equivale a 40;
+  - los espacios al principio y al final se ignoran, con la misma definición de espacio que en FR-03: " 40 " equivale a 40;
+  - si la persona intenta añadir un porcentaje vacío o que solo tiene espacios, la app no añade nada y no muestra ningún mensaje;
   - se muestran en el orden en que la persona los introduce, sin reordenar;
   - se puede repetir un porcentaje: cada repetición es una serie más y se muestran todas;
   - si la persona intenta añadir un porcentaje no válido, la app muestra un mensaje que dice qué falla y no lo añade.
@@ -111,7 +113,8 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 - **FR-13:** cuando la lista de porcentajes está vacía, la app no muestra ninguna serie y muestra una indicación para añadir porcentajes.
 - **FR-14:** formato de los números:
   - al escribir un peso, la app acepta como separador decimal tanto la coma como el punto, con como mucho dos cifras escritas tras él y sin separador de miles (FR-03);
-  - los pesos, el objetivo y la diferencia se muestran con coma decimal, como máximo dos decimales y sin ceros finales (por ejemplo, "73,5" y "40", nunca "73,50" ni "40,00").
+  - los pesos, el objetivo y la diferencia se muestran con coma decimal, como máximo dos decimales y sin ceros finales (por ejemplo, "73,5" y "40", nunca "73,50" ni "40,00");
+  - la app nunca reescribe lo que la persona teclea en un campo: este formato solo se aplica a lo que la app muestra.
 
 ## 5. Criterios de aceptación
 
@@ -174,6 +177,9 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - con la recta pequeña, un peso de barra escrito como ",5", 10 kg y el 50 % (objetivo 5 kg), la app carga 3 kg (1,25 por lado, 1,25 kg por lado) y avisa de la diferencia de −2 kg;
   - con la barra Z o la recta pequeña, un peso de barra escrito como "," o solo con espacios no muestra series ni ningún mensaje de error, solo la indicación de rellenarlo.
 - **AC-29 → FR-04:** al añadir el porcentaje " 40 ", la app lo añade como 40 %, sin ningún mensaje de error. Al intentar añadir "40,", ",5" o "4 0", la app muestra un mensaje que dice qué falla y no lo añade.
+- **AC-30 → FR-04:** al intentar añadir un porcentaje vacío o que solo tiene espacios, la lista no cambia y la app no muestra ningún mensaje.
+- **AC-31 → FR-03, FR-04:** con la barra de 20 kg y los porcentajes 40, 70 y 90, un peso de trabajo de 100 rodeado de un tabulador, un espacio duro o un salto de línea muestra las mismas series que AC-01, sin ningún mensaje de error. Al añadir 40 con un tabulador o un espacio duro detrás, la app lo añade como 40 %, sin ningún mensaje de error.
+- **AC-32 → FR-14:** con la barra de 20 kg y el 70 %, si la persona escribe el peso de trabajo como "102.5", el campo sigue mostrando "102.5" mientras la serie muestra el objetivo como "71,75 kg". Lo mismo con " 100 ", "100," y ",5": el campo conserva exactamente lo escrito.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
@@ -188,6 +194,8 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan, no se pueden leer o no son válidos (FR-11);
   - vuelta de segundo plano: se conserva todo el estado; FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
   - pesos o porcentajes con espacios al principio o al final, y pesos con un separador al final o al principio sin cifras ("100,", ",5"): se aceptan, y un peso que solo tiene espacios o el separador se trata como vacío; un peso con más de un separador o que vale 0 se sigue rechazando, también como paso intermedio (FR-03, FR-04);
+  - porcentaje vacío o solo con espacios: no se añade y no hay mensaje (FR-04);
+  - lo tecleado en un campo no se reescribe nunca; el formato de FR-14 solo afecta a lo que la app muestra (FR-14);
   - pesos con más de dos cifras tras el separador o con separador de miles, y porcentajes con separador decimal: se rechazan con mensaje (FR-03, FR-04);
   - objetivo con más de dos decimales: se redondea con la mitad hacia arriba antes de calcular la carga (FR-05);
   - formato de números: entrada con coma o punto, presentación con coma decimal, hasta dos decimales y sin ceros finales (FR-14).
