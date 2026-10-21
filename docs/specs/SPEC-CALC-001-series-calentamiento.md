@@ -15,7 +15,8 @@ Redactada con sdd-spec a partir de discovery/notas-descubrimiento.md
 de negocio las decidió Víctor; las que eran propuesta de Claude y él aceptó
 están marcadas en las notas. La versión 0.2 incorpora sus decisiones sobre las
 rondas 1, 2 y 3 de la revisión G4 (2026-10-21), registradas en el PR #2. La
-versión 0.3 enlaza ADR-0001 sin cambiar el comportamiento.
+versión 0.3 enlaza ADR-0001 y aclara en FR-11 que, si iOS cierra la app en
+segundo plano, la vuelta es un arranque de cero (decisión de Víctor).
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -163,7 +164,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - datos no válidos: mensaje y sin series (FR-03, FR-02);
   - porcentaje no válido: mensaje y no se añade (FR-04);
   - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan, no se pueden leer o no son válidos (FR-11);
-  - vuelta de segundo plano: se conserva todo el estado; FR-11 solo se aplica al arranque de cero (AC-22);
+  - vuelta de segundo plano: se conserva todo el estado; FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
   - pesos con más de dos cifras tras el separador o con separador de miles, y porcentajes con separador decimal: se rechazan con mensaje (FR-03, FR-04);
   - objetivo con más de dos decimales: se redondea con la mitad hacia arriba antes de calcular la carga (FR-05);
   - formato de números: entrada con coma o punto, presentación con coma decimal, hasta dos decimales y sin ceros finales (FR-14).
