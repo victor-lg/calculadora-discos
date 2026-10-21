@@ -1,8 +1,8 @@
 ---
 id: SPEC-CALC-001
 titulo: Series de calentamiento con cálculo de discos
-estado: aprobada
-version: 0.3
+estado: en-revision
+version: 0.4
 riesgo: R1
 sustituye: null
 adr: [ADR-0001]
@@ -16,7 +16,10 @@ de negocio las decidió Víctor; las que eran propuesta de Claude y él aceptó
 están marcadas en las notas. La versión 0.2 incorpora sus decisiones sobre las
 rondas 1, 2 y 3 de la revisión G4 (2026-10-21), registradas en el PR #2. La
 versión 0.3 enlaza ADR-0001 y aclara en FR-11 que, si iOS cierra la app en
-segundo plano, la vuelta es un arranque de cero (decisión de Víctor).
+segundo plano, la vuelta es un arranque de cero (decisión de Víctor). La
+versión 0.4 hace más tolerante la escritura de pesos y porcentajes (FR-03,
+FR-04) para que el recálculo al momento (FR-10) no muestre errores a mitad de
+escribir (decisión de Víctor, 2026-10-21).
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -60,14 +63,20 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - recta pequeña, con el peso que introduce la persona;
   - barra Z, con el peso que introduce la persona.
 
-  El peso de la barra Z y el de la recta pequeña cumplen las mismas reglas que el peso de trabajo (FR-03): rango, decimales, campo vacío como estado neutro y mensaje si el valor escrito no es válido.
+  El peso de la barra Z y el de la recta pequeña cumplen las mismas reglas que el peso de trabajo (FR-03): rango, decimales, forma de escribirlo, campo vacío como estado neutro y mensaje si el valor escrito no es válido.
 - **FR-03:** el peso de trabajo es mayor que 0 y como máximo 500 kg, con hasta dos decimales.
   - Se escribe solo con cifras y, si lleva decimales, un separador decimal (coma o punto) seguido como mucho de dos cifras escritas. No se admite separador de miles. Por ejemplo, "100,10" vale (equivale a 100,1); "100,120" y "1.000" se rechazan.
+  - Para que el recálculo al momento (FR-10) no muestre errores a mitad de escribir:
+    - los espacios al principio y al final se ignoran: " 100 " equivale a 100;
+    - un separador al final sin cifras detrás vale como si no estuviera: "100," equivale a 100;
+    - un separador al principio sin cifras delante vale como si llevara un 0 delante: ",5" equivale a 0,5;
+    - si, tras ignorar los espacios, no queda nada o solo queda el separador ("," o "."), el campo se trata como vacío.
   - Mientras el campo está vacío, la app no muestra series ni ningún error: muestra una indicación para rellenarlo.
   - Si el valor escrito no es válido, la app indica cuál y por qué, y no muestra series.
 - **FR-04:** los porcentajes de calentamiento forman una lista:
   - la persona puede añadir y quitar porcentajes en cualquier momento;
   - cada uno es un número entero del 1 al 99, escrito solo con cifras: "40,0" se rechaza;
+  - los espacios al principio y al final se ignoran: " 40 " equivale a 40;
   - se muestran en el orden en que la persona los introduce, sin reordenar;
   - se puede repetir un porcentaje: cada repetición es una serie más y se muestran todas;
   - si la persona intenta añadir un porcentaje no válido, la app muestra un mensaje que dice qué falla y no lo añade.
@@ -152,6 +161,16 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 - **AC-26 → FR-06, FR-09:** frontera de FR-09 en el modo Barra, con la barra de 20 kg y el 50 %:
   - con 45 kg (objetivo 22,5 kg, igual a la barra más 2 × 1,25 kg), la app carga 22,5 kg (1,25 por lado, 1,25 kg por lado), sin aviso de redondeo;
   - con 44,98 kg (objetivo 22,49 kg), la serie muestra "Solo barra (20 kg) · 0 kg por lado" y que el objetivo era 22,49 kg, sin cifra de diferencia.
+- **AC-27 → FR-03:** al escribir el peso de trabajo:
+  - con la barra de 20 kg y los porcentajes 40, 70 y 90, " 100 ", "100 ", "100," y "100." muestran las mismas series que AC-01, sin ningún mensaje de error;
+  - en el modo Un punto y con el 50 %, ",5" y ".5" se aceptan como 0,5 kg, sin ningún mensaje de error: la serie indica que el peso es demasiado pequeño y que el objetivo era 0,25 kg;
+  - ",", ".", " , " o solo espacios no muestran series ni ningún mensaje de error, solo la indicación de rellenarlo;
+  - ",0", ",123" y "10 0" muestran un mensaje que dice qué falla y no muestran series.
+- **AC-28 → FR-02:** las mismas reglas de escritura valen para el peso de barra:
+  - con la barra Z, un peso de barra escrito como " 8,5 ", 50 kg y el 70 % da el resultado de AC-04;
+  - con la recta pequeña, un peso de barra escrito como "7,", 60 kg y el 70 % (objetivo 42 kg), la app carga 42 kg (15 + 2,5 por lado, 17,5 kg por lado), sin aviso de redondeo;
+  - con la barra Z o la recta pequeña, un peso de barra escrito como "," no muestra series ni ningún mensaje de error, solo la indicación de rellenarlo.
+- **AC-29 → FR-04:** al añadir el porcentaje " 40 ", la app lo añade como 40 %, sin ningún mensaje de error. Al intentar añadir "40,", ",5" o "4 0", la app muestra un mensaje que dice qué falla y no lo añade.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
@@ -165,6 +184,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - porcentaje no válido: mensaje y no se añade (FR-04);
   - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan, no se pueden leer o no son válidos (FR-11);
   - vuelta de segundo plano: se conserva todo el estado; FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
+  - pesos o porcentajes con espacios al principio o al final, y pesos con un separador al final o al principio sin cifras ("100,", ",5"): se aceptan, y un peso que solo tiene espacios o el separador se trata como vacío (FR-03, FR-04);
   - pesos con más de dos cifras tras el separador o con separador de miles, y porcentajes con separador decimal: se rechazan con mensaje (FR-03, FR-04);
   - objetivo con más de dos decimales: se redondea con la mitad hacia arriba antes de calcular la carga (FR-05);
   - formato de números: entrada con coma o punto, presentación con coma decimal, hasta dos decimales y sin ceros finales (FR-14).
