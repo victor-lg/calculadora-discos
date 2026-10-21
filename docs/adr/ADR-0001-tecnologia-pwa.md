@@ -112,7 +112,7 @@ Se propone la **opción A, una PWA sin framework**, con estas reglas.
   - un **modelo de vista** completo, a partir del estado: las series, y todos los textos que se muestran (mensajes de error, indicaciones, "Solo barra (X kg) · 0 kg por lado", avisos) y qué campos se pueden editar.
 
   La interfaz es una capa fina que lee el estado, pide el modelo de vista y lo pinta tal cual, sin decidir nada. Así los tests unitarios prueban también los textos que exigen los AC.
-- Un `manifest.webmanifest` con nombre, iconos y `display: standalone`. iOS 26 no lo exige [F2], pero sus iconos y ajustes se usan si existe. `start_url` y `scope` son la ruta de la app en su origen (por ejemplo, `/calculadora-discos/` en Pages, o `/` con un dominio propio).
+- Un `manifest.webmanifest` con nombre, iconos y `display: standalone`. iOS 26 no lo exige [F2], pero sus iconos y ajustes se usan si existe. `start_url` y `scope` son `/`, la raíz del subdominio propio (§3.5).
 - Todo el JavaScript y el CSS van en ficheros propios, nunca en línea, para que la CSP de §3.4 no tenga que relajarse.
 
 ### 3.2 Almacenamiento local (FR-11, AC-11, AC-22)
@@ -123,7 +123,7 @@ Se propone la **opción A, una PWA sin framework**, con estas reglas.
 - Se guarda en cada cambio de la lista. Al arrancar de cero se lee y se valida. Si falta, no se puede leer o no es válida, la lista es 40/70/90 (FR-11). Todo acceso a `localStorage` va en `try/catch`, y un fallo cuenta como "no se puede leer".
 - Lo guardado es válido solo si es un array JSON de números enteros (tipo número, no cadenas) del 1 al 99, que es la traducción de FR-04 al dato guardado. Cualquier otra cosa no es válida: JSON roto, un objeto, `"40"`, `40.5`, `0`, `150`, `null`… Un array vacío sí es válido (FR-11).
 - **No se guardan** el modo, la barra, el peso de la barra ni el peso de trabajo (FR-11). Viven solo en memoria. Cuando la app vuelve de segundo plano sin haber terminado, el estado en memoria se conserva solo (AC-22).
-- **Sin resolver:** qué pasa si iOS termina el proceso mientras la app está en segundo plano. La spec no dice si eso cuenta como arranque de cero. Si cuenta, se pierde el peso de trabajo. Si no cuenta, habría que guardar el estado de la sesión (por ejemplo, en `sessionStorage`), y FR-11 dice que esos datos "no se guardan". Es una regla de negocio y la decide Víctor (§6). Si la respuesta cambia la spec, se aclara antes, en un PR de spec propio. Este ADR no elige.
+- **Si iOS termina el proceso mientras la app está en segundo plano**, la vuelta es un **arranque de cero** y se aplica FR-11: se recupera la lista y se pierden el modo, la barra y el peso de trabajo. Lo decidió Víctor el 2026-10-21 (§6.3). No se guarda ningún estado de sesión, así que la spec no cambia.
 - Se llama a `navigator.storage.persist()` en cada arranque, como mejora sin garantía [F5]. La recomendación de pedirlo en cada arranque es una hipótesis: viene de un foro sin respuesta de Apple [F12]. No tiene coste, y la app no depende de su resultado.
 - **Hecho:** los datos de la web app de la pantalla de inicio están aislados de los de Safari [F4]. La lista que se edite en una pestaña de Safari no aparece en la app instalada, y al revés.
   - Lo mismo vale, por deducción, para la caché del service worker: la caché que se llena en la pestaña no tiene por qué servirle a la app instalada.
@@ -161,18 +161,17 @@ Se propone la **opción A, una PWA sin framework**, con estas reglas.
 - no exige cabeceras propias (la app no depende de ellas, §3.4);
 - su origen pasa a ser el "propio origen" de NFR-02.
 
-**Opción preferida: GitHub Pages, condicionada a la decisión §6.1.** Este ADR no se fusiona hasta que Víctor elija una opción en §6.1 y esta sección la recoja. Así no hay que sustituir el ADR nada más aceptarlo.
+**Decisión: GitHub Pages con un subdominio propio de Víctor** (§6.1 y §6.2, decididos por Víctor el 2026-10-21).
 
 - Se publica con **GitHub Pages**, desde un workflow de GitHub Actions (`actions/deploy-pages`) que sube solo la carpeta de la app al fusionar en `main`.
-  - Los sitios `github.io` se sirven por HTTPS de forma automática [F13], que es lo que necesita el service worker.
+  - Todos los sitios de Pages, también los que tienen un dominio propio bien configurado, admiten HTTPS. Con un dominio propio, GitHub pide el certificado a Let's Encrypt tras comprobar el DNS [F13]. Eso es lo que necesita el service worker.
   - Los límites (1 GB por sitio y 100 GB al mes de tráfico como límite blando) quedan muy lejos de lo que usa una app de pocos KB [F14].
-- **Relación con NFR-02:** el "propio origen" es el de Pages (`https://victor-lg.github.io`) o un dominio propio (§6). GitHub recibe las peticiones de descarga y actualización, como cualquier servidor, pero nunca datos de la persona, porque la app no los envía (§3.4).
-- **Hecho:** en GitHub Free, Pages solo está disponible en repositorios públicos. En repositorios privados exige GitHub Pro, Team o Enterprise [F15]. Lo comprobé el 2026-10-21 con `gh repo view`: este repositorio es privado. Ver §6.
-- **Hecho:** todos los proyectos de Pages de una misma cuenta comparten el origen `victor-lg.github.io`. De ahí salen dos riesgos:
-  - comparten `localStorage`, porque el almacenamiento es por origen. La clave con prefijo (§3.2) evita choques;
-  - un sitio de usuario (un repositorio `victor-lg.github.io`) podría registrar un service worker con alcance `/` y controlar también las peticiones de `/calculadora-discos/`.
-
-  El 2026-10-21 consulté con `gh api` los repositorios públicos de `victor-lg`: ninguno tenía Pages activo. Los privados no los pude comprobar con la cuenta del agente. Un dominio propio elimina los dos riesgos (§6.2).
+- **Repositorio privado:** este repositorio es privado (lo comprobé el 2026-10-21 con `gh repo view`). En repositorios privados, Pages exige GitHub Pro, Team o Enterprise [F15]. Víctor tiene GitHub Pro (lo dice él; no lo he verificado). El sitio publicado es accesible para cualquiera aunque el repositorio sea privado. No es un problema, porque la app no contiene secretos ni datos de nadie.
+- **Subdominio propio** (el nombre exacto se fija al configurarlo):
+  - la app se sirve en la raíz de `https://<subdominio>/`, con un registro DNS hacia Pages y "Enforce HTTPS" activado [F13];
+  - el origen queda aislado de los demás proyectos de `victor-lg.github.io`, que comparten origen entre sí. Ningún otro proyecto comparte su `localStorage`, y ningún service worker con alcance `/` de otro sitio de la cuenta puede controlar la app.
+- **Relación con NFR-02:** el "propio origen" es `https://<subdominio>`. GitHub recibe las peticiones de descarga y actualización, como cualquier servidor, pero nunca datos de la persona, porque la app no los envía (§3.4).
+- **Si el subdominio deja de apuntar a Pages** (DNS o certificado), la app instalada sigue funcionando sin conexión con la versión que tiene en caché. Solo deja de recibir actualizaciones.
 
 ### 3.6 Tests y CI
 
@@ -226,7 +225,7 @@ Se propone la **opción A, una PWA sin framework**, con estas reglas.
   | Riesgo | Mitigación |
   | --- | --- |
   | iOS borra la lista guardada | Llamar a `persist()` en cada arranque. Si se borra, el comportamiento lo define FR-11. Es una lista corta. |
-  | iOS termina la app en segundo plano y se pierde el peso de trabajo | Pendiente de la decisión de Víctor (§6.3). La comprobación manual mide con qué frecuencia pasa. |
+  | iOS termina la app en segundo plano y se pierde el peso de trabajo | Aceptado: es un arranque de cero (§6.3). La comprobación manual mide con qué frecuencia pasa; si molesta en el uso real, se reabre con una spec nueva. |
   | Una actualización de iOS cambia el comportamiento de las web apps | Repetir la comprobación manual tras cada actualización mayor de iOS. |
   | Una petición a terceros se cuela (NFR-02) | CSP `default-src 'self'` en `<meta>` para el documento. Para el service worker, el test E2E de AC-13 y la revisión de código. |
   | El service worker sirve una versión vieja | SHA del commit inyectado en `sw.js` al publicar, caché versionada y limpieza en `activate`. Con conexión, la versión nueva se instala en una apertura y se activa en la siguiente. |
@@ -251,15 +250,11 @@ Se propone la **opción A, una PWA sin framework**, con estas reglas.
 
 ## 6. Seguimiento
 
-- **Decisiones pendientes (de Víctor):**
-  1. **Repositorio privado y Pages.** Con GitHub Free, Pages no publica desde un repositorio privado [F15]. Opciones:
-     - (a) hacer público el repositorio: no contiene secretos, pero quedan públicos también la spec, `discovery/` y el workflow;
-     - (b) contratar GitHub Pro;
-     - (c) otro alojamiento estático con HTTPS que publique desde un repositorio privado (por ejemplo, Cloudflare Workers/Pages o Netlify). Eso cambiaría §3.5 y añadiría un tercero con su propia cuenta.
-
-     Hay que decidirlo antes de fusionar este ADR (§3.5).
-  2. **Dominio propio** (por ejemplo, un subdominio de un dominio de Víctor) frente a `victor-lg.github.io`. Es opcional: aísla el origen, es decir, el `localStorage` y el alcance de los service workers (§3.5), y no cambia nada más.
-  3. **App terminada por iOS en segundo plano** (§3.2). Si iOS termina el proceso mientras la app está en segundo plano y Víctor vuelve a ella, ¿es un arranque de cero, en el que se pierden modo, barra y peso de trabajo (FR-11), o hay que restaurar el estado de la sesión? Es una regla de negocio que la spec no define. Si la respuesta es restaurar, primero hay que aclarar FR-11 y AC-22 en un PR de spec. No bloquea la tecnología elegida, pero sí la implementación de AC-22.
+- **Decisiones de Víctor (2026-10-21, durante la revisión G4 del PR #3):**
+  1. **Alojamiento:** GitHub Pages desde el repositorio privado, con su cuenta GitHub Pro. Se descartan hacer público el repositorio y usar otro alojamiento.
+  2. **Dominio:** un subdominio propio en lugar de `victor-lg.github.io`, para aislar el origen (§3.5).
+  3. **App terminada por iOS en segundo plano:** es un arranque de cero, y se aplica FR-11 (§3.2). La spec no cambia.
+- **Pendiente:** el nombre exacto del subdominio. Se fija al configurar Pages; no cambia ninguna decisión de este ADR.
 - **Condiciones para revisar este ADR:**
   - Apple deja de exentar las web apps de la pantalla de inicio del límite de ITP, o empieza a borrar sus datos con frecuencia;
   - el producto necesita algo que una PWA en iOS no da (por ejemplo, integración con Salud o widgets);
@@ -282,7 +277,7 @@ Consultadas el 2026-10-21.
 - **[F10]** Expo, "Internal distribution": "This method requires a paid Apple Developer account". <https://docs.expo.dev/build/internal-distribution/>
 - **[F11]** Scriptable en la App Store: <https://apps.apple.com/app/scriptable/id1405459188>
 - **[F12]** Apple Developer Forums, "Safari iOS PWA Data Persistence Beyond 7 Days" (2022–2023, sin respuesta de Apple; anecdótico). Hay experiencia de desarrolladores de que `persist()` hay que pedirlo en cada arranque. <https://developer.apple.com/forums/thread/710157>
-- **[F13]** GitHub Docs, "Securing your GitHub Pages site with HTTPS": <https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https>
+- **[F13]** GitHub Docs, "Securing your GitHub Pages site with HTTPS" (HTTPS también con dominio propio, certificado de Let's Encrypt y "Enforce HTTPS"): <https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https>
 - **[F14]** GitHub Docs, "GitHub Pages limits": <https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits>
 - **[F15]** GitHub Docs, "Creating a GitHub Pages site": "If the account that owns the repository uses GitHub Free or GitHub Free for organizations, the repository must be public." <https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site>
 - **[F16]** Node.js, "Test runner" (estable desde Node 20): <https://nodejs.org/api/test.html>
