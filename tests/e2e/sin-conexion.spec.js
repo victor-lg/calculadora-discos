@@ -21,6 +21,54 @@ const RUTAS_DE_LA_APP = new Set([
     .map((m) => (m[1] === './' ? '/' : `/${m[1]}`)),
 ]);
 
+// Cabeceras que ponen Chromium y WebKit en este recorrido; cualquier otra
+// (por ejemplo, una inventada por la app) hace fallar AC-13.
+const CABECERAS_DEL_NAVEGADOR = new Set([
+  'accept', 'accept-encoding', 'accept-language', 'cache-control', 'connection', 'host',
+  'origin', 'pragma', 'priority', 'referer', 'sec-ch-ua', 'sec-ch-ua-mobile',
+  'sec-ch-ua-platform', 'sec-fetch-dest', 'sec-fetch-mode', 'sec-fetch-site', 'sec-fetch-user',
+  'service-worker', 'upgrade-insecure-requests', 'user-agent',
+]);
+
+// Valores introducidos en el recorrido de AC-13, completos y en sus formas
+// codificadas. No se buscan fragmentos cortos, que podrían coincidir con el
+// puerto efímero o con la versión del navegador.
+const INTRODUCIDOS = ['7,35', '7.35', '7%2C35', '487,35', '487.35', '487%2C35', '48735',
+  'dos-lados', 'un-punto', 'recta'];
+
+// Comprueba una petición: URL de la lista cerrada y cabeceras permitidas, con
+// Host, Origin y Referer iguales al propio origen.
+function comprobarPeticion(urlTexto, cabeceras, origen) {
+  const url = new URL(urlTexto, origen);
+  expect(url.origin, urlTexto).toBe(origen);
+  expect(url.search, urlTexto).toBe('');
+  expect(url.hash, urlTexto).toBe('');
+  expect(RUTAS_DE_LA_APP.has(url.pathname), urlTexto).toBe(true);
+  for (const [nombre, valor] of cabeceras) {
+    const n = nombre.toLowerCase();
+    expect(CABECERAS_DEL_NAVEGADOR.has(n), `${urlTexto} ${n}`).toBe(true);
+    if (n === 'host') {
+      expect(valor, urlTexto).toBe(new URL(origen).host);
+    } else if (n === 'origin') {
+      expect(valor, urlTexto).toBe(origen);
+    } else if (n === 'referer') {
+      const referer = new URL(valor);
+      expect(referer.origin, urlTexto).toBe(origen);
+      expect(referer.search + referer.hash, urlTexto).toBe('');
+      expect(RUTAS_DE_LA_APP.has(referer.pathname), `${urlTexto} referer ${valor}`).toBe(true);
+    } else {
+      for (const dato of INTRODUCIDOS) expect(valor, `${urlTexto} ${n} ${dato}`).not.toContain(dato);
+      expect(valor, `${urlTexto} ${n}`).not.toMatch(/\b47\b/);
+    }
+  }
+}
+
+function pares(rawHeaders) {
+  const lista = [];
+  for (let i = 0; i < rawHeaders.length; i += 2) lista.push([rawHeaders[i], rawHeaders[i + 1]]);
+  return lista;
+}
+
 let servidor;
 let llegadas;
 
@@ -75,6 +123,9 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
       url: r.url(),
       metodo: r.method(),
       cuerpo: r.postData(),
+      // headers() se lee al momento; las cabeceras completas, incluidas las de
+      // cookies, se comprueban en lo que llega al servidor.
+      cabeceras: Object.entries(r.headers()),
       delServiceWorker: r.serviceWorker() !== null,
     });
   });
@@ -95,38 +146,33 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   await page.getByLabel('Dos lados sin barra').check();
   await expect(series(page)).toHaveCount(3);
   await page.reload();
+  expect(page.url()).toBe(servidor.base);
+  expect(await context.cookies()).toEqual([]);
   await page.close();
   await context.close();
 
   expect(sockets).toEqual([]);
 
-  // Navegador: todo al propio origen, solo GET y sin cuerpo.
+  // Navegador: todo al propio origen, solo GET, sin cuerpo, a la lista cerrada
+  // de ficheros y con las cabeceras permitidas. Cubre también las peticiones
+  // que aún no hubieran llegado al servidor al cerrar.
   expect(vistas.length).toBeGreaterThan(0);
   for (const r of vistas) {
-    expect(new URL(r.url).origin, r.url).toBe(origen);
     expect(r.metodo, r.url).toBe('GET');
     expect(r.cuerpo, r.url).toBeNull();
+    comprobarPeticion(r.url, r.cabeceras, origen);
   }
   // Las peticiones de precarga del service worker también se han visto.
   expect(vistas.some((r) => r.delServiceWorker)).toBe(true);
 
-  // Origen: lista cerrada de ficheros de la app, sin consulta, sin cuerpo, sin
-  // cookies y sin ningún dato introducido en las cabeceras.
-  const introducidos = ['7,35', '7.35', '7%2C35', '735', '487', '48735',
-    'dos-lados', 'un-punto', 'recta'];
+  // Origen: lo mismo sobre lo que llega de verdad, con las cabeceras en crudo,
+  // y sin cookies.
   expect(llegadas.length).toBeGreaterThan(0);
   for (const p of llegadas) {
-    const url = new URL(p.url, origen);
     expect(p.metodo, p.url).toBe('GET');
-    expect(url.search, p.url).toBe('');
-    expect(RUTAS_DE_LA_APP.has(url.pathname), p.url).toBe(true);
     expect(p.cuerpo, p.url).toBe('');
-    const nombres = p.cabeceras.filter((_, i) => i % 2 === 0).map((n) => n.toLowerCase());
-    expect(nombres, p.url).not.toContain('cookie');
-    const cabeceras = p.cabeceras.join('\n');
-    for (const dato of introducidos) {
-      expect(cabeceras, `${p.url} ${dato}`).not.toContain(dato);
-    }
-    expect(cabeceras, p.url).not.toMatch(/\b47\b/);
+    const cabeceras = pares(p.cabeceras);
+    expect(cabeceras.map(([n]) => n.toLowerCase()), p.url).not.toContain('cookie');
+    comprobarPeticion(p.url, cabeceras, origen);
   }
 });

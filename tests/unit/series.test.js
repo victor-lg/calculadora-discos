@@ -377,7 +377,7 @@ test('SPEC-CALC-001/AC-28 peso de barra "," o solo espacios: indicación, sin er
 });
 
 test('SPEC-CALC-001/AC-31 tabulador, espacio duro o salto de línea alrededor del peso', () => {
-  for (const trabajo of ['\t100\t', ' 100 ', '\n100\n', '\r\n100\r\n']) {
+  for (const trabajo of ['\t100\t', '\u00a0100\u00a0', '\n100\n', '\r\n100\r\n']) {
     const v = vista({ trabajo, porcentajes: [40, 70, 90] });
     assert.equal(v.errorTrabajo, null, JSON.stringify(trabajo));
     assert.deepEqual(AC01(v), SERIES_AC01, JSON.stringify(trabajo));

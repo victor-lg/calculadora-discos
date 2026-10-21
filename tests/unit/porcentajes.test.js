@@ -115,7 +115,7 @@ test('SPEC-CALC-001/AC-29 "40,", ",5" y "4 0" no se añaden y se explica qué fa
 });
 
 test('SPEC-CALC-001/AC-30 porcentaje vacío o solo con espacios: nada cambia y sin mensaje', () => {
-  for (const texto of ['', ' ', '   ', '\t', ' ']) {
+  for (const texto of ['', ' ', '   ', '\t', '\u00a0']) {
     const e = anadir(estadoInicial([40, 70]), texto);
     assert.deepEqual(e.porcentajes, [40, 70], JSON.stringify(texto));
     assert.equal(e.errorPorcentaje, null, JSON.stringify(texto));
@@ -126,7 +126,7 @@ test('SPEC-CALC-001/AC-30 porcentaje vacío o solo con espacios: nada cambia y s
 });
 
 test('SPEC-CALC-001/AC-31 40 con un tabulador o un espacio duro detrás se añade como 40 %', () => {
-  for (const texto of ['40\t', '40 ']) {
+  for (const texto of ['40\t', '40\u00a0']) {
     const e = anadir(estadoInicial([]), texto);
     assert.deepEqual(e.porcentajes, [40], JSON.stringify(texto));
     assert.equal(e.errorPorcentaje, null, JSON.stringify(texto));

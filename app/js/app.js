@@ -101,7 +101,8 @@ function pintar() {
     const li = crear('li', null);
     const quitar = crear('button', 'quitar', '×');
     quitar.type = 'button';
-    quitar.setAttribute('aria-label', `Quitar ${p}`);
+    // La posición hace único el nombre accesible aunque el porcentaje se repita (AC-09).
+    quitar.setAttribute('aria-label', `Quitar ${p}, posición ${i + 1}`);
     quitar.addEventListener('click', () => {
       actualizar(quitarPorcentaje(estado, i));
     });

@@ -41,6 +41,19 @@ test('SPEC-CALC-001/AC-13 la app no usa cookies ni otras API de red', () => {
   for (const f of FICHEROS_DE_TEXTO.filter((f) => f.endsWith('.js'))) {
     assert.doesNotMatch(readFileSync(`${APP}${f}`, 'utf8'), prohibidas, f);
   }
+  // La interfaz no hace peticiones por su cuenta ni navega: solo el service
+  // worker pide ficheros, y solo los de la app.
+  const enInterfaz = /\bfetch\s*\(|new\s+Image\b|\bWorker\s*\(|SharedWorker|window\.open|\blocation\s*\.|\blocation\s*=|pushState|replaceState|\.ping\b/;
+  for (const f of FICHEROS_DE_TEXTO.filter((f) => f.startsWith('js/'))) {
+    assert.doesNotMatch(readFileSync(`${APP}${f}`, 'utf8'), enInterfaz, f);
+  }
+});
+
+// ADR-0001 §3.3: el workflow de publicación sustituye este marcador por el SHA.
+test('sw.js conserva el marcador de versión que sustituye la publicación', () => {
+  const sw = readFileSync(`${APP}sw.js`, 'utf8');
+  assert.equal(sw.match(/'__VERSION__'/g)?.length, 1);
+  assert.match(sw, /^const VERSION = '__VERSION__';$/m);
 });
 
 // ADR-0001 §3.4: la CSP del documento, exacta y como primer elemento del head.

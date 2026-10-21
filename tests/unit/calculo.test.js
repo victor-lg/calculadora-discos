@@ -25,7 +25,7 @@ test('FR-03: análisis del peso escrito', () => {
   assert.deepEqual(analizarPeso('100.'), { estado: 'ok', cent: 10000 });
   assert.deepEqual(analizarPeso('.5'), { estado: 'ok', cent: 50 });
   assert.deepEqual(analizarPeso(' ,25 '), { estado: 'ok', cent: 25 });
-  for (const t of [' ', ',', '.', ' . ', '\t', ' ', '\n']) {
+  for (const t of [' ', ',', '.', ' . ', '\t', '\u00a0', '\n']) {
     assert.deepEqual(analizarPeso(t), { estado: 'vacio' }, JSON.stringify(t));
   }
   for (const t of ['0', '0,00', '0,', ',0', ',00', '500,01', '100,123', '1.000', '1,000', 'abc',
