@@ -32,7 +32,7 @@ AGENTS.md pide además el mínimo de dependencias (cada una nueva es R2) y un te
 ## 2. Alternativas consideradas
 
 - **A. PWA instalada en la pantalla de inicio.**
-  - No necesita Mac, firma ni cuenta de desarrollador. Desde iOS 26, cualquier web añadida a la pantalla de inicio se abre como web app [F1].
+  - No necesita Mac, firma ni cuenta de desarrollador. Desde iOS 26, una web añadida a la pantalla de inicio se abre por defecto como web app, con un interruptor para desactivarlo [F1].
   - Un service worker permite arrancar sin red [F2].
   - El origen de una web app de la pantalla de inicio está exento del límite de 7 días de ITP, y sus datos están aislados de Safari [F3].
   - Se prueba en Linux.
@@ -50,7 +50,7 @@ AGENTS.md pide además el mínimo de dependencias (cada una nueva es R2) y un te
   - La distribución ad hoc exige una cuenta de pago de Apple y registrar el UDID [F9].
   - Añade decenas de dependencias R2.
 - **D. Atajos o Scriptable** [F10].
-  - Atajos no puede recalcular al momento (FR-10) ni mostrar todas las series.
+  - Valoración propia, sin fuente: en Atajos, la interacción por diálogos sucesivos no permite recalcular al momento (FR-10).
   - Scriptable, metido en una vista web, sería la opción A dentro de una app de terceros, actualizada a mano en el teléfono.
 - **Con o sin framework (dentro de A).** Preact, Lit o Svelte añadirían dependencias R2 (y, en Svelte, compilación). No compensa para una pantalla con unos pocos campos.
 
@@ -69,17 +69,22 @@ AGENTS.md pide además el mínimo de dependencias (cada una nueva es R2) y un te
    - Una versión nueva nunca cambia el código a mitad de un uso.
 4. **Solo el propio origen.**
    - Ningún recurso de terceros: ni CDN, ni fuentes, ni analítica.
-   - Una CSP en `<meta>`, porque Pages no permite cabeceras propias. Esa CSP no cubre el service worker, que también pide solo al propio origen.
+   - Una CSP en `<meta>`, porque la configuración de Pages no ofrece cabeceras HTTP propias (lo sé por conocimiento general; no lo he contrastado con una fuente). Esa CSP no cubre el service worker, que también pide solo al propio origen.
 5. **Alojamiento.**
    - GitHub Pages desde este repositorio privado, con la cuenta GitHub Pro de Víctor [F11].
    - Con un **subdominio propio verificado en GitHub y sin DNS comodín** [F12]. La verificación evita que otro usuario reclame el subdominio. El subdominio aísla además el origen de los demás sitios `victor-lg.github.io`.
    - Pages da HTTPS también con dominio propio [F13].
 6. **Publicación manual.**
    - El workflow de publicación solo se lanza a mano (`workflow_dispatch`), nunca al fusionar en `main`. Fusionar no es publicar (D25).
-   - Publicar es una decisión de Víctor sobre una versión concreta de `main`.
+   - Publicar es una decisión de Víctor sobre una versión concreta de `main`. Aceptar un cambio y ponerlo en el iPhone son pasos distintos, y el agente no despliega (AGENTS.md).
+   - **Lo impone GitHub, no la buena fe.** Lanzar un `workflow_dispatch` solo exige permiso de escritura [F17], y la cuenta del agente lo tiene. Con GitHub Pro, en un repositorio privado, los entornos no admiten aprobadores obligatorios, pero sí limitar las ramas que despliegan [F18]. Por eso:
+     - el entorno `github-pages` solo admite `main`;
+     - el job de publicación solo se ejecuta si lo lanza la cuenta `victor-lg`.
+
+     El agente no puede cambiar el workflow, porque su token no tiene el permiso `workflow`.
 7. **Tests.**
    - `node --test` para la lógica, sin dependencias [F14].
-   - Playwright, como **única dependencia de desarrollo**, para lo que necesita un navegador. Corre en Chromium y WebKit, en la CI y en local cuando el entorno lo permita.
+   - Playwright, como **única dependencia de desarrollo**, para lo que necesita un navegador. En la CI corre **siempre** en Chromium y WebKit; en local, cuando el entorno lo permita.
    - Lo que dependa del service worker se prueba en Chromium, el único navegador donde Playwright ve su tráfico [F15]. El WebKit de Playwright no es Safari de iOS [F16].
 8. **Prueba manual en el iPhone.** AC-12 y AC-22 no se dan por cumplidos sin una prueba manual en el iPhone, registrada en el PR de la entrega, aunque haya tests que los citen.
 9. **Workflows.** Los workflows de tests y de publicación los añade una persona, porque el agente no tiene el permiso `workflow`.
@@ -95,16 +100,18 @@ AGENTS.md pide además el mínimo de dependencias (cada una nueva es R2) y un te
   - instalación manual desde Safari;
   - las pruebas en iOS real son manuales;
   - en la práctica, la "primera carga" de NFR-01 es la primera apertura desde el icono con conexión, porque los datos de la web app están aislados de Safari [F3];
-  - una corrección no llega al iPhone hasta que Víctor publica.
+  - una corrección no llega al iPhone hasta que Víctor publica;
+  - cambiar el subdominio después de instalar la app cambia el origen: hay que reinstalarla y se pierde la lista guardada (vuelve a 40/70/90, FR-11).
 - **Riesgos y mitigaciones:**
 
   | Riesgo | Mitigación |
   | --- | --- |
-  | iOS borra la lista guardada | Se pide `persist()`, sin garantía. Si se borra, se aplica FR-11 (40/70/90). |
-  | iOS termina la app en segundo plano y se pierde el peso | Aceptado como arranque de cero. La prueba manual mide con qué frecuencia pasa. |
+  | iOS borra la lista guardada | Se pide almacenamiento persistente, sin garantía [F4][F6]. Si se borra, se aplica FR-11 (40/70/90). |
+  | iOS termina la app en segundo plano y se pierde el peso | Aceptado como arranque de cero. Se observa en el uso real; si molesta, se reabre con una spec nueva. |
   | Un cambio de iOS altera las web apps | Repetir la prueba manual tras cada versión mayor de iOS. |
   | Se cuela una petición a terceros | CSP en `<meta>` para el documento, y el test de AC-13 y la revisión de código para el service worker. |
-  | El iPhone se queda con una versión vieja | Versión nueva en cada publicación, sin mezclar ficheros de versiones distintas. Se activa cuando la app se cierra del todo. |
+  | El iPhone se queda con una versión vieja | Versión nueva en cada publicación, sin mezclar ficheros de versiones distintas. Solo entra cuando no hay un uso en curso (§3.3), lo que en iOS puede tardar. |
+  | Alguien que no es Víctor publica | Entorno limitado a `main` y job condicionado a la cuenta `victor-lg` (§3.6). |
   | Alguien reclama el subdominio | Verificación en GitHub, sin DNS comodín, y borrar el registro DNS si se deja Pages [F12]. |
 
 - **Impacto:** el proyecto pasa a la etapa técnica, con PR propios posteriores:
@@ -152,3 +159,5 @@ Consultadas el 2026-10-21.
 - [F14] Node.js, "Test runner": <https://nodejs.org/api/test.html>
 - [F15] Playwright, "Service Workers" (solo en Chromium): <https://playwright.dev/docs/service-workers>
 - [F16] Playwright, "Browsers": <https://playwright.dev/docs/browsers>
+- [F17] GitHub Docs, "Manually running a workflow" ("Write access to the repository is required"): <https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow>
+- [F18] GitHub Docs, "Deployments and environments" (en Pro/Team, aprobadores obligatorios solo en repositorios públicos; ramas de despliegue también en privados): <https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments>
