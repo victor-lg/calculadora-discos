@@ -15,7 +15,7 @@ Calcula al instante qué discos cargar en cada serie de aproximación, a partir 
 
 PWA de HTML, CSS y JavaScript estándar, sin framework, sin compilación y sin dependencias en tiempo de ejecución.
 Funciona sin conexión con un service worker propio y solo guarda en el dispositivo la lista de porcentajes.
-Se publica a mano en GitHub Pages, con subdominio propio. El porqué está en los ADR:
+Se publica en GitHub Pages, con subdominio propio, mediante un workflow que solo lanza Víctor; fusionar no publica. El porqué está en los ADR:
 
 - [`ADR-0001`](docs/adr/ADR-0001-tecnologia-pwa.md) — PWA sin framework, alojada en GitHub Pages
 
@@ -30,7 +30,11 @@ npm ci --ignore-scripts
 # Tests unitarios (node --test)
 npm test
 
-# Navegadores de Playwright: se descargan fuera del sandbox del agente
+# Servir la app en local (http://127.0.0.1:4791; otro puerto con PUERTO=…)
+node tests/e2e/servidor.js
+
+# Navegadores de Playwright: se descargan fuera del sandbox del agente.
+# En Linux, WebKit puede necesitar librerías del sistema: añade --with-deps (usa sudo), como la CI.
 npx playwright install chromium webkit
 
 # Tests E2E (Chromium y WebKit; en la CI, siempre los dos)
