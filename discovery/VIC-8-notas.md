@@ -18,7 +18,7 @@ Estas notas son contexto, no norma (AGENTS.md). Lo que acabe en la spec lo aprue
 - **Memoria** *(propuesta de Claude, aceptada)*: se guarda qué discos están habilitados y se recupera al arrancar de cero. La primera vez, o si los datos faltan o no se pueden leer, están los 7 habilitados.
 - **Ninguno habilitado** *(propuesta de Claude, aceptada)*: no se muestra ninguna serie y aparece una indicación para habilitar al menos uno, como con la lista de porcentajes vacía.
 
-## Inferencias de Claude (en la spec, a confirmar en la revisión)
+## Inferencias de Claude (confirmadas por Víctor el 2026-10-23)
 
 - Un conjunto guardado vacío se recupera vacío, igual que la lista de porcentajes (SPEC-CALC-001 FR-11).
 - Los datos guardados que se leen pero no son válidos se tratan como ilegibles (los 7 habilitados), igual que con los porcentajes.
@@ -46,3 +46,8 @@ Estas notas son contexto, no norma (AGENTS.md). Lo que acabe en la spec lo aprue
 7. **¿Ninguno habilitado?** Lo propuesto: sin series y con una indicación.
 8. **¿Desempate?** El del disco más grande.
 - Lo dado por resuelto (buscar la mejor combinación y el disco mínimo = el habilitado más pequeño): de acuerdo.
+
+### Revisión del PR (2026-10-23)
+
+- Confirma las cuatro inferencias.
+- NFR-01 y NFR-02 se citan por ID a SPEC-CALC-001, sin copiar su texto. La SPEC-XCUT se deja para más adelante.

@@ -12,8 +12,8 @@ transversales: []
 <!--
 Redactada con sdd-spec a partir de discovery/VIC-8-notas.md (2026-10-23).
 Las reglas de negocio las decidió Víctor; las que eran propuesta de Claude y
-él aceptó están marcadas en las notas, igual que las inferencias pendientes de
-confirmar en la revisión. Ajusta SPEC-CALC-001 (v0.5) en FR-06, FR-07, FR-09,
+él aceptó están marcadas en las notas, igual que las cuatro inferencias de
+Claude, que Víctor confirmó el 2026-10-23. Ajusta SPEC-CALC-001 (v0.5) en FR-06, FR-07, FR-09,
 AC-13, §2 y §11 para que el cálculo use los discos habilitados.
 -->
 
@@ -38,7 +38,7 @@ Que Víctor indique qué tipos de disco hay disponibles en el gimnasio y que el 
 
 ## 3. Actores
 
-Víctor, único usuario, en su iPhone. Como en SPEC-CALC-001, ningún otro sistema recibe datos: los discos habilitados son un dato introducido por la persona (SPEC-CALC-001 NFR-02 y AC-13).
+Víctor, único usuario, en su iPhone. Los discos habilitados son un dato introducido por la persona a efectos de SPEC-CALC-001 NFR-01 y NFR-02 (y de su AC-13).
 
 ## 4. Requisitos funcionales
 
