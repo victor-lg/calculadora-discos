@@ -77,3 +77,5 @@ cruza carpetas. La CI usa la lista que hay en `main`, no la del PR.
 
 - `app/sw.js`
 - `app/index.html`
+- `tests/unit/sw.test.js`
+- `tests/e2e/sin-conexion.spec.js`
