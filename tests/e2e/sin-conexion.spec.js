@@ -186,9 +186,17 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   });
   const sockets = [];
 
+  // Se separa por fase, no por origen: así una petición del recorrido con datos
+  // al origen de referencia también se comprueba, y falla.
+  let vistasReferencia;
+  let vistasConDatos;
+  let llegadasReferenciaTrasRecorrido;
   try {
     await recorrido(context, servidorReferencia.base, false, sockets);
+    vistasReferencia = vistas.slice();
+    llegadasReferenciaTrasRecorrido = llegadasReferencia.length;
     await recorrido(context, servidor.base, true, sockets);
+    vistasConDatos = vistas.slice(vistasReferencia.length);
     expect(await context.cookies()).toEqual([]);
   } finally {
     await context.close();
@@ -197,10 +205,12 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
 
   expect(sockets).toEqual([]);
 
-  const vistasReferencia = vistas.filter((r) => new URL(r.url).origin === origenReferencia);
-  const vistasConDatos = vistas.filter((r) => new URL(r.url).origin !== origenReferencia);
+  // La referencia solo vale si todo fue a su propio origen, y durante el
+  // recorrido con datos no le llega nada.
   expect(vistasReferencia.length).toBeGreaterThan(0);
   expect(llegadasReferencia.length).toBeGreaterThan(0);
+  for (const r of vistasReferencia) expect(new URL(r.url).origin, r.url).toBe(origenReferencia);
+  expect(llegadasReferencia.length).toBe(llegadasReferenciaTrasRecorrido);
 
   // Navegador: todo al propio origen, solo GET, sin cuerpo, a la lista cerrada
   // de ficheros y con las cabeceras permitidas. Cubre también las peticiones

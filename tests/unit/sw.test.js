@@ -47,7 +47,7 @@ test('SPEC-CALC-001/AC-13 la app no usa cookies ni otras API de red', () => {
   // worker pide ficheros, y solo los de la app. `fetch` se prohíbe como palabra
   // para cubrir también el acceso indirecto (globalThis['fetch']), y los
   // nombres de elementos que cargan recursos, para cubrir createElement('img').
-  const enInterfaz = /\bfetch\b|new\s+Image\b|new\s+Audio\b|\bWorker\s*\(|SharedWorker|window\.open|\blocation\s*\.|\blocation\s*=|pushState|replaceState|\.ping\b|\.(src|srcset|href|action|formAction|data|poster)\s*=/;
+  const enInterfaz = /\bfetch\b|new\s+Image\b|new\s+Audio\b|\bWorker\s*\(|SharedWorker|window\.open|\blocation\s*\.|\blocation\s*=|pushState|replaceState|\.ping\b|\.(src|srcset|href|action|formAction|data|poster)\s*=|setAttribute\s*\(\s*['"`](src|srcset|href|action|formaction|data|poster|ping)['"`]/i;
   const elementosConRecursos = /['"`](img|image|script|iframe|frame|link|object|embed|audio|video|source|track|picture|a|form|base|meta|style|svg|use)['"`]/i;
   const interfaz = FICHEROS_DE_TEXTO.filter((f) => f.startsWith('js/'));
   assert.ok(interfaz.length > 0);
