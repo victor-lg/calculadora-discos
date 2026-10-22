@@ -37,16 +37,37 @@ test('la app no usa innerHTML ni recursos de terceros', () => {
 
 // SPEC-CALC-001/AC-13 (NFR-02): la app no tiene otra vía para sacar datos.
 test('SPEC-CALC-001/AC-13 la app no usa cookies ni otras API de red', () => {
-  const prohibidas = /document\.cookie|cookieStore|sendBeacon|WebSocket|EventSource|XMLHttpRequest|RTCPeerConnection|\bimport\s*\(/;
-  for (const f of FICHEROS_DE_TEXTO.filter((f) => f.endsWith('.js'))) {
+  const prohibidas = /document\.cookie|cookieStore|sendBeacon|WebSocket|WebTransport|EventSource|XMLHttpRequest|RTCPeerConnection|importScripts|\bimport\s*\(/;
+  const scripts = FICHEROS_DE_TEXTO.filter((f) => f.endsWith('.js'));
+  assert.ok(scripts.length > 0);
+  for (const f of scripts) {
     assert.doesNotMatch(readFileSync(`${APP}${f}`, 'utf8'), prohibidas, f);
   }
   // La interfaz no hace peticiones por su cuenta ni navega: solo el service
-  // worker pide ficheros, y solo los de la app.
-  const enInterfaz = /\bfetch\s*\(|new\s+Image\b|\bWorker\s*\(|SharedWorker|window\.open|\blocation\s*\.|\blocation\s*=|pushState|replaceState|\.ping\b/;
-  for (const f of FICHEROS_DE_TEXTO.filter((f) => f.startsWith('js/'))) {
-    assert.doesNotMatch(readFileSync(`${APP}${f}`, 'utf8'), enInterfaz, f);
+  // worker pide ficheros, y solo los de la app. `fetch` se prohíbe como palabra
+  // para cubrir también el acceso indirecto (globalThis['fetch']), y los
+  // nombres de elementos que cargan recursos, para cubrir createElement('img').
+  const enInterfaz = /\bfetch\b|new\s+Image\b|new\s+Audio\b|\bWorker\s*\(|SharedWorker|window\.open|\blocation\s*\.|\blocation\s*=|pushState|replaceState|\.ping\b|\.(src|srcset|href|action|formAction|data|poster)\s*=|setAttribute\s*\(\s*['"`](src|srcset|href|action|formaction|data|poster|ping)['"`]/i;
+  const elementosConRecursos = /['"`](img|image|script|iframe|frame|link|object|embed|audio|video|source|track|picture|a|form|base|meta|style|svg|use)['"`]/i;
+  const interfaz = FICHEROS_DE_TEXTO.filter((f) => f.startsWith('js/'));
+  assert.ok(interfaz.length > 0);
+  for (const f of interfaz) {
+    const texto = readFileSync(`${APP}${f}`, 'utf8');
+    assert.doesNotMatch(texto, enInterfaz, f);
+    assert.doesNotMatch(texto, elementosConRecursos, f);
   }
+});
+
+// SPEC-CALC-001/AC-13 (ADR-0001 §3.4): la única petición propia del service
+// worker es reenviar la que recibe; la precarga usa la lista fija FICHEROS.
+test('SPEC-CALC-001/AC-13 el service worker solo reenvía event.request', () => {
+  const sw = readFileSync(`${APP}sw.js`, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.equal(sw.match(/\bfetch\b/g)?.length, 2);
+  assert.equal(sw.match(/addEventListener\('fetch',/g)?.length, 1);
+  assert.equal(sw.match(/\bfetch\(event\.request\)/g)?.length, 1);
+  assert.equal(sw.match(/\bnew\s+Request\s*\(/g)?.length, 1);
+  assert.match(sw, /cache\.addAll\(FICHEROS\.map\(\(url\) => new Request\(url, \{ cache: 'reload' \}\)\)\)/);
+  assert.doesNotMatch(sw, /importScripts|\bcache\.add\s*\(|\bcache\.put\s*\(/);
 });
 
 // ADR-0001 §3.3: el workflow de publicación sustituye este marcador por el SHA.
