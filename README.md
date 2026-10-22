@@ -59,7 +59,8 @@ técnica
 
 <!--
 - documental → solo discovery/ y docs/ (visión, specs, ADR); aún no hay tecnología elegida.
-- técnica    → existe un ADR que fija la tecnología; hay src/, tests/ y la CI del stack.
+- técnica    → existe un ADR que fija la tecnología; hay código, tests y la CI del stack.
+No lo lee la CI: es información para quien abre el repo.
 -->
 
 ## Rutas sensibles
@@ -74,4 +75,5 @@ ejemplo `src/pagos/` (una carpeta entera) o `src/auth/*.ts`. El `*` también
 cruza carpetas. La CI usa la lista que hay en `main`, no la del PR.
 -->
 
-- (ninguna todavía)
+- `app/sw.js`
+- `app/index.html`
