@@ -30,16 +30,38 @@ const CABECERAS_DEL_NAVEGADOR = new Set([
   'service-worker', 'upgrade-insecure-requests', 'user-agent',
 ]);
 
-// Valores introducidos en el recorrido de AC-13, completos y en sus formas
-// codificadas. El puerto efímero solo aparece en Host, Origin y Referer, que se
-// comprueban aparte y no se escanean. No se buscan fragmentos cortos porque
-// podrían coincidir con la versión del navegador en user-agent o sec-ch-ua.
+// Valores introducidos en el recorrido de AC-13, completos, en sus formas
+// codificadas y en formas cortas (el peso en céntimos u otra codificación).
+// Se buscan en todas las cabeceras salvo Host, Origin y Referer, que se
+// comprueban aparte, y salvo user-agent y sec-ch-ua*, donde la versión del
+// navegador podría contenerlos sin que haya fuga. Esas cabeceras, como todas,
+// tienen que coincidir además con un valor del recorrido de referencia.
 const INTRODUCIDOS = ['7,35', '7.35', '7%2C35', '487,35', '487.35', '487%2C35', '48735',
-  'dos-lados', 'un-punto', 'recta'];
+  '735', '487', 'dos-lados', 'un-punto', 'recta'];
+const esDeVersion = (n) => n === 'user-agent' || n.startsWith('sec-ch-ua');
+
+// Tiempo que se sigue observando tras cerrar la página, con el contexto y el
+// servidor vivos: cubre peticiones aplazadas, un fetch con keepalive al
+// ocultarla y el trabajo posterior del service worker.
+const MARGEN_TRAS_CERRAR_MS = 3000;
+
+// Valores de cada cabecera vistos en el recorrido de referencia, sin datos.
+function valoresDeReferencia(peticiones) {
+  const valores = new Map();
+  for (const { cabeceras } of peticiones) {
+    for (const [nombre, valor] of cabeceras) {
+      const n = nombre.toLowerCase();
+      if (!valores.has(n)) valores.set(n, new Set());
+      valores.get(n).add(valor);
+    }
+  }
+  return valores;
+}
 
 // Comprueba una petición: URL de la lista cerrada y cabeceras permitidas, con
-// Host, Origin y Referer iguales al propio origen.
-function comprobarPeticion(urlTexto, cabeceras, origen) {
+// Host, Origin y Referer iguales al propio origen, y las demás con un valor de
+// la referencia y sin datos de la persona.
+function comprobarPeticion(urlTexto, cabeceras, origen, referencia) {
   const url = new URL(urlTexto, origen);
   expect(url.origin, urlTexto).toBe(origen);
   expect(url.search, urlTexto).toBe('');
@@ -58,6 +80,8 @@ function comprobarPeticion(urlTexto, cabeceras, origen) {
       expect(referer.search + referer.hash, urlTexto).toBe('');
       expect(RUTAS_DE_LA_APP.has(referer.pathname), `${urlTexto} referer ${valor}`).toBe(true);
     } else {
+      expect([...(referencia.get(n) ?? [])], `${urlTexto} ${n}`).toContain(valor);
+      if (esDeVersion(n)) continue;
       for (const dato of INTRODUCIDOS) expect(valor, `${urlTexto} ${n} ${dato}`).not.toContain(dato);
       expect(valor, `${urlTexto} ${n}`).not.toMatch(/\b47\b/);
     }
@@ -114,8 +138,38 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
   expect(llegadas.slice(antes)).toEqual([]);
 });
 
+// Uso completo: primera carga, calcular (si `conDatos`), recargar y cerrar.
+// Tras cerrar sigue observando un margen con el contexto y el servidor vivos.
+async function recorrido(context, base, conDatos, sockets) {
+  const page = await context.newPage();
+  page.on('websocket', (ws) => sockets.push(ws.url()));
+  await page.goto(base);
+  await esperarServiceWorker(page);
+  if (conDatos) {
+    await page.getByLabel('Recta pequeña').check();
+    await page.getByLabel('Peso de la barra (kg)').fill('7,35');
+    await page.getByLabel('Peso de trabajo (kg)').fill('487,35');
+    await page.getByLabel('Nuevo porcentaje').fill('47');
+    await page.getByRole('button', { name: 'Añadir' }).click();
+    await page.getByRole('button', { name: 'Quitar 70 %' }).click();
+    await page.getByLabel('Un punto').check();
+    await page.getByLabel('Dos lados sin barra').check();
+    await expect(series(page)).toHaveCount(3);
+  }
+  await page.reload();
+  expect(page.url()).toBe(base);
+  await page.close();
+  await new Promise((r) => setTimeout(r, MARGEN_TRAS_CERRAR_MS));
+}
+
 test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ context }) => {
   const origen = new URL(servidor.base).origin;
+  // Recorrido de referencia, sin datos, en otro origen (otro puerto), así que
+  // con su propio service worker y su propio almacenamiento.
+  const llegadasReferencia = [];
+  const servidorReferencia = await arrancar((p) => llegadasReferencia.push(p));
+  const origenReferencia = new URL(servidorReferencia.base).origin;
+
   // Lo que ve el navegador: sirve para detectar peticiones a otros orígenes,
   // que nunca llegarían a nuestro servidor.
   const vistas = [];
@@ -132,48 +186,44 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   });
   const sockets = [];
 
-  // Uso completo: primera carga, calcular, cambiar porcentajes y cerrar.
-  const page = await context.newPage();
-  page.on('websocket', (ws) => sockets.push(ws.url()));
-  await page.goto(servidor.base);
-  await esperarServiceWorker(page);
-  await page.getByLabel('Recta pequeña').check();
-  await page.getByLabel('Peso de la barra (kg)').fill('7,35');
-  await page.getByLabel('Peso de trabajo (kg)').fill('487,35');
-  await page.getByLabel('Nuevo porcentaje').fill('47');
-  await page.getByRole('button', { name: 'Añadir' }).click();
-  await page.getByRole('button', { name: 'Quitar 70 %' }).click();
-  await page.getByLabel('Un punto').check();
-  await page.getByLabel('Dos lados sin barra').check();
-  await expect(series(page)).toHaveCount(3);
-  await page.reload();
-  expect(page.url()).toBe(servidor.base);
-  expect(await context.cookies()).toEqual([]);
-  await page.close();
-  await context.close();
+  try {
+    await recorrido(context, servidorReferencia.base, false, sockets);
+    await recorrido(context, servidor.base, true, sockets);
+    expect(await context.cookies()).toEqual([]);
+  } finally {
+    await context.close();
+    await servidorReferencia.cerrar();
+  }
 
   expect(sockets).toEqual([]);
+
+  const vistasReferencia = vistas.filter((r) => new URL(r.url).origin === origenReferencia);
+  const vistasConDatos = vistas.filter((r) => new URL(r.url).origin !== origenReferencia);
+  expect(vistasReferencia.length).toBeGreaterThan(0);
+  expect(llegadasReferencia.length).toBeGreaterThan(0);
 
   // Navegador: todo al propio origen, solo GET, sin cuerpo, a la lista cerrada
   // de ficheros y con las cabeceras permitidas. Cubre también las peticiones
   // que aún no hubieran llegado al servidor al cerrar.
-  expect(vistas.length).toBeGreaterThan(0);
-  for (const r of vistas) {
+  const referenciaVistas = valoresDeReferencia(vistasReferencia);
+  expect(vistasConDatos.length).toBeGreaterThan(0);
+  for (const r of vistasConDatos) {
     expect(r.metodo, r.url).toBe('GET');
     expect(r.cuerpo, r.url).toBeNull();
-    comprobarPeticion(r.url, r.cabeceras, origen);
+    comprobarPeticion(r.url, r.cabeceras, origen, referenciaVistas);
   }
   // Las peticiones de precarga del service worker también se han visto.
-  expect(vistas.some((r) => r.delServiceWorker)).toBe(true);
+  expect(vistasConDatos.some((r) => r.delServiceWorker)).toBe(true);
 
   // Origen: lo mismo sobre lo que llega de verdad, con las cabeceras en crudo,
   // y sin cookies.
+  const referenciaLlegadas = valoresDeReferencia(llegadasReferencia.map((p) => ({ cabeceras: pares(p.cabeceras) })));
   expect(llegadas.length).toBeGreaterThan(0);
   for (const p of llegadas) {
     expect(p.metodo, p.url).toBe('GET');
     expect(p.cuerpo, p.url).toBe('');
     const cabeceras = pares(p.cabeceras);
     expect(cabeceras.map(([n]) => n.toLowerCase()), p.url).not.toContain('cookie');
-    comprobarPeticion(p.url, cabeceras, origen);
+    comprobarPeticion(p.url, cabeceras, origen, referenciaLlegadas);
   }
 });
