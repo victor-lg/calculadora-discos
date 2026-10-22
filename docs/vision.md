@@ -17,6 +17,7 @@ Solo Víctor, en el gimnasio y desde su iPhone. La app debe funcionar sin conexi
 ## Capacidades
 
 - **Series de calentamiento con cálculo de discos** (barra, dos lados sin barra, un punto): `docs/specs/SPEC-CALC-001-series-calentamiento.md`.
+- **Discos disponibles:** qué tipos de disco hay en el gimnasio, para que el cálculo use solo esos: `docs/specs/SPEC-CALC-002-inventario-discos.md`.
 - **Máquinas de placas y poleas:** pendiente, para una funcionalidad futura.
 - **Mancuernas:** pendiente, para una funcionalidad futura.
 
