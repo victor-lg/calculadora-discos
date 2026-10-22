@@ -42,8 +42,8 @@ jobs:
           cache: npm
 
       - if: steps.hay.outputs.si == 'true'
-        name: Instalar dependencias (versiones exactas del lockfile)
-        run: npm ci
+        name: Instalar dependencias (versiones exactas del lockfile, sin scripts de instalación)
+        run: npm ci --ignore-scripts
 
       - if: steps.hay.outputs.si == 'true'
         name: Tests unitarios
