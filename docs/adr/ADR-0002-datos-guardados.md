@@ -1,7 +1,7 @@
 ---
 id: ADR-0002
 titulo: Datos guardados en el dispositivo
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-10-23
 sustituye: null
 sustituido_por: null
@@ -13,6 +13,7 @@ referencias: [ADR-0001, SPEC-CALC-001, SPEC-CALC-002, VIC-8, PR #12]
 Redactado por Claude a partir de las decisiones de Víctor del 2026-10-23
 (VIC-8), tomadas en la revisión del PR #12. Cambia solo ADR-0001 §3.2;
 el resto de ADR-0001 sigue vigente y no se edita.
+Aceptado con el merge del PR #13.
 -->
 
 # ADR-0002 — Datos guardados en el dispositivo
