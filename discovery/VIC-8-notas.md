@@ -62,3 +62,9 @@ Estas notas son contexto, no norma (AGENTS.md). Lo que acabe en la spec lo aprue
 
 - **Aviso de fallo al guardar:** sigue visible mientras alguno de los dos datos (discos o porcentajes) tenga un valor que no se ha podido guardar; desaparece cuando los dos están guardados con su valor actual (sustituye a "hasta que un cambio posterior se guarda bien").
 - **Muchos discos:** con pocos tipos habilitados se muestran todos los discos, sin límite; la presentación es del diseño visual.
+
+### Revisión G4, ronda 3 (2026-10-23)
+
+- **El aviso solo sale al guardar** (confirmado): un fallo al leer se trata según FR-08, sin aviso.
+- **Cuándo desaparece el aviso:** se muestra mientras el valor actual de algún dato no coincida con el último que se guardó bien; no hace falta releer el almacenamiento. Concreta la decisión de la ronda 2 ("guardados con su valor actual"): si se deshace el cambio que falló, el aviso desaparece aunque el almacenamiento siga roto.
+- **NFR-01:** tras la ronda 1, SPEC-CALC-002 §3 cita solo SPEC-CALC-001 NFR-02 (y AC-13), porque NFR-01 no trata de datos introducidos. Corrige lo que dice "Revisión del PR" más arriba.
