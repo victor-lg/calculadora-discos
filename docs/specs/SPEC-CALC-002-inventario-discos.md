@@ -1,7 +1,7 @@
 ---
 id: SPEC-CALC-002
 titulo: Inventario de discos disponibles
-estado: en-revision
+estado: aprobada
 version: 0.1
 riesgo: R1
 sustituye: null
