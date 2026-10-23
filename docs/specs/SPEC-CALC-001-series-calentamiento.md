@@ -2,10 +2,10 @@
 id: SPEC-CALC-001
 titulo: Series de calentamiento con cálculo de discos
 estado: aprobada
-version: 0.4
+version: 0.5
 riesgo: R1
 sustituye: null
-adr: [ADR-0001]
+adr: [ADR-0001, ADR-0002]
 transversales: []
 ---
 
@@ -21,6 +21,11 @@ versión 0.4 hace más tolerante la escritura de pesos y porcentajes (FR-03,
 FR-04) para que el recálculo al momento (FR-10) no muestre errores a mitad de
 escribir, y aclara qué cuenta como espacio, qué pasa al añadir un porcentaje
 vacío y que la app no reescribe lo tecleado (decisiones de Víctor, 2026-10-21).
+La versión 0.5 delega en SPEC-CALC-002 qué discos se usan (FR-06, FR-07,
+FR-09), qué pasa sin ningún tipo habilitado (FR-08, FR-09, FR-12) y el fallo
+al guardar (FR-11), incluye los discos habilitados en AC-13, enlaza ADR-0002 y
+aclara que los AC suponen los 7 tipos habilitados. Con los 7 habilitados, el
+comportamiento no cambia (VIC-8, decisiones de Víctor, 2026-10-23).
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -42,7 +47,7 @@ Que Víctor, en el gimnasio y desde el iPhone, sepa al instante qué discos carg
   - máquinas de placas y poleas;
   - mancuernas;
   - libras;
-  - inventario limitado de discos;
+  - elegir qué tipos de disco están disponibles, que cubre SPEC-CALC-002;
   - repeticiones;
   - la serie de trabajo (100 %);
   - los cierres;
@@ -85,12 +90,14 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - se puede repetir un porcentaje: cada repetición es una serie más y se muestran todas;
   - si la persona intenta añadir un porcentaje no válido, la app muestra un mensaje que dice qué falla y no lo añade.
 - **FR-05:** para cada porcentaje, el peso objetivo es el peso de trabajo × porcentaje / 100, redondeado a dos decimales con la mitad hacia arriba. Ese objetivo redondeado es el que se usa en todo lo demás: el cálculo de la carga, el aviso de redondeo, la diferencia y lo que se muestra. En el modo Barra, el objetivo incluye la barra.
-- **FR-06:** el peso cargado es el mayor peso cargable que no supera el objetivo:
-  - **modos Barra y Dos lados:** el peso de cada lado se redondea hacia abajo a un múltiplo de 1,25 kg;
-  - **modo Un punto:** el peso total de discos se redondea hacia abajo a un múltiplo de 1,25 kg.
+- **FR-06:** el peso cargado es el mayor peso cargable con los discos habilitados (SPEC-CALC-002) que no supera el objetivo:
+  - **modos Barra y Dos lados:** el peso de discos de cada lado;
+  - **modo Un punto:** el peso total de discos.
+
+  Con los 7 tipos habilitados, equivale a redondear hacia abajo a un múltiplo de 1,25 kg (el peso de cada lado o el total, según el modo).
 
   Si el peso cargado no coincide con el objetivo, la serie muestra un aviso de redondeo con el objetivo y la diferencia.
-- **FR-07:** los discos se eligen entre 25, 20, 15, 10, 5, 2,5 y 1,25 kg, con existencias ilimitadas. Se toman de mayor a menor, tantos de cada uno como quepan, y se muestran en ese orden.
+- **FR-07:** los tipos de disco son 25, 20, 15, 10, 5, 2,5 y 1,25 kg. Los discos se eligen entre los tipos habilitados, con existencias ilimitadas de cada uno, según SPEC-CALC-002 (FR-04), y se muestran de mayor a menor. Con los 7 tipos habilitados, el resultado es el de tomarlos de mayor a menor, tantos de cada uno como quepan.
 - **FR-08:** cada serie muestra:
   - el porcentaje;
   - el peso total cargado;
@@ -98,18 +105,20 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - el peso de discos por lado, sin barra (en el modo Un punto, el peso total de discos);
   - el aviso de redondeo, cuando lo hay.
 
-  Los casos de FR-09 son la excepción.
-- **FR-09:** excepción explícita a FR-06 y FR-08. Cuando el objetivo no alcanza para cargar el disco más pequeño (1,25 kg), la serie muestra el objetivo que salía, sin cifra de diferencia ni aviso de redondeo, y además:
-  - en el modo Barra (el objetivo es menor que la barra más 2 × 1,25 kg, incluido un objetivo por debajo de la barra), "Solo barra (X kg) · 0 kg por lado";
-  - en el modo Dos lados (el objetivo por lado es menor de 1,25 kg), "Peso por lado demasiado pequeño: el disco mínimo es de 1,25 kg";
-  - en el modo Un punto (el objetivo es menor de 1,25 kg), "Peso demasiado pequeño: el disco mínimo es de 1,25 kg".
+  Los casos de FR-09 son la excepción. Sin ningún tipo habilitado, no se muestra ninguna serie (SPEC-CALC-002 FR-06).
+- **FR-09:** excepción explícita a FR-06 y FR-08. Cuando el objetivo no alcanza para cargar el disco más pequeño, la serie muestra el objetivo que salía, sin cifra de diferencia ni aviso de redondeo, y además:
+  - en el modo Barra (el objetivo es menor que la barra más 2 × el disco más pequeño, incluido un objetivo por debajo de la barra), "Solo barra (X kg) · 0 kg por lado";
+  - en el modo Dos lados (el objetivo por lado es menor que el disco más pequeño), "Peso por lado demasiado pequeño: el disco mínimo es de Y kg";
+  - en el modo Un punto (el objetivo es menor que el disco más pequeño), "Peso demasiado pequeño: el disco mínimo es de Y kg".
+
+  El disco más pequeño, Y, es el tipo habilitado más pequeño (SPEC-CALC-002 FR-05); con los 7 tipos habilitados, 1,25 kg. Sin ningún tipo habilitado, esta regla no se aplica: no se muestra ninguna serie (SPEC-CALC-002 FR-06).
 
   En los modos Dos lados y Un punto, la serie no muestra peso total.
 - **FR-10:** cualquier cambio de modo, barra, peso o porcentajes recalcula las series al momento, sin un botón de calcular.
-- **FR-11:** la lista de porcentajes se guarda en el dispositivo y se recupera cuando la app arranca de cero. Al arrancar de cero se recupera la lista guardada, aunque esté vacía. La lista 40 %, 70 % y 90 % se usa solo la primera vez o si los datos guardados faltan o no se pueden leer. Los datos guardados que se leen pero no son válidos (por ejemplo, una lista con un porcentaje que no cumple FR-04) se tratan igual que los que no se pueden leer. El modo, la barra, el peso de la barra y el peso de trabajo no se guardan: al arrancar de cero, el modo es Barra con la barra de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin error (FR-03).
+- **FR-11:** la lista de porcentajes se guarda en el dispositivo y se recupera cuando la app arranca de cero. Al arrancar de cero se recupera la lista guardada, aunque esté vacía. La lista 40 %, 70 % y 90 % se usa solo la primera vez o si los datos guardados faltan o no se pueden leer. Los datos guardados que se leen pero no son válidos (por ejemplo, una lista con un porcentaje que no cumple FR-04) se tratan igual que los que no se pueden leer. El modo, la barra, el peso de la barra y el peso de trabajo no se guardan: al arrancar de cero, el modo es Barra con la barra de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin error (FR-03). Los tipos de disco habilitados se guardan y se recuperan según SPEC-CALC-002 FR-08. Si la lista no se puede guardar, se aplica SPEC-CALC-002 FR-09.
 
-  Esta regla se aplica solo al arranque de cero. Cuando la app vuelve de segundo plano sin haberse cerrado, conserva todo su estado: modo, barra, peso de la barra, peso de trabajo y porcentajes. Si iOS la cerró mientras estaba en segundo plano, la vuelta es un arranque de cero (ADR-0001).
-- **FR-12:** en el modo Barra, si el peso de trabajo es menor que el peso de la barra elegida, la app muestra un aviso general: el peso de trabajo es inferior a la barra, conviene elegir una barra más ligera o revisar el peso. Las series se calculan igualmente según FR-09.
+  Esta regla se aplica solo al arranque de cero. Cuando la app vuelve de segundo plano sin haberse cerrado, conserva todo su estado: modo, barra, peso de la barra, peso de trabajo, porcentajes y tipos de disco habilitados (SPEC-CALC-002 FR-08). Si iOS la cerró mientras estaba en segundo plano, la vuelta es un arranque de cero (ADR-0001).
+- **FR-12:** en el modo Barra, si el peso de trabajo es menor que el peso de la barra elegida, la app muestra un aviso general: el peso de trabajo es inferior a la barra, conviene elegir una barra más ligera o revisar el peso. Las series se calculan igualmente según FR-09, salvo que no haya ningún tipo habilitado (SPEC-CALC-002 FR-06).
 - **FR-13:** cuando la lista de porcentajes está vacía, la app no muestra ninguna serie y muestra una indicación para añadir porcentajes.
 - **FR-14:** formato de los números:
   - al escribir un peso, la app acepta como separador decimal tanto la coma como el punto, con como mucho dos cifras escritas tras él y sin separador de miles (FR-03);
@@ -117,6 +126,8 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - la app nunca reescribe lo que la persona teclea en un campo: este formato solo se aplica a lo que la app muestra.
 
 ## 5. Criterios de aceptación
+
+Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002).
 
 - **AC-01 → FR-05, FR-07, FR-08:** dado el modo Barra con la barra de 20 kg, un peso de trabajo de 100 kg y los porcentajes 40, 70 y 90, la app muestra estas tres series, sin aviso de redondeo:
 
@@ -144,7 +155,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 - **AC-10 → FR-10:** al cambiar el peso de trabajo, añadir o quitar un porcentaje, o cambiar de modo o de barra, las series se actualizan sin ninguna otra acción.
 - **AC-11 → FR-11:** la primera vez que se abre, la lista es 40, 70 y 90. Si la persona la cambia a 50 y 75, cierra la app y la vuelve a abrir (arranque de cero), la lista es 50 y 75. Si la persona quita todos los porcentajes, cierra la app y la vuelve a abrir, la lista sigue vacía. Si los datos guardados faltan, no se pueden leer o contienen un porcentaje no válido (por ejemplo, 150), la lista es 40, 70 y 90. En todos los casos, al arrancar de cero, el modo es Barra, la barra es la de 20 kg y el peso de trabajo está vacío, con la indicación de rellenarlo y sin ningún mensaje de error.
 - **AC-12 → NFR-01:** con la app ya instalada en el iPhone y el teléfono en modo avión, la app se abre y reproduce el resultado de AC-01.
-- **AC-13 → NFR-02:** durante un uso completo, incluida la primera carga (abrir, calcular, cambiar porcentajes y cerrar), todas las peticiones de red van al propio origen de la app, y ninguna contiene datos que haya introducido la persona: pesos, porcentajes, modo o barra.
+- **AC-13 → NFR-02:** durante un uso completo, incluida la primera carga (abrir, calcular, cambiar porcentajes, habilitar y deshabilitar tipos de disco y cerrar), todas las peticiones de red van al propio origen de la app, y ninguna contiene datos que haya introducido la persona: pesos, porcentajes, modo, barra o discos habilitados.
 - **AC-14 → FR-12:** con la barra de 20 kg y un peso de trabajo de 15 kg, la app muestra el aviso de que el peso de trabajo es inferior a la barra, y las series 40, 70 y 90 aparecen como "Solo barra (20 kg) · 0 kg por lado" con sus objetivos (6, 10,5 y 13,5 kg).
 - **AC-15 → FR-13:** si la persona quita todos los porcentajes, con la barra de 20 kg y 100 kg, la app no muestra ninguna serie y muestra la indicación de añadir porcentajes.
 - **AC-16 → FR-05, FR-06:** con la barra de 20 kg, 101,11 kg y el 70 % (70,777 kg, que se redondea a un objetivo de 70,78 kg), la app carga 70 kg (25 por lado) y avisa: objetivo 70,78 kg, diferencia −0,78 kg.
@@ -192,7 +203,8 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - datos no válidos: mensaje y sin series (FR-03, FR-02);
   - porcentaje no válido: mensaje y no se añade (FR-04);
   - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan, no se pueden leer o no son válidos (FR-11);
-  - vuelta de segundo plano: se conserva todo el estado; FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
+  - tipos de disco habilitados guardados y fallo al guardar la lista: los cubren SPEC-CALC-002 FR-08 y FR-09, con sus AC-11, AC-12 y AC-14 (FR-11);
+  - vuelta de segundo plano: se conserva todo el estado, incluidos los tipos de disco habilitados (SPEC-CALC-002 FR-08); FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
   - pesos o porcentajes con espacios al principio o al final, y pesos con un separador al final o al principio sin cifras ("100,", ",5"): se aceptan, y un peso que solo tiene espacios o el separador se trata como vacío; un peso con más de un separador o que vale 0 se sigue rechazando, también como paso intermedio (FR-03, FR-04);
   - porcentaje vacío o solo con espacios: no se añade y no hay mensaje (FR-04);
   - lo tecleado en un campo no se reescribe nunca; el formato de FR-14 solo afecta a lo que la app muestra (FR-14);
@@ -211,4 +223,5 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 ## 11. Dependencias y restricciones
 
 - Solo iPhone (iOS). Sin Mac y sin publicar en la App Store. La tecnología la fija ADR-0001: una PWA sin framework, instalable en la pantalla de inicio y publicada en GitHub Pages, que encaja con NFR-01.
-- Juego de discos del gimnasio de Víctor, fijo: 25, 20, 15, 10, 5, 2,5 y 1,25 kg.
+- Tipos de disco del gimnasio de Víctor, fijos: 25, 20, 15, 10, 5, 2,5 y 1,25 kg. Cuáles están disponibles lo decide la persona (SPEC-CALC-002).
+- Qué se guarda en el dispositivo y dónde lo fija ADR-0002, que modifica ADR-0001 §3.2: la lista de porcentajes (FR-11) y los tipos de disco habilitados (SPEC-CALC-002 FR-08), cada uno por separado.
