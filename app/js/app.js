@@ -6,9 +6,10 @@ import {
   estadoInicial,
   anadirPorcentaje,
   quitarPorcentaje,
+  alternarDisco,
   modeloVista,
 } from './vista.js';
-import { leerPorcentajes, guardarPorcentajes } from './almacenamiento.js';
+import { leerPorcentajes, leerDiscos, guardarCambios } from './almacenamiento.js';
 
 function almacenLocal() {
   try {
@@ -19,7 +20,7 @@ function almacenLocal() {
 }
 
 const almacen = almacenLocal();
-let estado = estadoInicial(leerPorcentajes(almacen));
+let estado = estadoInicial(leerPorcentajes(almacen), leerDiscos(almacen));
 
 const $ = (id) => document.getElementById(id);
 
@@ -30,10 +31,10 @@ function crear(etiqueta, clase, texto) {
   return el;
 }
 
-function opcion(nombreGrupo, valor, texto, alCambiar) {
+function opcion(nombreGrupo, valor, texto, alCambiar, tipo = 'radio') {
   const label = crear('label', 'opcion');
   const input = document.createElement('input');
-  input.type = 'radio';
+  input.type = tipo;
   input.name = nombreGrupo;
   input.value = valor;
   input.addEventListener('change', () => alCambiar(valor));
@@ -47,6 +48,12 @@ function montarOpciones() {
   }
   for (const b of BARRAS) {
     $('lista-barras').append(opcion('barra', b.id, b.nombre, (barra) => actualizar({ ...estado, barra })));
+  }
+  // SPEC-CALC-002 FR-02: cada tipo se habilita o deshabilita al tocarlo.
+  for (const d of modeloVista(estado).discos) {
+    $('lista-discos').append(opcion('disco', String(d.cent), d.nombre, () => {
+      actualizar(alternarDisco(estado, d.cent));
+    }, 'checkbox'));
   }
 }
 
@@ -83,6 +90,9 @@ function pintar() {
 
   for (const input of document.querySelectorAll('input[name="modo"]')) input.checked = input.value === v.modo;
   for (const input of document.querySelectorAll('input[name="barra"]')) input.checked = input.value === v.barra;
+  for (const input of document.querySelectorAll('input[name="disco"]')) {
+    input.checked = v.discos.find((d) => String(d.cent) === input.value).habilitado;
+  }
 
   $('barras').hidden = !v.mostrarBarras;
   texto('peso-barra-fijo', v.pesoBarraFijo && `Peso de la barra: ${v.pesoBarraFijo}`);
@@ -115,13 +125,15 @@ function pintar() {
   $('nuevo-porcentaje').setAttribute('aria-invalid', String(Boolean(v.errorPorcentaje)));
 
   texto('aviso-barra', v.avisoBarra);
+  texto('indicacion-discos', v.indicacionDiscos);
+  texto('aviso-guardado', v.avisoGuardado);
   $('series').replaceChildren(...v.series.map(pintarSerie));
 }
 
-// FR-10: cualquier cambio recalcula al momento. FR-11: la lista se guarda en cada cambio.
+// FR-10: cualquier cambio recalcula al momento. FR-11 y SPEC-CALC-002 FR-08:
+// la lista y los discos se guardan en cada cambio (FR-09 si falla).
 function actualizar(nuevo) {
-  if (nuevo.porcentajes !== estado.porcentajes) guardarPorcentajes(almacen, nuevo.porcentajes);
-  estado = nuevo;
+  estado = guardarCambios(almacen, estado, nuevo);
   pintar();
 }
 

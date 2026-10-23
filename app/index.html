@@ -15,6 +15,7 @@
 <body>
   <main>
     <h1>Series de calentamiento</h1>
+    <p id="aviso-guardado" class="aviso-guardado" role="status"></p>
 
     <section aria-labelledby="titulo-carga">
       <h2 id="titulo-carga" class="oculto">Carga</h2>
@@ -41,6 +42,11 @@
         <p id="error-trabajo" class="error" role="alert"></p>
         <p id="indicacion-trabajo" class="indicacion"></p>
       </div>
+
+      <fieldset id="discos">
+        <legend>Discos disponibles</legend>
+        <div id="lista-discos"></div>
+      </fieldset>
     </section>
 
     <section aria-labelledby="titulo-porcentajes">
@@ -58,6 +64,7 @@
     <section aria-labelledby="titulo-series">
       <h2 id="titulo-series">Series</h2>
       <p id="aviso-barra" class="aviso" role="status"></p>
+      <p id="indicacion-discos" class="indicacion"></p>
       <ol id="series" class="series" aria-live="polite"></ol>
     </section>
   </main>
