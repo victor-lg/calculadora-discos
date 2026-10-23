@@ -315,7 +315,7 @@ test('SPEC-CALC-001/AC-27 ",5" y ".5" valen 0,5 kg en el modo Un punto', () => {
   for (const trabajo of [',5', '.5']) {
     const v = vista({ modo: 'un-punto', trabajo, porcentajes: [50] });
     assert.equal(v.errorTrabajo, null, trabajo);
-    assert.equal(v.series[0].mensaje, TEXTOS.minimoUnPunto, trabajo);
+    assert.equal(v.series[0].mensaje, 'Peso demasiado pequeño: el disco mínimo es de 1,25 kg', trabajo);
     assert.equal(v.series[0].objetivo, 'Objetivo: 0,25 kg', trabajo);
   }
 });
