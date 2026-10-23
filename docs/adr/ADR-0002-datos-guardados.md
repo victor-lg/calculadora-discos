@@ -63,5 +63,5 @@ Un dato nuevo que tenga que guardarse exige otro ADR que modifique este.
 
 ## 6. Seguimiento
 
-- **Pendiente:** ninguna spec dice qué hace la app si falla la escritura (cuota llena o almacenamiento no disponible). Es una regla de negocio y se decide en la spec, no aquí.
+- **Fallo al guardar** (cuota llena o almacenamiento no disponible): qué hace la app es una regla de negocio y la fija SPEC-CALC-002, no este ADR.
 - Revisar este ADR si hace falta guardar un dato más, si un dato deja de caber en `localStorage` o si iOS empieza a borrar los datos con frecuencia.
