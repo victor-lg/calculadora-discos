@@ -53,14 +53,16 @@ Víctor, único usuario, en su iPhone. Los discos habilitados son un dato introd
 
   Los discos se muestran de mayor a menor. Con los 7 tipos habilitados, el resultado coincide con tomar los discos de mayor a menor, tantos de cada uno como quepan.
 - **FR-05:** el "disco más pequeño" de SPEC-CALC-001 FR-09 es el tipo habilitado más pequeño. Los mensajes de FR-09 en los modos Dos lados y Un punto dicen ese peso: "el disco mínimo es de Y kg".
-- **FR-06:** cuando no hay ningún tipo habilitado, la app no muestra ninguna serie y muestra una indicación para habilitar al menos un disco. Esta indicación aparece además de las indicaciones, avisos o errores que correspondan por SPEC-CALC-001 (FR-03, FR-12 y FR-13).
+- **FR-06:** cuando no hay ningún tipo habilitado, la app no muestra ninguna serie y muestra una indicación para habilitar al menos un disco. Esta indicación aparece además de las indicaciones, avisos o errores que correspondan por SPEC-CALC-001 (FR-02, FR-03, FR-12 y FR-13).
 - **FR-07:** cuando la persona habilita o deshabilita un tipo, las series se recalculan al momento, sin un botón de calcular, como en SPEC-CALC-001 FR-10.
 - **FR-08:** los tipos habilitados se guardan en el dispositivo y se recuperan cuando la app arranca de cero, aunque no haya ninguno habilitado. Un cambio se guarda aunque no haya series que recalcular (por ejemplo, con el peso de trabajo vacío o no válido).
   - Los 7 tipos están habilitados solo la primera vez, o si los datos guardados faltan, no se pueden leer o no son válidos.
-  - Los datos guardados de los tipos solo son válidos si son una lista de pesos sin repetidos en la que cada peso es uno de los 7 tipos. La lista vacía es válida (ningún tipo habilitado). Cualquier otra cosa no es válida: por ejemplo, un peso que no es uno de los 7, un peso repetido o un valor que no es una lista.
+  - Los datos guardados de los tipos solo son válidos si son una lista de números sin repetidos en la que cada número es el peso en kg de uno de los 7 tipos. El orden de la lista no importa y la lista vacía es válida (ningún tipo habilitado). Cualquier otra cosa no es válida: por ejemplo, un peso que no es uno de los 7, un peso repetido, un peso escrito como texto o un valor que no es una lista.
   - Los tipos habilitados y la lista de porcentajes (SPEC-CALC-001 FR-11) se recuperan por separado: si los datos de uno faltan o no son válidos, el otro se recupera igualmente.
   - Cuando la app vuelve de segundo plano sin haberse cerrado, conserva los tipos habilitados. Si iOS la cerró mientras estaba en segundo plano, la vuelta es un arranque de cero (ADR-0001).
-- **FR-09:** si la app no puede guardar un cambio de los tipos habilitados o de la lista de porcentajes (SPEC-CALC-001 FR-11), sigue funcionando con los valores que tiene en memoria y muestra un aviso discreto: "No se ha podido guardar: se mantendrá hasta cerrar la app". Las series se calculan con esos valores como si se hubiera guardado. El aviso sigue visible hasta que un cambio posterior se guarda bien.
+- **FR-09:** si la app no puede guardar un cambio de los tipos habilitados o de la lista de porcentajes (SPEC-CALC-001 FR-11), sigue funcionando con los valores que tiene en memoria y muestra un aviso discreto: "No se ha podido guardar: se mantendrá hasta cerrar la app". Las series se calculan con esos valores como si se hubiera guardado.
+  - El aviso sigue visible mientras alguno de los dos datos (tipos habilitados o lista de porcentajes) tenga un valor que no se ha podido guardar, y desaparece cuando los dos están guardados con su valor actual.
+  - El aviso solo aparece al guardar. Un fallo al leer los datos al arrancar de cero se trata según FR-08 y SPEC-CALC-001 FR-11, sin aviso.
 
 ## 5. Criterios de aceptación
 
@@ -90,22 +92,31 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
   - con el peso de trabajo vacío, la app muestra la indicación de rellenarlo y la de habilitar al menos un disco, sin ningún mensaje de error;
   - con la lista de porcentajes vacía y 100 kg, muestra la indicación de añadir porcentajes y la de habilitar al menos un disco;
   - con la barra de 20 kg y 15 kg, muestra el aviso de que el peso de trabajo es inferior a la barra y la indicación de habilitar al menos un disco, sin ninguna serie;
-  - con un peso de trabajo de 0, muestra el mensaje que dice qué falla y la indicación de habilitar al menos un disco, sin ninguna serie.
+  - con un peso de trabajo de 0, muestra el mensaje que dice qué falla y la indicación de habilitar al menos un disco, sin ninguna serie;
+  - con la barra Z, un peso de barra de 0 y 50 kg, muestra el mensaje que dice qué falla en el peso de barra y la indicación de habilitar al menos un disco, sin ninguna serie.
 - **AC-10 → FR-07, FR-04:** con la barra de 20 kg, 100 kg y el 90 %, la serie muestra 25 + 10 por lado. Al deshabilitar el de 25 kg, sin ninguna otra acción, muestra 20 + 15 por lado; al volver a habilitarlo, otra vez 25 + 10.
 - **AC-11 → FR-08:** al recuperar los tipos habilitados en un arranque de cero:
   - la primera vez que se abre la app, los 7 tipos están habilitados;
   - si la persona deshabilita los de 25 y 1,25 kg, cierra la app y la vuelve a abrir, esos dos siguen deshabilitados y los demás habilitados;
   - si la persona deshabilita todos, cierra la app y la vuelve a abrir, sigue sin haber ninguno habilitado y se muestra la indicación de habilitar al menos un disco;
   - si, con el peso de trabajo vacío, la persona deshabilita el de 25 kg, cierra la app y la vuelve a abrir, el de 25 kg sigue deshabilitado;
-  - si los datos guardados de los tipos faltan, no se pueden leer, incluyen un peso que no es uno de los 7 (por ejemplo, 50 kg), repiten un peso (por ejemplo, 25 y 25) o no son una lista, los 7 tipos están habilitados.
+  - los 7 tipos están habilitados si los datos guardados de los tipos:
+    - faltan;
+    - no se pueden leer;
+    - incluyen un peso que no es uno de los 7 (por ejemplo, 50 kg);
+    - repiten un peso (por ejemplo, 25 y 25);
+    - incluyen un peso escrito como texto (por ejemplo, "25");
+    - no son una lista;
+  - si los datos guardados son la lista 1,25 y 25 (en ese orden), solo esos dos tipos están habilitados.
 - **AC-12 → FR-08:** los datos guardados se recuperan por separado:
   - con el de 25 kg deshabilitado y los datos de los porcentajes ilegibles, al arrancar de cero la lista es 40, 70 y 90 y el de 25 kg sigue deshabilitado;
   - con la lista 50 y 75 y los datos de los tipos ilegibles, al arrancar de cero los 7 tipos están habilitados y la lista sigue siendo 50 y 75.
 - **AC-13 → FR-08:** con el de 25 kg deshabilitado, la barra de 20 kg, 100 kg y el 90 %, si la persona pasa a otra app y vuelve sin que la app haya arrancado de cero, el de 25 kg sigue deshabilitado y la serie sigue mostrando 20 + 15 por lado.
-- **AC-14 → FR-09:** con la barra de 20 kg, 100 kg, el 90 % y el almacenamiento del dispositivo sin poder guardar:
+- **AC-14 → FR-09:** con la barra de 20 kg, 100 kg, el 90 %, sin el aviso de fallo al guardar y con el almacenamiento del dispositivo sin poder guardar, cada caso desde ese punto de partida:
   - al deshabilitar el de 25 kg, el de 25 kg queda deshabilitado, la serie muestra 20 + 15 por lado y la app muestra el aviso "No se ha podido guardar: se mantendrá hasta cerrar la app";
   - al añadir el porcentaje 50, aparece la serie del 50 % y la app muestra el mismo aviso;
-  - si después el almacenamiento vuelve a poder guardar y la persona habilita el de 25 kg, el cambio se guarda y el aviso desaparece.
+  - al quitar el porcentaje 90, desaparece su serie y la app muestra el mismo aviso;
+  - al deshabilitar el de 25 kg (aparece el aviso), si después el almacenamiento vuelve a poder guardar y la persona añade el porcentaje 50, la lista se guarda pero el aviso sigue, porque los tipos habilitados no se han guardado; al habilitar otra vez el de 25 kg, los tipos se guardan y el aviso desaparece.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
@@ -117,7 +128,8 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
   - ningún tipo habilitado guardado: se recupera así (FR-08, AC-11);
   - datos guardados de los tipos que faltan, ilegibles o no válidos (con un peso ajeno a los 7, con un peso repetido o que no son una lista): los 7 habilitados, sin afectar a la lista de porcentajes (FR-08, AC-11, AC-12);
   - habilitar o deshabilitar con el peso vacío o no válido: no hay series que recalcular, pero el cambio se aplica y se guarda (FR-02, FR-08, AC-11);
-  - fallo al guardar los tipos o los porcentajes: la app sigue con los valores en memoria y muestra un aviso discreto (FR-09, AC-14).
+  - fallo al guardar los tipos o los porcentajes: la app sigue con los valores en memoria y muestra un aviso discreto hasta que los dos datos están guardados (FR-09, AC-14);
+  - pocos tipos habilitados y un objetivo grande (por ejemplo, solo el de 1,25 kg y 500 kg en el modo Un punto, 400 discos): se muestran todos los discos, sin límite; cómo se presentan es parte del diseño visual (§2).
 - **Decisiones pendientes:** ninguna crítica. El diseño visual de los tipos se decide aparte y no cambia esta spec.
 
 ---

@@ -57,3 +57,8 @@ Estas notas son contexto, no norma (AGENTS.md). Lo que acabe en la spec lo aprue
 - **ADR:** guardar los tipos habilitados contradice ADR-0001 §3.2. Se decide un ADR nuevo, ADR-0002, en su propio PR, que modifica ADR-0001 §3.2 (fusionado en `main` con el PR #13).
 - **Validez de los datos guardados de los tipos:** lista estricta. Solo es válida una lista de pesos sin repetidos, cada uno igual a uno de los 7 tipos; cualquier otra cosa no es válida y se habilitan los 7 (SPEC-CALC-002 FR-08).
 - **Fallo al guardar:** la app sigue funcionando con los valores en memoria y muestra un aviso discreto: "No se ha podido guardar: se mantendrá hasta cerrar la app". Vale para los discos y para los porcentajes. El aviso sigue visible hasta que un cambio posterior se guarda bien (SPEC-CALC-002 FR-09, citado desde SPEC-CALC-001 FR-11).
+
+### Revisión G4, ronda 2 (2026-10-23)
+
+- **Aviso de fallo al guardar:** sigue visible mientras alguno de los dos datos (discos o porcentajes) tenga un valor que no se ha podido guardar; desaparece cuando los dos están guardados con su valor actual (sustituye a "hasta que un cambio posterior se guarda bien").
+- **Muchos discos:** con pocos tipos habilitados se muestran todos los discos, sin límite; la presentación es del diseño visual.

@@ -203,6 +203,7 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002).
   - datos no válidos: mensaje y sin series (FR-03, FR-02);
   - porcentaje no válido: mensaje y no se añade (FR-04);
   - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan, no se pueden leer o no son válidos (FR-11);
+  - tipos de disco habilitados guardados y fallo al guardar la lista: los cubren SPEC-CALC-002 FR-08 y FR-09, con sus AC-11, AC-12 y AC-14 (FR-11);
   - vuelta de segundo plano: se conserva todo el estado, incluidos los tipos de disco habilitados (SPEC-CALC-002 FR-08); FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
   - pesos o porcentajes con espacios al principio o al final, y pesos con un separador al final o al principio sin cifras ("100,", ",5"): se aceptan, y un peso que solo tiene espacios o el separador se trata como vacío; un peso con más de un separador o que vale 0 se sigue rechazando, también como paso intermedio (FR-03, FR-04);
   - porcentaje vacío o solo con espacios: no se añade y no hay mensaje (FR-04);
