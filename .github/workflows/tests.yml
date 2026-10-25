@@ -22,6 +22,12 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Imagen oficial de Playwright: trae Chromium, WebKit y sus dependencias del sistema,
+    # así que no hay que instalarlos en cada ejecución (con --with-deps se agotaban los
+    # 15 minutos esperando al servidor de paquetes de Ubuntu; PR #12 y #14).
+    # Su versión tiene que coincidir exactamente con @playwright/test del package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     steps:
       # Fijada por SHA (v7.0.1, 2026-07-17), igual que en sdd.yml.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,10 +54,6 @@ jobs:
       - if: steps.hay.outputs.si == 'true'
         name: Tests unitarios
         run: node --test "tests/unit/**/*.test.js"
-
-      - if: steps.hay.outputs.si == 'true'
-        name: Navegadores de Playwright
-        run: npx playwright install --with-deps chromium webkit
 
       - if: steps.hay.outputs.si == 'true'
         name: Tests E2E (Chromium y WebKit)
