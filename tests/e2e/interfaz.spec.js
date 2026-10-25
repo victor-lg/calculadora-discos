@@ -22,6 +22,9 @@ async function quitarTodos(page) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
+  // Cada test parte de un almacenamiento vacío (contexto propio de Playwright):
+  // así ningún test hereda tipos de disco deshabilitados de otro.
+  expect(await page.evaluate(() => localStorage.length)).toBe(0);
 });
 
 test('SPEC-CALC-001/AC-04 las barras de 20 y 15 kg no permiten cambiar su peso', async ({ page }) => {
