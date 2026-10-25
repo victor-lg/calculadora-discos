@@ -33,14 +33,17 @@ const CABECERAS_DEL_NAVEGADOR = new Set([
 // Valores introducidos en el recorrido de AC-13, completos, en sus formas
 // codificadas y en formas cortas (el peso en céntimos u otra codificación).
 // Los discos habilitados del recorrido (15, 10, 5 y 2,5 kg) se buscan como
-// lista, en kg y en centésimas, y por su par menos habitual.
+// lista, en kg y en centésimas, y por su par menos habitual; de los
+// deshabilitados (25, 20 y 1,25 kg), el de 1,25, el único con una forma
+// propia que no aparece en cabeceras normales.
 // Se buscan en todas las cabeceras salvo Host, Origin y Referer, que se
 // comprueban aparte, y salvo user-agent y sec-ch-ua*, donde la versión del
 // navegador podría contenerlos sin que haya fuga. Esas cabeceras, como todas,
 // tienen que coincidir además con un valor del recorrido de referencia.
 const INTRODUCIDOS = ['7,35', '7.35', '7%2C35', '487,35', '487.35', '487%2C35', '48735',
   '735', '487', 'dos-lados', 'un-punto', 'recta',
-  '15,10,5,2.5', '15%2C10', '1500,1000', '1500%2C1000', '%5B15', '2.5', '2%2C5'];
+  '15,10,5,2.5', '15%2C10', '1500,1000', '1500%2C1000', '%5B15', '2.5', '2%2C5',
+  '1.25', '1%2C25'];
 const esDeVersion = (n) => n === 'user-agent' || n.startsWith('sec-ch-ua');
 
 // Tiempo que se sigue observando tras cerrar la página, con el contexto y el
