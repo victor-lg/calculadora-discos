@@ -26,8 +26,15 @@ jobs:
     # así que no hay que instalarlos en cada ejecución (con --with-deps se agotaban los
     # 15 minutos esperando al servidor de paquetes de Ubuntu; PR #12 y #14).
     # Su versión tiene que coincidir exactamente con @playwright/test del package.json.
+    # Fijada por digest (índice multiplataforma, comprobado en el registro el 2026-10-25),
+    # igual que las acciones por SHA: una etiqueta se puede volver a publicar con otro contenido.
+    # Para actualizarla: docker buildx imagetools inspect mcr.microsoft.com/playwright:vX.Y.Z-noble
+    #
+    # El job corre como root dentro del contenedor y Chromium arranca sin su sandbox.
+    # Se acepta porque no da más privilegios que antes: el token es de solo lectura,
+    # el job no usa secretos y los E2E solo cargan la app local.
     container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
     steps:
       # Fijada por SHA (v7.0.1, 2026-07-17), igual que en sdd.yml.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
