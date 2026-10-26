@@ -13,12 +13,13 @@ Calcula al instante qué discos cargar en cada serie de aproximación, a partir 
 
 ## Arquitectura
 
-PWA de HTML, CSS y JavaScript estándar, sin framework, sin compilación y sin dependencias en tiempo de ejecución.
+PWA de HTML, CSS y JavaScript estándar, sin framework y sin compilación. La única dependencia en tiempo de ejecución que se admite es three.js, para el dibujo 3D, servida desde la propia app.
 Funciona sin conexión con un service worker propio y solo guarda en el dispositivo la lista de porcentajes y los discos habilitados.
 Se publica en GitHub Pages, con subdominio propio, mediante un workflow que solo lanza Víctor; fusionar no publica. El porqué está en los ADR:
 
 - [`ADR-0001`](docs/adr/ADR-0001-tecnologia-pwa.md) — PWA sin framework, alojada en GitHub Pages
 - [`ADR-0002`](docs/adr/ADR-0002-datos-guardados.md) — datos guardados en el dispositivo; modifica ADR-0001 §3.2
+- [`ADR-0003`](docs/adr/ADR-0003-dibujo-3d.md) — dibujo 3D en vivo con three.js y un solo renderizador; modifica ADR-0001 §3.1
 
 ## Desarrollo
 
