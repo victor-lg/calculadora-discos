@@ -14,11 +14,12 @@ Calcula al instante qué discos cargar en cada serie de aproximación, a partir 
 ## Arquitectura
 
 PWA de HTML, CSS y JavaScript estándar, sin framework, sin compilación y sin dependencias en tiempo de ejecución.
-Funciona sin conexión con un service worker propio y solo guarda en el dispositivo la lista de porcentajes y los discos habilitados.
+Funciona sin conexión con un service worker propio y solo guarda en el dispositivo la lista de porcentajes, los discos habilitados, el último peso de trabajo válido, el peso de la recta y de la Z y la opción de collarines.
 Se publica en GitHub Pages, con subdominio propio, mediante un workflow que solo lanza Víctor; fusionar no publica. El porqué está en los ADR:
 
 - [`ADR-0001`](docs/adr/ADR-0001-tecnologia-pwa.md) — PWA sin framework, alojada en GitHub Pages
 - [`ADR-0002`](docs/adr/ADR-0002-datos-guardados.md) — datos guardados en el dispositivo; modifica ADR-0001 §3.2
+- [`ADR-0004`](docs/adr/ADR-0004-mas-datos-guardados.md) — más datos guardados en el dispositivo; modifica ADR-0002 §3.1
 
 ## Desarrollo
 
