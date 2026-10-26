@@ -20,6 +20,7 @@ Se publica en GitHub Pages, con subdominio propio, mediante un workflow que solo
 - [`ADR-0001`](docs/adr/ADR-0001-tecnologia-pwa.md) — PWA sin framework, alojada en GitHub Pages
 - [`ADR-0002`](docs/adr/ADR-0002-datos-guardados.md) — datos guardados en el dispositivo; modifica ADR-0001 §3.2
 - [`ADR-0003`](docs/adr/ADR-0003-dibujo-3d.md) — dibujo 3D en vivo con three.js y un solo renderizador; modifica ADR-0001 §3.1
+- [`ADR-0004`](docs/adr/ADR-0004-mas-datos-guardados.md) — más datos guardados en el dispositivo; modifica ADR-0002 §3.1
 
 ## Desarrollo
 
