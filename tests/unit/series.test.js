@@ -146,9 +146,10 @@ test('SPEC-CALC-001/AC-09 85 y 87 %: se muestran las dos aunque carguen lo mismo
   assert.deepEqual([b.porcentaje, b.total, b.diferencia], ['87 %', '85 kg', '−2 kg']);
 });
 
-// Parte de SPEC-CALC-001/AC-11: el peso de trabajo "100" y lo guardado llegan con FR-11 (siguiente PR de VIC-10).
-test('FR-02, FR-15: al empezar, Barra, olímpica de 20 kg, sin collarines y recta y Z de 10 kg', () => {
+// Lo recuperado del almacenamiento lo cubre guardados.test.js.
+test('SPEC-CALC-001/AC-11 FR-02, FR-15: al empezar, Barra, olímpica de 20 kg, "100", sin collarines y recta y Z de 10 kg', () => {
   const v = modeloVista(estadoInicial([50, 75]));
+  assert.equal(v.trabajo, '100');
   assert.equal(v.modo, 'barra');
   assert.equal(v.barra, '20');
   assert.equal(v.collarines, false);

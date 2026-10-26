@@ -2,7 +2,15 @@
 // datos guardados y fallo al guardar.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { estadoInicial, modeloVista, alternarDisco, anadirPorcentaje, quitarPorcentaje, TEXTOS } from '../../app/js/vista.js';
+import {
+  estadoInicial,
+  modeloVista,
+  alternarDisco,
+  anadirPorcentaje,
+  quitarPorcentaje,
+  escribirTrabajo,
+  TEXTOS,
+} from '../../app/js/vista.js';
 import { calcularSerie, repartirDiscos, objetivoCent, DISCOS_CENT } from '../../app/js/calculo.js';
 import {
   CLAVE_DISCOS,
@@ -272,7 +280,7 @@ test('SPEC-CALC-002/AC-11 se recuperan los tipos guardados, también ninguno', (
 
 test('SPEC-CALC-002/AC-11 con el peso de trabajo vacío, el cambio se guarda igual', () => {
   const almacen = new AlmacenFalso();
-  const antes = estadoInicial([40, 70, 90]);
+  const antes = escribirTrabajo(estadoInicial([40, 70, 90]), '');
   assert.equal(antes.trabajo, '');
   guardarCambios(almacen, antes, alternarDisco(antes, 2500));
   assert.deepEqual(leerDiscos(almacen), SIN_25);
