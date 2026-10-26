@@ -83,6 +83,7 @@ Sin esta decisión no se puede implementar SPEC-CALC-003.
    - Se incluye en `app/` una copia de `build/three.module.min.js` con su `LICENSE`, y se importa por ruta relativa. Así el despliegue de `app/` sigue sin paso de compilación.
    - Un test comprueba que la copia es idéntica, byte a byte, al fichero del paquete de la versión fijada.
    - El service worker la guarda en caché como el resto de la app (NFR-01).
+   - **Tests estáticos.** Los de `tests/unit/sw.test.js` (sin URLs, sin `fetch`, sin asignar `src` y demás) siguen aplicándose a todo `app/`, salvo a la copia de three.js. La copia contiene esas cadenas en sus cargadores, que la app no usa, y no se puede editar sin romper su identidad. La cubren el test de identidad, la CSP (`connect-src 'self'`, `img-src 'self'`) y el E2E de red de SPEC-CALC-001 AC-13. No se abre ninguna otra excepción. El cambio de `sw.test.js` va en el PR de código R2, con este apartado como motivo.
 4. **Sin módulos de `examples/jsm`.**
    - Los módulos de ejemplo importan `three` por nombre, y resolverlo exige un mapa de importación en línea. La CSP de ADR-0001 §3.4 lo bloquea. Ni la CSP ni el contenido de la copia se tocan.
    - Lo que el prototipo toma de ahí (`RoundedBoxGeometry`, para el brazo de la máquina) se escribe en el código de la app.
@@ -112,12 +113,13 @@ Sin esta decisión no se puede implementar SPEC-CALC-003.
   | Riesgo | Mitigación |
   | --- | --- |
   | El dibujo va pesado en el iPhone | Se mide en el iPhone 15 Pro Max con 6 series (SPEC-CALC-003 NFR-04). Si no basta, se reduce primero la resolución de las sombras. |
-  | Se cuela una petición a terceros desde three.js | La CSP no cambia; el test de SPEC-CALC-001 AC-13 y `sw.test.js` cubren también la copia. |
+  | Se cuela una petición a terceros desde three.js | La CSP no cambia y bloquea cualquier petición fuera del origen; el E2E de SPEC-CALC-001 AC-13 lo comprueba en uso. Los tests estáticos no cubren la copia (§3.3), pero el test de identidad garantiza que es la del paquete fijado. |
   | La copia de three.js se modifica o no corresponde a su versión | Test de identidad con el paquete fijado (§3.3). |
   | WebGL no está disponible en Playwright | La vista sin WebGL se prueba forzando su ausencia. Está por comprobar si Chromium y WebKit sin pantalla, en la CI, crean el contexto. |
   | Una versión de three.js con un fallo de seguridad | Se sigue el registro de cambios de three.js; actualizar es un PR R2 (§3.2). |
 
 - **Impacto:**
+  - `tests/unit/sw.test.js` deja de aplicar sus reglas estáticas a la copia de three.js, solo a ella (§3.3). Lo decidió Víctor el 2026-10-26;
   - el PR de código que añade three.js es R2, porque añade una dependencia, y pasa la revisión de dependencias;
   - las fuentes Barlow (licencia OFL) son recursos estáticos, no código: se sirven desde la app como el resto (ADR-0001 §3.4) y no cuentan como dependencia;
   - SPEC-CALC-003 cita este ADR y no se fusiona antes que él.
@@ -142,5 +144,5 @@ Sin esta decisión no se puede implementar SPEC-CALC-003.
 Consultadas el 2026-10-26.
 
 - [F1] Registro de npm, `three@0.160.0`: licencia MIT, publicada el 2023-12-22; `three@0.186.1`, publicada el 2026-09-24 (`npm view three`).
-- [F2] Paquete `three-0.160.0.tgz` del registro de npm: `build/three.module.min.js` ocupa 670 681 bytes y 166 748 con gzip. `examples/jsm/geometries/RoundedBoxGeometry.js` importa `three` por nombre.
+- [F2] Paquete `three-0.160.0.tgz` del registro de npm: `build/three.module.min.js` ocupa 670 681 bytes y 166 748 con gzip. `examples/jsm/geometries/RoundedBoxGeometry.js` importa `three` por nombre. `three.module.min.js` contiene 3 veces `://`, 3 veces `fetch(` y 1 vez `.src=`, comprobado con `grep` sobre el paquete.
 - El límite de contextos WebGL de iOS sale de las notas de diseño (§2.1) y no lo he contrastado con una fuente.
