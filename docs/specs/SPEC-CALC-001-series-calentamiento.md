@@ -34,7 +34,10 @@ presentación en SPEC-CALC-003. Cuatro decisiones son de Víctor del 2026-10-26,
 tomadas al preparar el PR: ADR-0004 se fusiona antes que esta versión; solo se
 guarda un peso válido y el peso de barra vacío muestra el error; el mensaje
 de porcentaje dice "entre 1 y 100" y una lista guardada se ordena y se quitan
-los repetidos al leerla; SPEC-CALC-002 se ajusta en el mismo PR.
+los repetidos al leerla; SPEC-CALC-002 se ajusta en el mismo PR. En la revisión
+del PR #16 fijó el texto de FR-03 para un peso mal escrito y confirmó como reglas
+el descarte del peso no válido al cambiar de barra (FR-02) y el redondeo hacia
+arriba del exceso de la manga (FR-16).
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -100,7 +103,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - Mientras el campo está vacío, la app no muestra series ni ningún error: muestra la indicación "Escribe el peso de trabajo.".
   - Si el valor escrito no es válido, la app no muestra series y muestra uno de estos mensajes, el primero que se cumpla:
     1. con un solo separador seguido de más de dos cifras, como un separador de miles ("100,123", "1.000"): "El peso de trabajo admite como máximo dos decimales.";
-    2. con algo que no sean cifras y un separador ("10 0", "100,5,", "abc"): "El peso de trabajo se escribe solo con cifras y una coma o un punto decimal.";
+    2. con algo que no sean cifras y un separador ("10 0", "100,5,", "abc"): "Escribe el peso solo con cifras y, si hace falta, una coma decimal." (el punto se sigue aceptando como separador);
     3. con un valor de 0 o mayor que 500: "El peso de trabajo debe estar entre 0 y 500 kg.".
 - **FR-04:** los porcentajes de calentamiento forman una lista:
   - la persona puede añadir y quitar porcentajes en cualquier momento;
@@ -245,7 +248,7 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
   - con la olímpica de 20 kg y los porcentajes 40, 70 y 90, " 100 ", "100 ", "100," y "100." muestran las mismas series que AC-01, sin ningún mensaje de error;
   - en el modo Un punto y con el 50 %, ",5" y ".5" se aceptan como 0,5 kg, sin ningún mensaje de error: la serie muestra "Sin discos" y "El 50 % son 0,25 kg: faltan 1 kg para poner el disco más pequeño (1,25 kg).";
   - ",", ".", " , " o solo espacios no muestran series ni ningún mensaje de error, solo la indicación "Escribe el peso de trabajo.";
-  - ",0" muestra "El peso de trabajo debe estar entre 0 y 500 kg.", ",123" muestra "El peso de trabajo admite como máximo dos decimales." y "10 0", "100,5," y "100,," muestran "El peso de trabajo se escribe solo con cifras y una coma o un punto decimal."; en ningún caso hay series.
+  - ",0" muestra "El peso de trabajo debe estar entre 0 y 500 kg.", ",123" muestra "El peso de trabajo admite como máximo dos decimales." y "10 0", "100,5," y "100,," muestran "Escribe el peso solo con cifras y, si hace falta, una coma decimal."; en ningún caso hay series.
 - **AC-28 → FR-02:** las mismas reglas de escritura valen para el peso de barra:
   - con la Z, un peso de barra escrito como " 8,5 ", 50 kg y el 70 % da el resultado de AC-04;
   - con la recta, un peso de barra escrito como "7,", 60 kg y el 70 % (objetivo 42 kg), la app carga 42 kg (15 + 2,5 por lado), sin diferencia;

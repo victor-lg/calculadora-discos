@@ -14,19 +14,20 @@ Redactada con sdd-spec (VIC-9) a partir de docs/diseno/notas-diseno-interfaz.md
 §3–§6 y §8 y de docs/diseno/maqueta-interfaz.html, con las decisiones que Víctor
 tomó en las sesiones de diseño del 23 al 25 de octubre. Las reglas de cálculo,
 validación y guardado, y sus textos, viven en SPEC-CALC-001 y SPEC-CALC-002:
-esta spec dice dónde y cómo se presentan. Son inferencias de Claude a partir de
-la maqueta, pendientes de confirmar en la revisión, FR-08 (solo se puede
-deshacer el último borrado), FR-09 (una confirmación añade una sola vez) y
-FR-12 (el dibujo acaba en la carga actual). Son propuestas de Claude
-el umbral de contraste WCAG 2.2 AA (NFR-02) y la prueba con el texto al 200 %
-(NFR-03).
+esta spec dice dónde y cómo se presentan. En la revisión del PR #16, Víctor
+confirmó como reglas tres inferencias de Claude a partir de la maqueta: FR-08
+(solo se puede deshacer el último borrado), FR-09 (una confirmación añade una
+sola vez) y FR-12 (el dibujo acaba en la carga actual). También fijó el
+contraste WCAG 2.2 AA (NFR-02) y la prueba con el zoom de página de Safari al
+200 % (NFR-03), en lugar del texto ampliado del sistema, que Safari no aplica a
+una web.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
 
 ## 1. Objetivo
 
-Que Víctor vea de un vistazo, con el móvil en una mano y entre series, qué cargar en cada serie, con la carga dibujada como la verá en la barra o en la máquina, y que la app siga siendo usable sin 3D, sin animaciones y con el texto ampliado.
+Que Víctor vea de un vistazo, con el móvil en una mano y entre series, qué cargar en cada serie, con la carga dibujada como la verá en la barra o en la máquina, y que la app siga siendo usable sin 3D, sin animaciones y con el zoom de página.
 
 ## 2. Alcance y exclusiones
 
@@ -38,7 +39,7 @@ Que Víctor vea de un vistazo, con el móvil en una mano y entre series, qué ca
   - los paneles Carga y Mis discos;
   - el dibujo 3D de la carga, su movimiento y su desactivación;
   - el funcionamiento sin 3D y tras perder el contexto gráfico;
-  - la accesibilidad: tamaño de toque, contraste, alternativas a los gestos y texto ampliado.
+  - la accesibilidad: tamaño de toque, contraste, alternativas a los gestos y zoom de página.
 - **Excluye:**
   - las reglas de cálculo, validación y guardado, y sus textos, que fijan SPEC-CALC-001 y SPEC-CALC-002;
   - la tecnología del dibujo, que fija ADR-0003;
@@ -171,12 +172,13 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 - **AC-19 → FR-15:** al perderse el contexto WebGL, los dibujos siguen visibles; al recuperarlo, todas las tarjetas se repintan y sus etiquetas coinciden con su carga, también la de una serie que cambió mientras no había contexto.
 - **AC-20 → NFR-01:** a 390 px de ancho, en cada estado de los AC anteriores, todos los elementos que se pueden pulsar, incluido el botón "Quitar la serie del P %" con el foco, miden al menos 44 × 44 px.
 - **AC-21 → NFR-02:** cada pareja de texto y fondo cumple 4,5:1, el texto grande 3:1, y los bordes de los campos, el indicador de foco, el estado de los interruptores y los puntos de los discos frente a su fondo 3:1.
-- **AC-22 → NFR-03:** con el texto al 200 %, a 390 px de ancho, no hay desplazamiento horizontal y ningún texto se corta ni se solapa. En el iPhone, con el tamaño de texto del sistema al máximo, ocurre lo mismo.
+- **AC-22 → NFR-03:** con el zoom de página al 200 % sobre una pantalla de 390 px de ancho (equivale a 195 px CSS), no hay desplazamiento horizontal, ningún texto se corta ni se solapa, y se pueden añadir, borrar y deshacer series y abrir los paneles Carga y Mis discos. En el iPhone, con la app abierta en Safari y el zoom de página al 200 %, ocurre lo mismo.
 - **AC-23 → NFR-04:** en el iPhone 15 Pro Max, con 6 series y la animación activa, Víctor anota en el PR que la animación y el gesto de borrar son fluidos.
-- **AC-24 → FR-08, FR-13, FR-15:** en el iPhone, registrado en el PR con la versión de iOS:
+- **AC-24 → FR-08, FR-13, FR-15, NFR-03:** en el iPhone, registrado en el PR con la versión de iOS:
   - el gesto de borrar funciona con el dedo, con su umbral;
   - la animación se ve y desaparece con "Reducir movimiento";
   - tras dejar la app un rato en segundo plano y volver, los dibujos se ven bien;
+  - con la app abierta en Safari y el zoom de página al 200 %, se cumple AC-22;
   - en modo avión, la app se abre con las fuentes y el dibujo (SPEC-CALC-001 AC-12).
 
 ## 6. Casos límite, errores y decisiones pendientes
@@ -199,7 +201,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 
 - **NFR-01:** todo lo que se puede pulsar mide al menos 44 × 44 px CSS (44 × 44 pt en el iPhone).
 - **NFR-02:** contraste según WCAG 2.2 AA: 4,5:1 en el texto, 3:1 en el texto grande y 3:1 en los componentes y estados que no son texto (bordes de campos, indicador de foco, interruptores y puntos de color de los discos).
-- **NFR-03:** con el texto al 200 % y con el tamaño de texto del sistema al máximo en el iPhone, la pantalla no necesita desplazamiento horizontal y ningún texto se corta ni se solapa.
+- **NFR-03:** con el zoom de página de Safari al 200 %, la interfaz se puede usar entera: no necesita desplazamiento horizontal y ningún texto se corta ni se solapa. No se exige adaptar la app al tamaño de texto del sistema, que Safari no aplica a una web.
 - **NFR-04:** en el iPhone 15 Pro Max, con 6 series y la animación activa, la animación y el gesto de borrar se ven fluidos a juicio de Víctor, que lo anota en el PR. Si no lo son, se reduce primero la resolución de las sombras.
 
 ## 11. Dependencias y restricciones
