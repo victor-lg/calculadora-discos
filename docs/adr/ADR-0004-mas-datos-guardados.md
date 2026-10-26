@@ -1,7 +1,7 @@
 ---
 id: ADR-0004
 titulo: Más datos guardados en el dispositivo
-estado: Propuesto          # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-10-26
 sustituye: null
 sustituido_por: null
@@ -15,6 +15,8 @@ y de SPEC-CALC-001 v0.6 FR-11 (PR #16), con las decisiones de Víctor de las
 sesiones de diseño del 23 al 25 de octubre y del 2026-10-26: solo se guarda un
 peso válido, y este ADR se fusiona antes que el PR #16. Cambia solo la lista de
 ADR-0002 §3.1; el resto de ADR-0002 sigue vigente y no se edita.
+Revisado en G4 en el PR #18 (dos revisores, sin nada que corregir tras a315d15).
+Aceptado con el merge del PR #18.
 -->
 
 # ADR-0004 — Más datos guardados en el dispositivo
