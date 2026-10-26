@@ -1,0 +1,923 @@
+<title>Calculadora de discos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Una sola pantalla de gimnasio: peso arriba, series con la carga en 3D como protagonistas, "Carga" y "Mis discos" plegados.
+   Tema único oscuro. Objetos físicos en 3D (una sola luz de estudio); controles planos; un solo acento, naranja. */
+:root{
+  color-scheme: dark;
+  --bg:#0d0e10; --surface:#16181b; --surface-2:#1e2125; --line:#2b2f35;
+  --fg:#f1f2f4; --fg-muted:#a6abb3;
+  --accent:#ff8a2a; --accent-ink:#1a0e02;
+  --font-num:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-ui:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--font-ui);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased}
+.app{max-width:480px;margin:0 auto;padding-block:20px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px;min-height:100%}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-muted);font-weight:600}
+.flecha{width:18px;height:18px;flex:none;color:var(--fg-muted);transition:transform .25s}
+[aria-expanded="true"]>.flecha{transform:rotate(180deg)}
+
+.peso{display:flex;flex-direction:column;gap:2px}
+.peso label{font-size:13px;color:var(--fg-muted);font-weight:500}
+.peso-campo{display:flex;align-items:baseline;gap:6px;cursor:text;border-bottom:2px solid var(--line);padding-bottom:2px;transition:border-color .2s}
+.peso-campo:focus-within{border-color:var(--accent)}
+.auto{display:inline-grid;min-width:0}
+.auto::after,.auto input{grid-area:1/1;font:inherit;letter-spacing:inherit;font-variant-numeric:inherit;margin:0;border:0;padding:0 3px 0 0}
+.auto::after{content:attr(data-v);visibility:hidden;white-space:pre;overflow:hidden}
+.auto input{width:0;min-width:100%}
+#peso-auto{max-width:calc(100% - 40px);font-family:var(--font-num);font-weight:600;font-size:64px;line-height:1;font-variant-numeric:tabular-nums}
+#peso{background:none;outline:none;caret-color:var(--accent)}
+.peso-campo .unidad{font-family:var(--font-num);font-size:24px;color:var(--fg-muted);font-weight:500}
+
+.plegable{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.pl-res{width:100%;border:0;background:none;min-height:56px;display:flex;align-items:center;gap:12px;padding:0 14px;text-align:left}
+.pl-res .res{flex:1;min-width:0;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-panel{display:flex;flex-direction:column;gap:10px;padding:0 10px 12px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--bg);border-radius:12px;padding:4px;gap:4px}
+.seg button{border:0;background:none;border-radius:9px;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:500;color:var(--fg-muted)}
+.seg button svg{width:40px;height:20px}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.tile{border:1px solid var(--line);background:var(--surface);border-radius:12px;min-height:76px;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.tile svg{width:100%;max-width:62px;height:20px}
+.tile img{display:block;width:100%;max-width:88px;height:30px;object-fit:contain;-webkit-mask-image:linear-gradient(to right,transparent,#000 22%);mask-image:linear-gradient(to right,transparent,#000 22%)}
+.tile .n{font-size:13px;font-weight:600;line-height:1.1}
+.tile .w{font-family:var(--font-num);font-size:14px;color:var(--fg-muted);font-variant-numeric:tabular-nums}
+.tile[aria-pressed="true"]{background:var(--surface-2);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.tile[aria-pressed="true"] .w{color:var(--fg)}
+.opcion{display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--bg);border-radius:12px;padding:10px 12px;min-height:52px;cursor:pointer}
+.opcion b{display:block;font-size:14px;font-weight:600}
+.opcion small{display:block;font-size:12px;color:var(--fg-muted)}
+.opcion input{appearance:none;-webkit-appearance:none;flex:none;width:46px;height:28px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:background .2s;margin:0}
+.opcion input::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--fg);transition:transform .2s}
+.opcion input:checked{background:var(--accent)}
+.opcion input:checked::after{transform:translateX(18px);background:var(--accent-ink)}
+.nota-maquina{font-size:13px;color:var(--fg-muted);padding:2px 4px}
+.barra-peso{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--fg-muted)}
+.barra-peso input{width:84px;min-height:44px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 10px;font-family:var(--font-num);font-size:20px;font-weight:600;text-align:right}
+.barra-peso input:focus{border-color:var(--accent);outline:none}
+.barra-peso input[aria-invalid="true"]{border-color:#e5484d}
+.error{font-size:13px;color:#ff9b9b;padding:0 4px;margin:0}
+
+.bloque{display:flex;flex-direction:column;gap:8px}
+.fila{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;min-height:44px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:500;color:var(--fg)}
+.pcts .chip{padding:0 4px 0 14px;font-family:var(--font-num);font-size:18px;font-weight:600}
+.pcts .quitar{border:0;background:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--fg-muted)}
+.pcts .quitar svg{width:14px;height:14px}
+.pcts .add{border-style:dashed;color:var(--fg-muted);padding:0 14px;font-family:var(--font-ui);font-size:15px}
+.pcts input{width:72px;min-height:44px;background:var(--surface);border:1px solid var(--accent);border-radius:999px;padding:0 12px;font-family:var(--font-num);font-size:18px;font-weight:600;text-align:center;outline:none}
+
+.avisos{display:flex;flex-direction:column;gap:6px}
+.deslizable{position:relative;border-radius:14px;overflow:hidden}
+.fondo-borrar{position:absolute;inset:1px;opacity:0;background:#3b1c1e;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding-right:22px;font-weight:600;color:#ff9592;transition:background .15s,color .15s}
+.fondo-borrar svg{transition:transform .15s}
+.deslizable.listo .fondo-borrar{background:#e5484d;color:#fff}
+.deslizable.listo .fondo-borrar svg{transform:scale(1.15)}
+.fondo-borrar svg{width:20px;height:20px}
+.deslizable.arrastra .fondo-borrar{opacity:1}
+.deslizable .serie{position:relative;touch-action:pan-y;transition:transform .2s ease;user-select:none;-webkit-user-select:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}
+.sr:focus{position:static;width:auto;height:auto;clip:auto;margin-top:6px;padding:8px 12px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line)}
+.anadir button{width:100%;min-height:48px;border:1.5px dashed var(--line);background:none;border-radius:14px;color:var(--fg-muted);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.anadir button:hover{color:var(--fg);border-color:var(--fg-muted)}
+.anadir form{display:flex;gap:4px;cursor:text;align-items:center;background:var(--surface);border:1.5px solid var(--accent);border-radius:14px;padding:6px 6px 6px 14px}
+#pct-auto{flex:none;max-width:60%;font-family:var(--font-num);font-size:22px;font-weight:600}
+.anadir input{background:none;outline:none;min-height:40px}
+.anadir form .unidad{font-family:var(--font-num);font-size:18px;color:var(--fg-muted);margin-right:auto}
+.anadir .cerrar{background:none!important;color:var(--fg-muted)!important;padding:0!important;width:44px;display:grid;place-items:center;margin-right:6px}
+.anadir .cerrar svg{width:16px;height:16px}
+.anadir form[aria-invalid="true"]{border-color:#e5484d}
+.anadir .error{margin-top:6px}
+.anadir form button{width:auto;min-height:40px;border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:0 14px;font-weight:700}
+.toast{position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));align-self:center;display:flex;gap:14px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 14px;font-size:14px;box-shadow:0 10px 24px rgba(0,0,0,.5);z-index:4}
+.toast button{border:0;background:none;color:var(--accent);font-weight:700;min-height:36px;padding:0 8px}
+.aviso{display:flex;gap:8px;align-items:flex-start;font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.aviso svg,.nota svg{flex:none;width:16px;height:16px;margin-top:2px;color:var(--fg-muted)}
+
+.series{display:flex;flex-direction:column;gap:10px}
+.serie{background:var(--surface);border-radius:14px;padding:12px 8px 12px 16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:6px;align-items:center}
+.serie .txt{display:flex;flex-direction:column;gap:2px;min-width:0;position:relative}
+.serie .cab{display:flex;align-items:center;gap:8px;min-height:24px}
+.serie .pct{font-family:var(--font-num);font-size:18px;font-weight:600;color:var(--fg-muted)}
+.serie .tot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-family:var(--font-num);font-size:34px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.serie .tot .kg{white-space:nowrap}
+.serie .tot small{font-size:16px;font-weight:500;color:var(--fg-muted)}
+.dif{position:relative;border:0;background:var(--line);color:var(--fg);border-radius:999px;padding:4px 8px;font-family:var(--font-num);font-size:14px;font-weight:700;line-height:1}
+.dif::before{content:"";position:absolute;inset:-10px}
+.dif[aria-expanded="true"]{background:var(--accent);color:var(--accent-ink)}
+.burbuja{grid-column:1/-1;margin:2px 8px 0 0;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.35}
+.serie .reparto{font-size:14px;color:var(--fg-muted)}
+.serie .reparto b{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:2px;font-family:var(--font-num);font-size:20px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
+.tk{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tk i{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.sin-discos{display:block;margin-top:4px;font-size:15px;font-weight:600;color:var(--fg)}
+.col-linea{display:block;margin-top:4px;font-size:13px;font-weight:500;color:var(--fg-muted)}
+.tk em{font-style:normal;font-family:var(--font-ui);font-size:12px;font-weight:700;line-height:1;background:var(--line);border-radius:6px;padding:4px 6px}
+.dib{min-width:0;position:relative}
+.dib canvas{display:block;width:100%;aspect-ratio:1.25;height:auto}
+.maquina .dib canvas{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 11%,#000 89%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 11%,#000 89%,transparent)}
+.notas{grid-column:1/-1;display:flex;flex-direction:column;gap:4px}
+.nota{display:flex;gap:6px;font-size:13px;border-top:1px solid var(--line);padding-top:8px}
+.nota+.nota{border-top:0;padding-top:0}
+.cargando{position:absolute;inset:0;display:grid;place-items:center;font-size:12px;color:var(--fg-muted)}
+
+.app{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+.discos-caja{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.discos-resumen{width:100%;border:0;background:none;min-height:56px;display:flex;align-items:center;gap:10px;padding:0 14px;text-align:left}
+.discos-resumen .t{font-weight:600;font-size:15px}
+.discos-resumen .cuenta{font-family:var(--font-num);font-size:14px;font-weight:600;background:var(--line);border-radius:6px;padding:3px 7px}
+.puntos{display:flex;gap:4px;flex:1;min-width:0}
+.puntos i{width:12px;height:12px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.puntos i.off{opacity:.18}
+.discos-panel{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:2px 8px 12px}
+.disco{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:64px;padding:4px 0;border-radius:10px}
+.disco svg{width:40px;height:40px;transition:opacity .2s,filter .2s}
+.disco span{font-family:var(--font-num);font-size:14px;font-weight:600}
+.disco[aria-pressed="false"] svg{opacity:.25;filter:grayscale(1)}
+.disco[aria-pressed="false"] span{color:var(--fg-muted);text-decoration:line-through}
+
+.defs{position:absolute;width:0;height:0;overflow:hidden}
+@media (max-width:360px){ .serie{grid-template-columns:1fr} #peso-auto{font-size:52px} .disco svg{width:32px;height:32px} }
+.sin3d .dib{display:none}
+.sin3d .serie{grid-template-columns:1fr}
+</style>
+
+<svg class="defs" aria-hidden="true" focusable="false"><defs>
+  <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d737b"/><stop offset=".32" stop-color="#eef1f4"/><stop offset=".55" stop-color="#b9bfc7"/><stop offset="1" stop-color="#4f545b"/></linearGradient>
+  <linearGradient id="buje" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f5f7"/><stop offset="1" stop-color="#7f868e"/></linearGradient>
+</defs></svg>
+
+<main class="app">
+  <div class="peso">
+    <label for="peso">Peso de trabajo</label>
+    <div class="peso-campo"><span class="auto" id="peso-auto" data-v="100"><input id="peso" size="1" inputmode="decimal" autocomplete="off" maxlength="6" value="100"></span><span class="unidad">kg</span></div>
+  </div>
+
+  <div class="plegable">
+    <button class="pl-res" id="carga-btn" aria-expanded="false" aria-controls="carga-panel"><span class="eyebrow">Carga</span><span class="res" id="carga-res"></span><svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="pl-panel" id="carga-panel" hidden>
+      <div class="seg" id="modos" role="group" aria-label="Modo de carga"></div>
+      <div class="bloque" id="barras-bloque">
+        <div class="tiles" id="barras" role="group" aria-label="Barra"></div>
+        <label class="opcion" for="collares"><span><b>Collarines de competición</b><small>2,5 kg cada uno; suman 5 kg en las series con discos</small></span><input type="checkbox" id="collares" role="switch"></label>
+        <div class="barra-peso" id="barra-peso" hidden>
+          <label for="barra-peso-in">Peso de la barra</label>
+          <input id="barra-peso-in" inputmode="decimal" autocomplete="off" aria-describedby="barra-peso-error"><span>kg</span>
+        </div>
+        <p class="error" id="barra-peso-error" role="alert" hidden>Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo.</p>
+      </div>
+      <p class="nota-maquina" id="nota-maquina" hidden>Los discos se cargan en el cuerno de la máquina.</p>
+    </div>
+  </div>
+
+  <div class="discos">
+    <div class="discos-caja">
+      <button class="discos-resumen" id="discos-btn" aria-expanded="false" aria-controls="discos-panel">
+        <span class="t">Mis discos</span><span class="cuenta" id="cuenta" hidden></span><span class="puntos" id="puntos"></span>
+        <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="discos-panel" id="discos-panel" hidden></div>
+    </div>
+  </div>
+  <div class="avisos" id="avisos" aria-live="polite"></div>
+  <section class="series" id="series" aria-label="Series"></section>
+  <div class="anadir" id="anadir"></div>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+</main>
+<p id="fallo" hidden style="text-align:center;color:var(--fg-muted);padding:16px">No se ha podido cargar el motor 3D. Recarga la página.</p>
+<script>setTimeout(() => { if (!window.__app) document.getElementById('fallo').hidden = false; }, 12000);</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+window.__app = true;
+const $ = s => document.querySelector(s);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fmt = n => (Math.round(n * 100) / 100).toLocaleString('es-ES', {maximumFractionDigits:2});
+const decimales = s => (String(s).trim().replace(',', '.').split('.')[1] || '').length;
+const parse = s => { const t = String(s).trim().replace(',', '.'); if (!t) return null; const n = Number(t); return Number.isFinite(n) ? n : NaN; };
+
+/* ---------- Datos: discos IPF (mm), barras y máquina ---------- */
+const DISCOS = {
+  25:   {u:20, R:225,   t:27,   color:'#c8102e', tinta:'#ffffff'},
+  20:   {u:16, R:225,   t:22.5, color:'#0b4fc4', tinta:'#ffffff'},
+  15:   {u:12, R:200,   t:21,   color:'#e9a600', tinta:'#ffffff'},
+  10:   {u:8,  R:162.5, t:21,   color:'#13893a', tinta:'#ffffff'},
+  5:    {u:4,  R:114,   t:16,   color:'#ffffff', tinta:'#151515'},
+  2.5:  {u:2,  R:95,    t:12,   color:'#1b1c1f', tinta:'#ffffff'},
+  1.25: {u:1,  R:80,    t:11,   color:'#c3c8cf', tinta:'#151515', metal:true},
+};
+const ORDEN = [25, 20, 15, 10, 5, 2.5, 1.25];
+const BARRAS = {
+  o20:   {nombre:'Olímpica', peso:20, editable:false, manga:415, agarre:{r:14}},
+  o15:   {nombre:'Olímpica', peso:15, editable:false, manga:320, agarre:{r:12.5}},
+  recta: {nombre:'Recta',    peso:10, editable:true,  manga:240, agarre:{r:12.5}},
+  z:     {nombre:'Z',        peso:10, editable:true,  manga:240, agarre:{r:12.5, curva:true}},
+};
+const MAQUINA = {manga:320, sinCollar:true};
+const MODOS = [{id:'barra', label:'Barra'}, {id:'dos', label:'Dos lados'}, {id:'punto', label:'Un punto'}];
+const lee = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : v; } catch { return def; } };
+const guarda = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const state = {peso:lee('peso', '100'), modo:'barra', barra:'o20', pcts:[40, 70, 90], on:Object.fromEntries(ORDEN.map(w => [w, true])), collares:lee('collares', '0') === '1'};
+for (const id of ['recta', 'z']) { const v = parse(lee(`barra-${id}`, '')); if (v >= 1 && v <= 50) BARRAS[id].peso = v; }
+const COLLARIN = 2.5;   // kg por collarín de competición
+const equipo = () => state.modo === 'barra' ? BARRAS[state.barra] : MAQUINA;
+const util = e => e.sinCollar ? e.manga - 10 : e.manga - 40;   // mm de manga para discos
+
+/* ---------- Cálculo: mayor peso, después menos discos, después el disco más grande ---------- */
+function mejor(T){
+  const habil = ORDEN.filter(w => state.on[w]);
+  const best = new Array(T + 1).fill(null); best[0] = [];
+  const gana = (a, b) => { if (!b) return true; if (a.length !== b.length) return a.length < b.length; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+  for (let s = 1; s <= T; s++) for (const w of habil) { const u = DISCOS[w].u;
+    if (s >= u && best[s - u]) { const c = best[s - u].concat(w).sort((x, y) => y - x); if (gana(c, best[s])) best[s] = c; } }
+  for (let s = T; s >= 0; s--) if (best[s]) return best[s];
+  return [];
+}
+function serie(pct, W){
+  const obj = W * pct / 100, bar = state.modo === 'barra' ? BARRAS[state.barra].peso : 0;
+  const conCol = state.modo === 'barra' && state.collares;
+  const x = state.modo === 'barra' ? (obj - bar - (conCol ? 2 * COLLARIN : 0)) / 2 : state.modo === 'dos' ? obj / 2 : obj;
+  const combo = mejor(Math.max(0, Math.floor(x / 1.25 + 1e-9)));
+  const carga = combo.reduce((a, b) => a + b, 0), collares = conCol && combo.length > 0;
+  const total = state.modo === 'barra' ? bar + 2 * carga + (collares ? 2 * COLLARIN : 0) : state.modo === 'dos' ? 2 * carga : carga;
+  // Capacidad por grosor real: se dibujan los que caben, en orden; el resto se avisa en centímetros.
+  const cap = util(equipo()); let usado = 0; const dib = [];
+  for (const w of combo) { if (usado + DISCOS[w].t > cap) break; usado += DISCOS[w].t; dib.push(w); }
+  const grosor = combo.reduce((a, w) => a + DISCOS[w].t, 0);
+  return {pct, obj, total, diff: total - obj, combo, bar, dib, collares, falta: Math.max(0, grosor - cap)};
+}
+const grupos = combo => { const g = []; for (const w of combo) { const l = g[g.length - 1]; if (l && l.w === w) l.n++; else g.push({w, n:1}); } return g; };
+const repartoHTML = combo => grupos(combo).map(x => `<span class="tk" aria-label="${x.n > 1 ? x.n + ' discos' : '1 disco'} de ${fmt(x.w)} kg"><i style="background:${DISCOS[x.w].color}"></i>${fmt(x.w)}${x.n > 1 ? `<em>×${x.n}</em>` : ''}</span>`).join('');
+const repartoTexto = combo => grupos(combo).map(x => (x.n > 1 ? `${x.n} de ` : '') + fmt(x.w)).join(', ');
+
+/* ---------- Motor 3D: un solo renderizador para todas las tarjetas ---------- */
+const lienzo3d = document.createElement('canvas');
+let renderer = null;
+try { renderer = new THREE.WebGLRenderer({canvas:lienzo3d, antialias:true, alpha:true, preserveDrawingBuffer:true}); } catch (e) { console.warn(e); }
+// Sin WebGL la app sigue funcionando: las tarjetas muestran solo el texto.
+if (!renderer) { document.body.classList.add('sin3d'); renderer = {setPixelRatio(){}, setSize(){}, render(){}, shadowMap:{}, sin:true}; }
+renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const pmrem = renderer.sin ? null : new THREE.PMREMGenerator(renderer);
+function estudio(){
+  const s = new THREE.Scene(); s.background = new THREE.Color(0x0a0b0d);
+  const caja = (w, h, pos, int) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({color:new THREE.Color(1, 1, 1).multiplyScalar(int), side:THREE.DoubleSide}));
+    m.position.set(...pos); m.lookAt(0, 0, 0); s.add(m);
+  };
+  caja(1400, 900, [-900, 1100, 900], 8);     // softbox principal, arriba a la izquierda
+  caja(260, 1700, [1300, 300, -300], 4.5);   // tira de recorte, detrás a la derecha
+  caja(1000, 700, [1100, 650, -1100], .8);  // reflejo en las caras de los discos (suave, para no lavar el color)
+  caja(1700, 500, [0, -900, 1100], .22);     // relleno bajo, de frente (flojo: más contraste)
+  caja(3000, 3000, [0, 1700, 0], .05);       // rebote del techo, casi nada
+  return pmrem.fromScene(s, 0.02, 1, 10000).texture;
+}
+if (pmrem) scene.environment = estudio();
+// Safari descarta el contexto WebGL si la app pasa tiempo en segundo plano. Los dibujos ya pintados se conservan
+// (cada tarjeta tiene su lienzo 2D); al recuperarlo se rehace el entorno y se repintan todas.
+lienzo3d.addEventListener('webglcontextlost', e => e.preventDefault());
+lienzo3d.addEventListener('webglcontextrestored', () => { scene.environment = estudio(); tamano = {w:0, h:0}; ajustaTamano(); cards.forEach(c => c.sucio = true); });
+const luz = new THREE.DirectionalLight(0xffffff, 1.4);
+luz.position.set(-900, 1100, 900);
+luz.intensity = 1.8;
+luz.castShadow = true;
+luz.shadow.mapSize.set(2048, 2048);
+Object.assign(luz.shadow.camera, {left:-900, right:900, top:900, bottom:-900, near:1, far:4000});
+luz.shadow.radius = 4; luz.shadow.bias = -0.0005;
+scene.add(luz);
+const recorte = new THREE.DirectionalLight(0xffffff, .9);
+recorte.position.set(600, 250, -700);
+scene.add(recorte);
+const fondo = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({opacity:.32}));
+fondo.position.z = -260; fondo.receiveShadow = true;
+const sombra = o => o.traverse(m => { if (m.isMesh && !m.material.transparent) { m.castShadow = true; m.receiveShadow = true; } });
+
+
+/* Materiales */
+const cromo = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.12});
+const anodizado = new THREE.MeshPhysicalMaterial({color:0x2a2d32, metalness:.7, roughness:.32, clearcoat:.4});
+function moleteado(){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#808080'; g.fillRect(0, 0, 64, 64);
+  g.strokeStyle = '#2a2a2a'; g.lineWidth = 6;
+  g.beginPath(); g.moveTo(-8, 72); g.lineTo(72, -8); g.moveTo(-8, -8); g.lineTo(72, 72); g.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(30, 60);
+  return t;
+}
+const agarreMat = new THREE.MeshPhysicalMaterial({color:0xc4c9d0, metalness:1, roughness:.38, bumpMap:moleteado(), bumpScale:1.2});
+function ruido(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), img = g.createImageData(256, 256);
+  for (let i = 0; i < img.data.length; i += 4) { const v = 150 + Math.random() * 60; img.data[i] = img.data[i+1] = img.data[i+2] = v; img.data[i+3] = 255; }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(6, 2);
+  return t;
+}
+const grano = ruido();
+function mecanizado(){
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const g = c.getContext('2d');
+  for (let y = 0; y < 256; y++) { const v = 110 + Math.random() * 40 + (y % 3 === 0 ? 50 : 0); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(0, y, 4, 1); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 3);
+  return t;
+}
+const cromoBuje = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.2, bumpMap:mecanizado(), bumpScale:.5});
+const pintura = (color, brillo) => new THREE.MeshPhysicalMaterial({color:new THREE.Color(color), metalness:brillo ? .55 : .2, roughness:brillo ? .3 : .42, roughnessMap:grano, clearcoat:.85, clearcoatRoughness:.1, side:THREE.DoubleSide});
+
+/* Pieza de revolución alrededor del eje X a partir de un perfil (radio, posición axial). */
+function torno(perfil, mat, seg = 128){
+  const g = new THREE.LatheGeometry(perfil.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+  g.rotateZ(-Math.PI / 2);
+  const m = mat.side === THREE.DoubleSide ? mat : mat.clone();
+  m.side = THREE.DoubleSide;
+  return new THREE.Mesh(g, m);
+}
+/* Diseño propio de la cara: aro exterior grueso en relieve, anillo intermedio en relieve que separa dos coronas,
+   la marca arriba y abajo y el peso a los lados, y buje cromado con escalón. */
+/* Mismas proporciones en 25, 20, 15 y 10 (escaladas a su diámetro IPF). En los pequeños el buje se estrecha
+   (el agujero es de 50 mm en todos) y el anillo intermedio solo aparece donde cabe: en el de 5. */
+const BUJE = {25:50, 20:50, 15:50, 10:50, 5:40, 2.5:40, 1.25:34};
+function diseno(w){
+  const R = DISCOS[w].R, hub = BUJE[w], borde = .089 * R, an = .018 * R;
+  if (R > 120) { const rc = .42 * R; return {R, hub, borde, anillo:[rc - an, rc + an], corona:[rc + an, R - borde]}; }
+  if (w === 5) { const rc = hub + 12; return {R, hub, borde, anillo:[rc - an, rc + an], corona:[rc + an, R - borde]}; }
+  return {R, hub, borde, anillo:null, corona:[hub + 4, R - borde]};
+}
+/* Rotulación con la tipografía de la app. La marca, con interletraje abierto; el peso, con los decimales al 78 %,
+   la coma pequeña y más aire hasta "KG", en la misma proporción en todos los discos.
+   Se dibuja dos veces: en color (con una sombra corta) y en un mapa de alturas que le da relieve. */
+const FUENTE = '"Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif';
+const MARCA = 'BVNKER';
+/* Interletraje óptico por parejas (en fracción del cuerpo): la V deja huecos a sus lados, así que BV y VN se cierran. */
+const KERN = {BV:-.07, VN:-.075, NK:.04, KE:.035, ER:.04};
+function arco(g, texto, cx, cy, radio, arriba, track, cuerpo = 0){
+  const anchos = [...texto].map((ch, i) => g.measureText(ch).width + track + (KERN[ch + (texto[i + 1] || '')] || 0) * cuerpo);
+  const total = anchos.reduce((a, b) => a + b, 0) / radio;
+  let a = arriba ? -Math.PI / 2 - total / 2 : Math.PI / 2 + total / 2;
+  [...texto].forEach((ch, i) => {
+    const paso = anchos[i] / radio, m = arriba ? a + paso / 2 : a - paso / 2;
+    g.save(); g.translate(cx + radio * Math.cos(m), cy + radio * Math.sin(m)); g.rotate(arriba ? m + Math.PI / 2 : m - Math.PI / 2);
+    g.fillText(ch, 0, 0); g.restore();
+    a = arriba ? a + paso : a - paso;
+  });
+}
+function peso(g, w, x, y, A, girado){
+  const [ent, dec] = String(w).split('.');
+  const f = (k, peso = 800) => `${peso} ${A * k}px ${FUENTE}`;
+  const trozos = [[ent, f(1)]].concat(dec ? [[',', f(.6)], [dec, f(.78)]] : []);
+  const ancho = trozos.reduce((s, [t, fu]) => { g.font = fu; return s + g.measureText(t).width; }, 0) + (dec ? A * -.02 : 0);
+  g.save(); g.translate(x, y); if (girado) g.rotate(Math.PI);
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  let cx = -ancho / 2; const base = A * .26;
+  for (const [t, fu] of trozos) {
+    g.font = fu; g.fillText(t, cx, base);
+    cx += g.measureText(t).width + (t === ',' ? -A * .02 : 0);
+  }
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `700 ${A * (dec ? .44 : .34)}px ${FUENTE}`;
+  g.letterSpacing = `${A * .02}px`;
+  g.fillText('KG', 0, A * (dec ? .68 : .62));
+  g.letterSpacing = '0px';
+  g.restore();
+}
+function textos(g, w, d, N, color, sombra){
+  const mm = N / (2 * d.R), [c0, c1] = diseno(w).corona, rm = (c0 + c1) / 2 * mm, ancho = (c1 - c0) * mm;
+  const capa = (dx, dy, col) => {
+    g.save(); g.translate(dx, dy); g.fillStyle = col;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const tb = ancho * .66;
+    g.font = `800 ${tb}px ${FUENTE}`;
+    arco(g, MARCA, N / 2, N / 2, rm, true, tb * .08, tb);
+    g.save(); g.translate(N / 2, N / 2); g.rotate(Math.PI); g.translate(-N / 2, -N / 2);
+    arco(g, MARCA, N / 2, N / 2, rm, true, tb * .08, tb);
+    g.restore();
+    const A = ancho * .56;
+    peso(g, w, N / 2 - rm, N / 2, A, false);
+    peso(g, w, N / 2 + rm, N / 2, A, true);
+    g.restore();
+  };
+  if (sombra) capa(N * .0025, N * .0035, 'rgba(0,0,0,.35)');
+  capa(0, 0, color);
+}
+function rotulo(w, d){
+  const N = 1024, [c0, c1] = diseno(w).corona;
+  const lienzo = (fondo, tinta, sombra) => {
+    const c = document.createElement('canvas'); c.width = c.height = N;
+    const g = c.getContext('2d'); g.fillStyle = fondo; g.fillRect(0, 0, N, N);
+    textos(g, w, d, N, tinta, sombra);
+    return c;
+  };
+  const k = c1 / d.R, ajusta = t => { t.repeat.set(k, k); t.offset.set((1 - k) / 2, (1 - k) / 2); t.anisotropy = 8; return t; };
+  const color = ajusta(new THREE.CanvasTexture(lienzo(d.color, d.tinta, false))); color.colorSpace = THREE.SRGBColorSpace;
+  const rugoso = ajusta(new THREE.CanvasTexture(lienzo('rgb(107,107,107)', 'rgb(158,158,158)', false)));
+  const malla = new THREE.Mesh(new THREE.RingGeometry(c0 + .4, c1 - .4, 256, 4),
+    new THREE.MeshPhysicalMaterial({map:color, roughnessMap:rugoso, roughness:1, metalness:d.metal ? .55 : .2, clearcoat:.85, clearcoatRoughness:.12}));
+  malla.rotation.y = Math.PI / 2;
+  return malla;
+}
+function redondea(p, radio){
+  const out = [p[0]];
+  for (let i = 1; i < p.length - 1; i++) {
+    const [ax, ay] = p[i - 1], [bx, by] = p[i], [cx, cy] = p[i + 1];
+    const l1 = Math.hypot(bx - ax, by - ay), l2 = Math.hypot(cx - bx, cy - by);
+    if (!l1 || !l2) continue;
+    const d = Math.min(radio, l1 / 3, l2 / 3);
+    const p0 = [bx - (bx - ax) / l1 * d, by - (by - ay) / l1 * d], p2 = [bx + (cx - bx) / l2 * d, by + (cy - by) / l2 * d];
+    for (let k = 0; k <= 4; k++) { const t = k / 4, u = 1 - t; out.push([u*u*p0[0] + 2*u*t*bx + t*t*p2[0], u*u*p0[1] + 2*u*t*by + t*t*p2[1]]); }
+  }
+  out.push(p[p.length - 1]);
+  return out;
+}
+function perfilDisco(w, h, lip){
+  const {R, hub, borde, anillo, corona} = diseno(w);
+  const macizo = anillo ? anillo[1] : corona[0];
+  const zonas = [[macizo, h], [corona[1], h - lip], [R - .018 * R, h]];
+  const frente = [[hub - 3, h]]; let r = hub - 3, z0 = h;
+  for (const [r1, z] of zonas) { if (z !== z0) frente.push([r + 2, z]); frente.push([r1, z]); r = r1; z0 = z; }
+  frente.push([R, h - Math.min(3, h * .45)]);
+  return redondea(frente.concat(frente.slice().reverse().map(([rr, zz]) => [rr, -zz]), [frente[0]]), 1.4);
+}
+function disco(w, t){
+  const d = DISCOS[w], h = t / 2, r0 = 25.25, lip = Math.min(2.2, h - 2), hub = BUJE[w];
+  const g = new THREE.Group();
+  g.add(torno(perfilDisco(w, h, lip), pintura(d.color, d.metal)));
+  g.add(torno([[r0,-h-1],[hub-3,-h-1],[hub-3,-h-.4],[hub,-h-.4],[hub,h+.4],[hub-3,h+.4],[hub-3,h+1],[r0,h+1],[r0,-h-1]], cromoBuje, 96));
+  const r = rotulo(w, d);
+  r.position.x = h - lip + .05;
+  g.add(r);
+  g.userData.t = t;
+  return g;
+}
+
+
+const ranuras = mecanizado(); ranuras.repeat.set(1, 26);
+const cromoManga = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.16, bumpMap:ranuras, bumpScale:.35});
+const ranurasTope = mecanizado(); ranurasTope.repeat.set(1, 4);
+const cromoTope = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.16, bumpMap:ranurasTope, bumpScale:.4});
+const molePav = moleteado(); molePav.repeat.set(30, 60);
+const pavonado = new THREE.MeshPhysicalMaterial({color:0x2c2e33, metalness:.9, roughness:.36, bumpMap:molePav, bumpScale:1.1, clearcoat:.25});
+const moleZ = moleteado(); moleZ.repeat.set(60, 4);
+const cromoZ = agarreMat.clone(); const moleZ2 = moleteado(); moleZ2.repeat.set(79, 30); cromoZ.bumpMap = moleZ2;
+const pinturaMaquina = new THREE.MeshPhysicalMaterial({color:0x1d1f23, metalness:.35, roughness:.5, clearcoat:.35, clearcoatRoughness:.3});
+const aceroCepillado = new THREE.MeshPhysicalMaterial({color:0xc9ced5, metalness:1, roughness:.32, bumpMap:ranuras, bumpScale:.2});
+const goma = new THREE.MeshPhysicalMaterial({color:0x111214, metalness:0, roughness:.85});
+const pinturaNaranja = new THREE.MeshPhysicalMaterial({color:new THREE.Color('#ff7a1a'), metalness:.15, roughness:.38, clearcoat:.6, clearcoatRoughness:.2});
+const tuerca = (r, h) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 6), aceroCepillado);
+
+
+function manga(F, mat = cromoManga){ return torno([[0,0],[25,0],[25,F-6],[23.5,F],[0,F]], mat, 96); }
+function tope(){ return torno([[14,-30],[27,-30],[30,-27],[30,-3],[27,0],[14,0],[14,-30]], cromoTope, 96); }
+function agarre(a, desde = -360){
+  if (a.curva) {
+    // Quiebros en ángulo, como una barra Z real: tramo recto, bajada, subida y tramo recto hasta el tope.
+    const curva = new THREE.CatmullRomCurve3([[desde,0],[-325,0],[-310,-4],[-282,-24],[-268,-28],[-254,-24],[-200,14],[-186,18],[-172,14],[-150,4],[-138,0],[-30,0]].map(([x, y]) => new THREE.Vector3(x, y, 0)), false, 'centripetal');
+    return new THREE.Mesh(new THREE.TubeGeometry(curva, 160, a.r, 32), a.mat);
+  }
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(a.r, a.r, -30 - desde, 64, 1), a.mat);
+  m.geometry.rotateZ(-Math.PI / 2); m.position.x = (desde - 30) / 2;
+  return m;
+}
+
+const naranjaMat = new THREE.MeshPhysicalMaterial({color:new THREE.Color('#ff8a2a'), metalness:.55, roughness:.28, clearcoat:.5});
+const oscuro = new THREE.MeshStandardMaterial({color:0x050506, roughness:.9});
+const grafito = new THREE.MeshPhysicalMaterial({color:0x5c6269, metalness:.85, roughness:.3, clearcoat:.3});
+
+/* Collarín propio: cuerpo de aluminio anodizado negro con chaflanes, aro interior cromado, ranura de apriete
+   y palanca naranja (el acento de la app) con bisagra. Abierta, la palanca se levanta; cerrada, queda plana. */
+function nuevoCollar(){
+  const g = new THREE.Group(), RE = 40, RI = 25.4, MEDIO = .16;
+  // Anillo partido: un aro de aluminio con una ranura arriba, biselado.
+  const forma = new THREE.Shape();
+  forma.absarc(0, 0, RE, Math.PI / 2 + MEDIO, Math.PI / 2 - MEDIO + Math.PI * 2, false);
+  forma.lineTo(RI * Math.cos(Math.PI / 2 - MEDIO), RI * Math.sin(Math.PI / 2 - MEDIO));
+  forma.absarc(0, 0, RI, Math.PI / 2 - MEDIO + Math.PI * 2, Math.PI / 2 + MEDIO, true);
+  forma.closePath();
+  const geo = new THREE.ExtrudeGeometry(forma, {depth:32, bevelEnabled:true, bevelThickness:1.6, bevelSize:1.2, bevelSegments:3, curveSegments:96});
+  geo.translate(0, 0, -16); geo.rotateY(Math.PI / 2);
+  g.add(new THREE.Mesh(geo, grafito));
+  g.add(torno([[39.6,-5],[41.3,-5],[41.3,5],[39.6,5],[39.6,-5]], naranjaMat, 96));
+  // Orejetas a los lados de la ranura, tornillo pasante y leva con palanca.
+  const orejas = [-1, 1].map(s => { const o = new THREE.Mesh(new THREE.BoxGeometry(30, 15, 7), grafito); o.position.set(0, 44, s * 9); g.add(o); return o; });
+  const tornillo = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 30, 20), cromo); tornillo.rotation.x = Math.PI / 2; tornillo.position.set(0, 47, 0); g.add(tornillo);
+  const piv = new THREE.Group(); piv.position.set(0, 47, 0);
+  const leva = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 12, 32), naranjaMat); leva.rotation.x = Math.PI / 2; piv.add(leva);
+  const brazo = new THREE.Mesh(new THREE.BoxGeometry(65, 8, 14), naranjaMat); brazo.position.set(32.5, 5, 0); piv.add(brazo);
+  const punta = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 16, 24), naranjaMat); punta.rotation.x = Math.PI / 2; punta.position.set(65, 5, 0); piv.add(punta);
+  g.add(piv);
+  g.userData.piv = piv;
+  g.userData.ranura = v => { orejas[0].position.z = -(5.5 + v / 2); orejas[1].position.z = 5.5 + v / 2; };
+  g.userData.ranura(3);
+  sombra(g);
+  return g;
+}
+const ABIERTA = 1.15, RANURA_ABIERTA = 7, RANURA_CERRADA = 3;
+let FIN_MANGA = 415;
+const estructura = new THREE.Group(); scene.add(estructura);
+function construye(){
+  const e = equipo(); FIN_MANGA = e.manga;
+  estructura.clear(); estructura.position.set(0, 0, 0);
+  if (e.agarre) {
+    estructura.add(agarre({r:e.agarre.r, mat:e.agarre.curva ? cromoZ : agarreMat, curva:e.agarre.curva}), tope(), manga(FIN_MANGA));
+  } else {
+    // Máquina de carga por discos (uno o dos puntos). Todo va en la misma línea (el mismo X): brazo, horquilla,
+    // montante y tope. El brazo pasa entre las dos pletinas de la horquilla; el casquillo, soldado a su cara inferior,
+    // gira en el eje. Debajo, el tope con taco de goma donde descansa el brazo. El cuerno sale del costado del brazo.
+    const caja = (w, h, d, r, mat) => new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), mat);
+    const XA = -28, W = 45, T = 28, RC = 11;
+    const curva = new THREE.CatmullRomCurve3([[XA,-620,-375],[XA,-330,-200],[XA,0,0],[XA,320,235],[XA,760,555]].map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    const seccion = new THREE.Shape();
+    seccion.moveTo(-T + RC, -W); seccion.lineTo(T - RC, -W); seccion.absarc(T - RC, -W + RC, RC, -Math.PI / 2, 0, false);
+    seccion.lineTo(T, W - RC); seccion.absarc(T - RC, W - RC, RC, 0, Math.PI / 2, false);
+    seccion.lineTo(-T + RC, W); seccion.absarc(-T + RC, W - RC, RC, Math.PI / 2, Math.PI, false);
+    seccion.lineTo(-T, -W + RC); seccion.absarc(-T + RC, -W + RC, RC, Math.PI, Math.PI * 1.5, false);
+    const brazo = new THREE.Mesh(new THREE.ExtrudeGeometry(seccion, {steps:160, extrudePath:curva, bevelEnabled:false, curveSegments:6}), pinturaNaranja);
+    estructura.add(brazo);
+    // Punto del brazo a una altura dada, su tangente y la normal hacia su cara inferior.
+    const enY = y => { let best = 0, d = 1e9; for (let i = 0; i <= 400; i++) { const q = curva.getPointAt(i / 400); if (Math.abs(q.y - y) < d) { d = Math.abs(q.y - y); best = i / 400; } }
+      const p = curva.getPointAt(best), tg = curva.getTangentAt(best), n = new THREE.Vector3(0, -tg.z, tg.y).normalize(); if (n.y > 0) n.negate(); return {p, tg, n}; };
+    // Pivote bajo el brazo.
+    const piv = enY(300), PV = piv.p.clone().addScaledVector(piv.n, W - 10);
+    const pletinaForma = new THREE.Shape(); pletinaForma.moveTo(-55, -120); pletinaForma.lineTo(55, -120); pletinaForma.lineTo(55, 0);
+    pletinaForma.absarc(0, 0, 55, 0, Math.PI, false); pletinaForma.lineTo(-55, -120);
+    const hueco = new THREE.Path(); hueco.absarc(0, 0, 16, 0, Math.PI * 2, true); pletinaForma.holes.push(hueco);
+    for (const dx of [-46, 46]) {
+      const g = new THREE.ExtrudeGeometry(pletinaForma, {depth:14, bevelEnabled:true, bevelThickness:2.5, bevelSize:2.5, bevelSegments:3, curveSegments:48});
+      g.translate(0, 0, -7); g.rotateY(Math.PI / 2);
+      const m = new THREE.Mesh(g, pinturaMaquina); m.position.set(PV.x + dx, PV.y, PV.z); estructura.add(m);
+    }
+    const puente = caja(110, 22, 112, 5, pinturaMaquina); puente.position.set(PV.x, PV.y - 109, PV.z);
+    const montante = caja(60, 900, 78, 9, pinturaMaquina); montante.position.set(PV.x, PV.y - 120 - 450, PV.z);
+    const casquillo = new THREE.Mesh(new THREE.CylinderGeometry(27, 27, 76, 40), pinturaNaranja); casquillo.rotation.z = Math.PI / 2; casquillo.position.copy(PV);
+    const eje = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, 128, 32), aceroCepillado); eje.rotation.z = Math.PI / 2; eje.position.copy(PV);
+    const arandela = new THREE.Mesh(new THREE.CylinderGeometry(27, 27, 3, 40), aceroCepillado); arandela.rotation.z = Math.PI / 2; arandela.position.set(PV.x + 57, PV.y, PV.z);
+    const cabeza = new THREE.Mesh(new THREE.CylinderGeometry(17, 17, 10, 6), cromo); cabeza.rotation.z = Math.PI / 2; cabeza.position.set(PV.x + 64, PV.y, PV.z);
+    estructura.add(puente, montante, casquillo, eje, arandela, cabeza);
+    // Tope bajo el brazo, entre el pivote y el cuerno, en la misma línea: tubo cuadrado desde el montante y taco de goma.
+    // El tope sale del montante perpendicular al brazo, así el taco de goma queda alineado con su tubo y plano contra el brazo.
+    const ap = enY(140), C = ap.p.clone().addScaledVector(ap.n, W);      // punto de contacto en la cara inferior del brazo
+    const L = Math.max(120, (PV.z - C.z) / ap.n.z);                        // largo hasta la línea del montante
+    const giro = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), ap.n.clone().negate());
+    const topeGoma = caja(58, 44, 84, 9, goma); topeGoma.position.copy(C).addScaledVector(ap.n, 22); topeGoma.quaternion.copy(giro);
+    const capuchon = caja(56, 16, 76, 5, pinturaMaquina); capuchon.position.copy(C).addScaledVector(ap.n, 52); capuchon.quaternion.copy(giro);
+    const ini = C.clone().addScaledVector(ap.n, 60), fin = C.clone().addScaledVector(ap.n, L + 30);
+    const tubo = caja(46, ini.distanceTo(fin), 50, 6, pinturaMaquina);
+    tubo.position.copy(ini).add(fin).multiplyScalar(.5); tubo.quaternion.copy(giro);
+    estructura.add(topeGoma, tubo, capuchon);
+    // Cuerno soldado al costado exterior del brazo (x = 0), con su collar.
+    estructura.add(torno([[25.5,-1],[38,-1],[38,4],[36,6],[25.5,6],[25.5,-1]], cromoTope, 64), manga(FIN_MANGA, cromoManga));
+    // La máquina se retira 6 mm para que la cara del collar quede en x = 0, igual que el tope de las barras:
+    // así el primer disco ocupa exactamente la misma posición en todos los equipos.
+    estructura.position.x = -6;
+  }
+  sombra(estructura);
+}
+
+const camera = new THREE.OrthographicCamera();
+const dir = new THREE.Vector3(.6, .16, .784).normalize(), objetivo = new THREE.Vector3(110, -10, 0);
+let tamano = {w:0, h:0};
+function encuadra(){
+  if (!tamano.h) return;
+  const alto = equipo().sinCollar ? 600 : 540, ancho = alto * tamano.w / tamano.h;
+  Object.assign(camera, {left:-ancho / 2, right:ancho / 2, top:alto / 2, bottom:-alto / 2, near:1, far:5000});
+  camera.position.copy(objetivo).addScaledVector(dir, 2000); camera.up.set(0, 1, 0); camera.lookAt(objetivo); camera.updateProjectionMatrix();
+}
+function ajustaTamano(){
+  const c = cards[0]?.lienzo; if (!c) return;
+  const dpr = Math.min(devicePixelRatio, 2), w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
+  if (!w || !h) return;
+  if (w !== tamano.w || h !== tamano.h) { tamano = {w, h}; renderer.setSize(w, h, false); encuadra(); }
+  cards.forEach(cd => { if (cd.lienzo.width !== w || cd.lienzo.height !== h) { cd.lienzo.width = w; cd.lienzo.height = h; cd.sucio = true; } });
+}
+function pintaTarjeta(card){
+  if (!tamano.w || renderer.sin) { card.sucio = false; return; }
+  for (const c of cards) c.grupo.visible = c === card;
+  renderer.render(scene, camera);
+  card.ctx.clearRect(0, 0, tamano.w, tamano.h); card.ctx.drawImage(lienzo3d, 0, 0);
+  card.sucio = false;
+}
+
+/* ---------- Movimiento por tarjeta ---------- */
+let tweens = [];
+const set = (o, k, v) => { if (k === 'x') o.position.x = v; else if (k === 'ranura') o.userData.ranura(v); else o.rotation.z = v; };
+function tw(card, o, k, desde, hasta, retraso, dur, curva, fin, ini){ tweens.push({card, o, k, desde, hasta, t0:performance.now() + retraso, dur, curva, fin, ini}); return retraso + dur; }
+const salida = x => x * x * x, entrada = x => 1 - Math.pow(1 - x, 3);
+const rebote = x => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function acaba(card){ tweens = tweens.filter(t => { if (card && t.card !== card) return true; if (!t.empezado) t.ini?.(); set(t.o, t.k, t.hasta); t.fin?.(); t.card.sucio = true; return false; }); }
+const posiciones = lista => { let x = 1; return lista.map(w => { const t = DISCOS[w].t, c = x + t / 2; x += t; return c; }).concat([x + 18.5]); };
+const fuera = t => FIN_MANGA + 40 + t / 2;
+
+function aplicar(card, nueva, animar, retraso = 0){
+  acaba(card);
+  const vieja = card.piezas.map(p => p.w);
+  let k = 0; while (k < vieja.length && k < nueva.length && vieja[k] === nueva[k]) k++;
+  const conCollar = !equipo().sinCollar;
+  if (k === vieja.length && k === nueva.length && !!card.collar === (conCollar && nueva.length > 0)) return;
+  const pos = posiciones(nueva), G = card.grupo; animar = animar && !reduce;
+  let t = retraso;
+  // 1. Se abre la palanca y sale el collarín.
+  if (card.collar) {
+    const c = card.collar; card.collar = null;
+    if (animar) {
+      tw(card, c, 'ranura', RANURA_CERRADA, RANURA_ABIERTA, t + 60, 160, entrada);
+      t = tw(card, c.userData.piv, 'z', 0, ABIERTA, t, 220, entrada);
+      t = tw(card, c, 'x', c.position.x, FIN_MANGA + 80, t, 260, salida, () => G.remove(c));
+    } else G.remove(c);
+  }
+  // 2. Salen los discos que cambian, de fuera hacia dentro y de uno en uno: el siguiente no se mueve
+  //    hasta que el anterior ha salido de la manga, así nunca se tocan.
+  const salen = card.piezas.slice(k).reverse(); card.piezas = card.piezas.slice(0, k);
+  for (const p of salen) {
+    if (animar) { const hasta = fuera(DISCOS[p.w].t) + 60, d = hasta - p.o.position.x; t = tw(card, p.o, 'x', p.o.position.x, hasta, t, 140 + d * .5, salida, () => G.remove(p.o)); }
+    else G.remove(p.o);
+  }
+  // 3. Entran los nuevos, del más pesado al más ligero. No se ven hasta que les toca entrar.
+  let prevIni = null, prevDur = 0;
+  for (let i = k; i < nueva.length; i++) {
+    const w = nueva[i], o = disco(w, DISCOS[w].t); sombra(o); G.add(o); card.piezas.push({w, o});
+    if (animar) {
+      const d0 = fuera(DISCOS[w].t), dur = 220 + (d0 - pos[i]) * .7, ini = prevIni === null ? t : prevIni + prevDur * .75;
+      o.position.x = d0; o.visible = false;
+      tw(card, o, 'x', d0, pos[i], ini, dur, entrada, null, () => { o.visible = true; });
+      prevIni = ini; prevDur = dur; t = Math.max(t, ini + dur);
+    } else o.position.x = pos[i];
+  }
+  // 4. Entra el collarín con la palanca abierta y la cierra al llegar.
+  if (nueva.length && conCollar) {
+    const c = nuevoCollar(), cx = pos[nueva.length]; G.add(c); card.collar = c;
+    if (animar) {
+      c.userData.piv.rotation.z = ABIERTA; c.userData.ranura(RANURA_ABIERTA); c.position.x = FIN_MANGA + 80; c.visible = false;
+      t = tw(card, c, 'x', FIN_MANGA + 80, cx, t + 60, 200 + (FIN_MANGA + 80 - cx) * .6, entrada, null, () => { c.visible = true; });
+      tw(card, c.userData.piv, 'z', ABIERTA, 0, t + 40, 340, rebote);
+      tw(card, c, 'ranura', RANURA_ABIERTA, RANURA_CERRADA, t + 200, 180, entrada);
+    } else c.position.x = cx;
+  }
+  card.sucio = true;
+}
+function vacia(card){ acaba(card); card.grupo.clear(); card.piezas = []; card.collar = null; card.sucio = true; }
+function bucle(now){
+  const activas = new Set();
+  tweens = tweens.filter(t => {
+    const k = (now - t.t0) / t.dur;
+    if (k < 0) return true;
+    activas.add(t.card);
+    if (!t.empezado) { t.empezado = true; t.ini?.(); }
+    const kk = Math.min(1, k); set(t.o, t.k, t.desde + (t.hasta - t.desde) * t.curva(kk));
+    if (kk >= 1) { t.fin?.(); t.card.sucio = true; return false; }
+    return true;
+  });
+  for (const c of cards) if (activas.has(c) || c.sucio) pintaTarjeta(c);
+  requestAnimationFrame(bucle);
+}
+
+/* ---------- Interfaz ---------- */
+/* Iconos de modo dibujados a medida: barra con un disco a cada lado, dos cuernos de máquina con su disco, un solo cuerno. */
+const LINEA = 'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
+const ICON_MODO = {
+  barra:`<svg viewBox="0 0 40 20" ${LINEA} aria-hidden="true"><path d="M2 10h36"/><rect x="7" y="3" width="4.5" height="14" rx="1.6"/><rect x="28.5" y="3" width="4.5" height="14" rx="1.6"/><path d="M13.5 7v6M26.5 7v6"/></svg>`,
+  dos:`<svg viewBox="0 0 40 20" ${LINEA} aria-hidden="true"><path d="M3 3.5v13M3 10h11"/><rect x="7" y="4" width="4" height="12" rx="1.5"/><path d="M37 3.5v13M37 10H26"/><rect x="29" y="4" width="4" height="12" rx="1.5"/></svg>`,
+  punto:`<svg viewBox="0 0 40 20" ${LINEA} aria-hidden="true"><path d="M11 3.5v13M11 10h19"/><rect x="16" y="4" width="4" height="12" rx="1.5"/></svg>`,
+};
+const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+const ICON_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>';
+function miniBarra(id){
+  const b = BARRAS[id], g = {o20:4, o15:3.3, recta:3.3, z:3.3}[id], corta = id === 'recta' || id === 'z';
+  const m0 = corta ? 10 : 2, m1 = corta ? 18 : 12, a0 = m1 + 2, a1 = 64 - a0;
+  const agarreSvg = b.agarre.curva
+    ? `<path d="M${a0} 10 L${a0+5} 10 L${a0+9} 6 L${a0+13} 14 L${a1-13} 6 L${a1-9} 14 L${a1-5} 10 L${a1} 10" fill="none" stroke="url(#metal)" stroke-width="${g}" stroke-linejoin="round"/>`
+    : `<rect x="${a0}" y="${10-g/2}" width="${a1-a0}" height="${g}" fill="url(#metal)"/>`;
+  return `<svg viewBox="0 0 64 20" aria-hidden="true">${agarreSvg}<rect x="${m1}" y="5" width="2" height="10" rx=".6" fill="url(#metal)"/><rect x="${a1}" y="5" width="2" height="10" rx=".6" fill="url(#metal)"/><rect x="${m0}" y="7" width="${m1-m0}" height="6" rx="1" fill="url(#metal)"/><rect x="${a1+2}" y="7" width="${64-m0-a1-2}" height="6" rx="1" fill="url(#metal)"/></svg>`;
+}
+let mini = {};
+function mediaBarra(id){
+  const b = BARRAS[id], g = new THREE.Group();
+  g.add(agarre({r:b.agarre.r, mat:b.agarre.curva ? cromoZ : agarreMat, curva:b.agarre.curva}, -360), tope(), manga(b.manga));
+  return g;
+}
+/* Miniaturas: media barra (agarre, tope y manga) de frente y a la misma escala, para que se vean el grosor,
+   el moleteado, los quiebros de la Z y la diferencia de manga. Se pintan una vez y se guardan como imagen. */
+function miniaturas(){
+  if (renderer.sin) return;
+  const W = 264, H = 90, esc = new THREE.Scene(); esc.environment = scene.environment;
+  const l = new THREE.DirectionalLight(0xffffff, 1.6); l.position.set(-900, 1100, 900); esc.add(l);
+  const cam = new THREE.OrthographicCamera(-410, 410, 410 * H / W, -410 * H / W, 1, 8000);
+  const c = new THREE.Vector3(30, -2, 0);
+  cam.position.copy(c).addScaledVector(new THREE.Vector3(0, .28, .96).normalize(), 3000); cam.lookAt(c); cam.updateProjectionMatrix();
+  renderer.setSize(W, H, false); const expo = renderer.toneMappingExposure; renderer.toneMappingExposure = 1.4;
+  for (const id of Object.keys(BARRAS)) { const g = mediaBarra(id); esc.add(g); renderer.render(esc, cam); mini[id] = lienzo3d.toDataURL('image/png'); esc.remove(g); }
+  renderer.toneMappingExposure = expo; renderer.setSize(tamano.w || 1, tamano.h || 1, false);
+}
+function resumenCarga(){
+  const m = MODOS.find(x => x.id === state.modo).label;
+  $('#carga-res').textContent = state.modo === 'barra' ? `${m} · ${BARRAS[state.barra].nombre} ${fmt(BARRAS[state.barra].peso)} kg${state.collares ? ' · collarines' : ''}` : `${m} · máquina`;
+}
+function pintaModos(){
+  $('#modos').innerHTML = MODOS.map(m => `<button aria-pressed="${state.modo === m.id}" data-m="${m.id}">${ICON_MODO[m.id]}<span>${m.label}</span></button>`).join('');
+  $('#barras-bloque').hidden = state.modo !== 'barra';
+  $('#nota-maquina').hidden = state.modo === 'barra';
+  document.body.classList.toggle('maquina', state.modo !== 'barra');
+  resumenCarga();
+}
+function pintaBarras(){
+  $('#barras').innerHTML = Object.entries(BARRAS).map(([id, b]) => `<button class="tile" aria-pressed="${state.barra === id}" data-b="${id}" aria-label="${b.nombre} de ${fmt(b.peso)} kg">${mini[id] ? `<img src="${mini[id]}" alt="">` : miniBarra(id)}<span class="n">${b.nombre}</span><span class="w">${fmt(b.peso)} kg</span></button>`).join('');
+  const b = BARRAS[state.barra];
+  $('#barra-peso').hidden = !b.editable;
+  if (b.editable) $('#barra-peso-in').value = fmt(b.peso);
+  resumenCarga();
+}
+/* El % va pegado a la cifra, como el kg del peso de trabajo. */
+function anchoPct(){ const i = $('#pct-nuevo'); if (i) i.parentNode.dataset.v = i.value || i.placeholder; }
+let anadiendo = false, errorPct = '', valorPct = '';
+function pintaAnadir(){
+  $('#anadir').innerHTML = anadiendo
+    ? `<form id="form-pct"${errorPct ? ' aria-invalid="true"' : ''}><label class="sr" for="pct-nuevo">Nuevo porcentaje</label><span class="auto" id="pct-auto" data-v="${valorPct || 'Porcentaje'}"><input id="pct-nuevo" size="1" inputmode="numeric" pattern="[0-9]*" placeholder="Porcentaje" autocomplete="off" maxlength="3" value="${valorPct}" aria-describedby="pct-error"></span><span class="unidad">%</span><button type="button" class="cerrar" aria-label="Cancelar">${ICON_X}</button><button type="submit">Añadir</button></form><p class="error" id="pct-error" role="alert"${errorPct ? '' : ' hidden'}>${errorPct}</p>`
+    : `<button id="pct-add"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Añadir porcentaje</button>`;
+  if (anadiendo) { const i = $('#pct-nuevo'); anchoPct(); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+}
+function pintaDiscos(){
+  const n = ORDEN.filter(w => state.on[w]).length;
+  $('#cuenta').hidden = n === ORDEN.length; $('#cuenta').textContent = `${n} de ${ORDEN.length}`;
+  $('#puntos').innerHTML = ORDEN.map(w => `<i class="${state.on[w] ? '' : 'off'}" style="background:${DISCOS[w].color}"></i>`).join('');
+  $('#discos-panel').innerHTML = ORDEN.map(w => {
+    const d = DISCOS[w], r = 6 + 12 * d.R / 225;
+    return `<button class="disco" aria-pressed="${state.on[w]}" data-d="${w}" aria-label="Disco de ${fmt(w)} kg"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="${r}" fill="${d.color}" stroke="rgba(255,255,255,.25)" stroke-width="1"/><circle cx="20" cy="20" r="${r * .62}" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1"/><circle cx="20" cy="20" r="3.6" fill="url(#buje)"/></svg><span>${fmt(w)}</span></button>`;
+  }).join('');
+}
+
+let cards = [], timer = null, deshacer = null, tToast = null;
+function deslizar(card){
+  const art = card.el.querySelector('.serie'); let x0 = null, y0 = 0, dx = 0, activo = false;
+  art.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; x0 = e.clientX; y0 = e.clientY; dx = 0; activo = false; });
+  art.addEventListener('pointermove', e => {
+    if (x0 === null) return;
+    const mx = e.clientX - x0, my = e.clientY - y0;
+    if (!activo) { if (Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my)) { activo = true; art.setPointerCapture(e.pointerId); } else if (Math.abs(my) > 10) { x0 = null; return; } else return; }
+    dx = Math.min(0, mx); card.el.classList.add('arrastra'); card.el.classList.toggle('listo', dx < -art.offsetWidth * .35); art.style.transition = 'none'; art.style.transform = `translateX(${dx}px)`;
+  });
+  const fin = () => {
+    if (x0 === null) return; x0 = null; art.style.transition = '';
+    if (activo && dx < -art.offsetWidth * .35) { art.style.transform = 'translateX(-110%)'; setTimeout(() => colapsa(card), 200); }
+    else { art.style.transform = ''; card.el.classList.remove('listo'); setTimeout(() => card.el.classList.remove('arrastra'), 220); }
+  };
+  art.addEventListener('pointerup', fin); art.addEventListener('pointercancel', fin);
+}
+/* Cierra el hueco de la tarjeta antes de quitarla: las de debajo suben en lugar de saltar. */
+function colapsa(card){
+  const el = card.el;
+  if (reduce) return borra(card.pct);
+  el.style.height = `${el.offsetHeight}px`; el.offsetHeight;
+  el.style.transition = 'height .26s cubic-bezier(.2,.8,.2,1), margin-bottom .26s cubic-bezier(.2,.8,.2,1), opacity .18s';
+  el.style.height = '0px'; el.style.marginBottom = '-10px'; el.style.opacity = '0';
+  setTimeout(() => borra(card.pct), 270);
+}
+function borra(pct){
+  const i = state.pcts.indexOf(pct); if (i < 0) return;
+  state.pcts.splice(i, 1); deshacer = pct; render();
+  const t = $('#toast'); t.hidden = false;
+  t.innerHTML = `<span>Serie del ${fmt(pct)} % borrada</span><button id="deshacer">Deshacer</button>`;
+  clearTimeout(tToast); tToast = setTimeout(() => { t.hidden = true; deshacer = null; }, 5000);
+}
+function nuevaTarjeta(pct){
+  const el = document.createElement('div'); el.className = 'deslizable';
+  el.innerHTML = `<div class="fondo-borrar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Borrar</div>`
+    + `<article class="serie"><div class="txt"><div class="cab"><span class="pct"></span><span class="difw"></span></div><div class="tot"></div><div class="reparto"></div><button class="sr" data-borrar>Quitar la serie del ${fmt(pct)} %</button></div><div class="dib"><canvas role="img"></canvas></div><div class="burbuja" role="note" hidden></div><div class="notas"></div></article>`;
+  const lienzo = el.querySelector('canvas'), grupo = new THREE.Group(); scene.add(grupo);
+  if (tamano.w) { lienzo.width = tamano.w; lienzo.height = tamano.h; }
+  const card = {pct, el, lienzo, ctx:lienzo.getContext('2d'), grupo, piezas:[], collar:null, sucio:true};
+  deslizar(card);
+  return card;
+}
+/* Serie sin discos: qué cargar y por qué, con la cifra que falta. */
+function porQueSinDiscos(r){
+  const minimo = Math.min(...ORDEN.filter(w => state.on[w])), col = state.modo === 'barra' && state.collares;
+  const inicio = `El ${fmt(r.pct)} % son ${fmt(r.obj)} kg`;
+  if (state.modo === 'barra' && r.obj < r.bar) return `${inicio}, menos que la barra (${fmt(r.bar)} kg).`;
+  const necesita = state.modo === 'barra' ? r.bar + 2 * (minimo + (col ? COLLARIN : 0)) : state.modo === 'dos' ? 2 * minimo : minimo;
+  const falta = Math.round((necesita - r.obj) * 100) / 100;
+  const que = state.modo === 'punto' ? `el disco más pequeño (${fmt(minimo)} kg)` : col ? `el disco más pequeño (${fmt(minimo)} kg) y el collarín a cada lado` : `el disco más pequeño (${fmt(minimo)} kg) a cada lado`;
+  return `${inicio}: faltan ${fmt(falta)} kg para poner ${que}.`;
+}
+function texto(card, r){
+  const e = card.el, vacia = !r.combo.length, dif = !vacia && r.diff < -0.001;
+  e.querySelector('.pct').textContent = `${fmt(r.pct)} %`;
+  e.querySelector('.tot').innerHTML = `<span class="kg">${fmt(r.total)}<small> kg</small></span>`;
+  e.querySelector('.difw').innerHTML = (dif ? `<button class="dif" aria-expanded="false" aria-label="${fmt(-r.diff)} kg menos que el objetivo. Ver detalle">−${fmt(-r.diff)} kg</button>` : '');
+  const bur = e.querySelector('.burbuja'); bur.hidden = true;
+  bur.textContent = dif ? `El ${fmt(r.pct)} % de ${fmt(r.obj * 100 / r.pct)} kg son ${fmt(r.obj)} kg. Con tus discos, lo más cercano sin pasarte es ${fmt(r.total)} kg: ${fmt(-r.diff)} kg menos.`
+    : '';
+  const lado = state.modo === 'punto' ? 'Total en discos' : 'Por lado';
+  e.querySelector('.reparto').innerHTML = r.combo.length ? `${lado}<b>${repartoHTML(r.combo)}</b>${r.collares ? `<span class="col-linea">+ collarín de ${fmt(COLLARIN)} kg</span>` : ''}`
+    : `<span class="sin-discos">${state.modo === 'barra' ? 'Solo la barra' : 'Sin discos'}</span><span class="col-linea">${porQueSinDiscos(r)}</span>`;
+  card.lienzo.setAttribute('aria-label', r.dib.length ? `Carga: ${repartoTexto(r.dib)} kg` : 'Sin discos');
+  e.querySelector('.notas').innerHTML = r.falta > 0 ? `<div class="nota">${ICON_INFO}<span>No caben en la manga: faltan ${fmt(Math.ceil(r.falta) / 10)} cm. Se dibujan los que caben.</span></div>` : '';
+}
+function avisos(W){
+  const a = [];
+  if (W === null) a.push('Escribe el peso de trabajo.');
+  else if (Number.isNaN(W) || W <= 0 || W > 500) a.push('El peso de trabajo debe estar entre 0 y 500 kg.');
+  else if (decimales(state.peso) > 2) a.push('El peso de trabajo admite como máximo dos decimales.');
+  if (!state.pcts.length) a.push('Añade al menos un porcentaje.');
+  if (!ORDEN.some(w => state.on[w])) a.push('Habilita al menos un disco en Mis discos.');
+  if (state.modo === 'barra' && W > 0 && W < BARRAS[state.barra].peso) a.push('El peso de trabajo es inferior a la barra: elige una barra más ligera o revisa el peso.');
+  return a;
+}
+function render({anim = true, diferido = false, reinicia = false} = {}){
+  const W = parse(state.peso), av = avisos(W);
+  $('#avisos').innerHTML = av.map(t => `<div class="aviso">${ICON_INFO}<span>${t}</span></div>`).join('');
+  const barraMal = state.modo === 'barra' && BARRAS[state.barra].editable && state.barraMal;
+  const bloquea = barraMal || W === null || Number.isNaN(W) || W <= 0 || W > 500 || decimales(state.peso) > 2 || !state.pcts.length || !ORDEN.some(w => state.on[w]);
+  if (bloquea) { cards.forEach(c => { vacia(c); scene.remove(c.grupo); }); cards = []; $('#series').replaceChildren(); return; }
+  const libres = cards.slice(), nuevas = [];
+  for (const pct of state.pcts) { const i = libres.findIndex(c => c.pct === pct); nuevas.push(i >= 0 ? libres.splice(i, 1)[0] : Object.assign(nuevaTarjeta(pct), {nueva:true})); }
+  libres.forEach(c => { vacia(c); scene.remove(c.grupo); });
+  cards = nuevas; $('#series').replaceChildren(...cards.map(c => c.el));
+  if (anim && !reduce) cards.forEach(c => { if (c.nueva) c.el.animate([{opacity:0, transform:'translateY(-8px) scale(.98)'}, {opacity:1, transform:'none'}], {duration:240, easing:'cubic-bezier(.2,.8,.2,1)'}); });
+  cards.forEach(c => c.nueva = false);
+  ajustaTamano();
+  const res = cards.map(c => serie(c.pct, W));
+  cards.forEach((c, i) => texto(c, res[i]));
+  if (reinicia) cards.forEach(vacia);
+  clearTimeout(timer);
+  const pinta = () => cards.forEach((c, i) => aplicar(c, res[i].dib, anim, i * 90));
+  if (diferido) timer = setTimeout(pinta, 400); else pinta();
+}
+
+const anchoPeso = () => { const i = $('#peso'); i.parentNode.dataset.v = i.value || '0'; };
+$('.peso-campo').addEventListener('click', e => { if (e.target.id !== 'peso') $('#peso').focus(); });
+$('#peso').addEventListener('input', e => { anchoPeso(); state.peso = e.target.value; guarda('peso', state.peso); render({diferido:true}); });
+$('#collares').addEventListener('change', e => { state.collares = e.target.checked; guarda('collares', state.collares ? '1' : '0'); resumenCarga(); render(); });
+$('#carga-btn').addEventListener('click', e => { const b = e.currentTarget, ab = b.getAttribute('aria-expanded') === 'true'; b.setAttribute('aria-expanded', String(!ab)); $('#carga-panel').hidden = ab; });
+$('#modos').addEventListener('click', e => {
+  const b = e.target.closest('[data-m]'); if (!b || b.dataset.m === state.modo) return;
+  const antes = equipo(); state.modo = b.dataset.m; pintaModos();
+  if (equipo() !== antes) { construye(); encuadra(); render({reinicia:true}); } else render();
+});
+$('#barras').addEventListener('click', e => { const b = e.target.closest('[data-b]'); if (!b || b.dataset.b === state.barra) return; state.barra = b.dataset.b; state.barraMal = false; $('#barra-peso-error').hidden = true; $('#barra-peso-in').setAttribute('aria-invalid', 'false'); pintaBarras(); construye(); render({reinicia:true}); });
+$('#barra-peso-in').addEventListener('input', e => {
+  const v = parse(e.target.value), ok = v >= 1 && v <= 50 && decimales(e.target.value) <= 2;
+  e.target.setAttribute('aria-invalid', String(!ok)); $('#barra-peso-error').hidden = ok;
+  state.barraMal = !ok;
+  if (!ok) return render();
+  BARRAS[state.barra].peso = v; guarda(`barra-${state.barra}`, String(v));
+  const w = $(`[data-b="${state.barra}"] .w`); if (w) w.textContent = `${fmt(v)} kg`; resumenCarga(); render({diferido:true});
+});
+$('#anadir').addEventListener('click', e => { if (e.target.closest('#pct-add')) { anadiendo = true; pintaAnadir(); } else if (e.target.closest('.cerrar')) cierraPct(); });
+function cierraPct(){ anadiendo = false; errorPct = valorPct = ''; pintaAnadir(); }
+function confirmaPct(desdeFoco = false){
+  const inp = $('#pct-nuevo'); if (!inp) return;
+  const v = parse(inp.value); valorPct = inp.value.replace(/[^0-9.,]/g, '');
+  const entero = Number.isInteger(v) && v >= 1 && v <= 100;
+  if (v === null) return cierraPct();
+  errorPct = !entero ? 'Escribe un porcentaje entre 0 y 100.'
+    : state.pcts.includes(v) ? `Ya tienes una serie del ${fmt(v)} %.` : '';
+  if (errorPct) {
+    if (!desdeFoco) pintaAnadir();
+    else { $('#form-pct').setAttribute('aria-invalid', 'true'); const er = $('#pct-error'); er.textContent = errorPct; er.hidden = false; }
+    return;
+  }
+  state.pcts.push(v); state.pcts.sort((a, b) => a - b); cierraPct(); render();
+}
+$('#anadir').addEventListener('input', e => { if (e.target.id === 'pct-nuevo') anchoPct(); });
+$('#anadir').addEventListener('pointerdown', e => { if (e.target.id === 'form-pct' || e.target.classList.contains('unidad')) { e.preventDefault(); $('#pct-nuevo').focus(); } });
+$('#anadir').addEventListener('submit', e => { e.preventDefault(); confirmaPct(); });
+$('#anadir').addEventListener('keydown', e => { if (e.target.id === 'pct-nuevo' && e.key === 'Escape') cierraPct(); });
+$('#anadir').addEventListener('focusout', e => { if (anadiendo && !$('#anadir').contains(e.relatedTarget)) confirmaPct(true); });
+$('#toast').addEventListener('click', e => { if (!e.target.closest('#deshacer') || deshacer === null) return; if (!state.pcts.includes(deshacer)) state.pcts.push(deshacer); state.pcts.sort((a, b) => a - b); deshacer = null; $('#toast').hidden = true; render(); });
+$('#series').addEventListener('click', e => {
+  const q = e.target.closest('[data-borrar]'); if (q) { const c = cards.find(x => x.el.contains(q)); if (c) colapsa(c); return; }
+  const b = e.target.closest('.dif');
+  document.querySelectorAll('.dif[aria-expanded="true"]').forEach(x => { if (x !== b) { x.setAttribute('aria-expanded', 'false'); x.closest('.serie').querySelector('.burbuja').hidden = true; } });
+  if (!b) return;
+  const ab = b.getAttribute('aria-expanded') === 'true'; b.setAttribute('aria-expanded', String(!ab)); b.closest('.serie').querySelector('.burbuja').hidden = ab;
+});
+$('#discos-btn').addEventListener('click', e => { const b = e.currentTarget, ab = b.getAttribute('aria-expanded') === 'true'; b.setAttribute('aria-expanded', String(!ab)); $('#discos-panel').hidden = ab; });
+$('#discos-panel').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (!b) return; const w = Number(b.dataset.d); state.on[w] = !state.on[w]; pintaDiscos(); render(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) cards.forEach(c => c.sucio = true); });
+new ResizeObserver(() => { const antes = tamano.w; ajustaTamano(); if (tamano.w !== antes) cards.forEach(c => c.sucio = true); }).observe($('#series'));
+
+await Promise.race([document.fonts.load(`800 64px ${FUENTE}`).then(() => document.fonts.load(`700 64px ${FUENTE}`)), new Promise(r => setTimeout(r, 3000))]);
+$('#peso').value = state.peso; anchoPeso(); $('#collares').checked = state.collares;
+pintaModos(); pintaBarras(); pintaAnadir(); pintaDiscos(); construye();
+try { miniaturas(); pintaBarras(); } catch (e) { console.warn(e); }
+tamano = {w:0, h:0};
+render({anim:false});
+requestAnimationFrame(bucle);
+</script>
