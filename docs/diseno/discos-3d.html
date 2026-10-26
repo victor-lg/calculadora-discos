@@ -1,0 +1,546 @@
+<title>Discos en 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@700;800&display=swap">
+<style>
+/* Banco de pruebas del render: un lienzo grande con la vista de la app y pocos controles. Tema oscuro único, como la app. */
+:root{
+  color-scheme: dark;
+  --bg:#0d0e10; --surface:#16181b; --surface-2:#1e2125; --line:#2b2f35;
+  --fg:#f1f2f4; --fg-muted:#a6abb3; --accent:#ff8a2a; --accent-ink:#1a0e02;
+  --font:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--font);font-size:16px;line-height:1.45}
+.wrap{max-width:760px;margin:0 auto;padding-block:20px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-size:24px;font-weight:700;text-wrap:balance}
+p{margin:0;color:var(--fg-muted);max-width:62ch}
+.lienzo{position:relative;width:100%;aspect-ratio:4/3;background:var(--surface);border-radius:16px;overflow:hidden}
+.lienzo canvas{display:block;width:100%;height:100%;touch-action:none}
+#estado{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--fg-muted);font-size:14px}
+.fila{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;min-height:44px;padding:0 16px;font:inherit;font-size:15px;font-weight:500;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nota{font-size:13px}
+.selector{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.pieza{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 12px}
+.pieza .punto{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.pieza .peso{flex:1;font-weight:600;font-variant-numeric:tabular-nums}
+.pieza .n{min-width:20px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.pieza button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font-size:20px;line-height:1;cursor:pointer}
+.pieza button:disabled{opacity:.35;cursor:default}
+.ocupado{font-size:14px;color:var(--fg)}
+</style>
+
+<main class="wrap">
+  <h1>Discos en 3D</h1>
+  <p>Prueba de render con medidas de competición: elige la barra o la máquina y los discos, en la misma vista de tres cuartos que la app.</p>
+  <div class="lienzo"><canvas id="c" aria-label="Barra olímpica con los discos elegidos y el collarín"></canvas><div id="estado">Cargando el motor 3D…</div></div>
+  <div class="fila">
+    <button class="chip" id="vista" aria-pressed="true">Vista de la app</button>
+    <button class="chip" data-v="a" aria-pressed="false">Ángulo actual</button>
+    <button class="chip" data-v="b" aria-pressed="false">Más de frente</button>
+    <button class="chip" data-v="c" aria-pressed="false">Más de frente y desde arriba</button>
+    <button class="chip" data-v="d" aria-pressed="true">Aún más de frente</button>
+    <button class="chip" id="girar" aria-pressed="false">Girar con el dedo</button>
+    <button class="chip" id="vaciar">Vaciar la barra</button>
+  </div>
+  <div class="fila" id="equipos" role="group" aria-label="Barra o máquina"></div>
+  <div class="selector" id="selector" role="group" aria-label="Discos en la barra"></div>
+  <p class="ocupado" id="ocupado" aria-live="polite"></p>
+  <p class="nota">Discos de acero calibrado con pintura brillante, diseño de cara propio (aro exterior y anillo intermedio en relieve, BVNKER arriba y abajo, peso a los lados) y buje cromado; barra cromada con moleteado en el agarre y mecanizado en el tope y la manga; collarín propio con palanca. Grosores reales; los de los discos pequeños, aproximados.</p>
+</main>
+
+<script>
+setTimeout(() => { if (!window.__discos3d) { const e = document.getElementById('estado'); if (e) e.textContent = 'No se ha podido cargar el motor 3D. Recarga la página; si sigue igual, dímelo.'; } }, 10000);
+window.addEventListener('error', ev => { const e = document.getElementById('estado'); if (e) { e.hidden = false; e.textContent = 'Error: ' + ev.message; } });
+</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+window.__discos3d = true;
+
+/* Medidas en milímetros. Diámetros IPF de 25 a 10 kg; grosores y pequeños, aproximados. */
+const DISCOS = {
+  25:   {R:225, t:27,   color:'#c8102e', tinta:'#ffffff'},
+  20:   {R:225, t:22.5, color:'#0b4fc4', tinta:'#ffffff'},
+  15:   {R:200, t:21,   color:'#e9a600', tinta:'#ffffff'},
+  10:   {R:162.5, t:21, color:'#13893a', tinta:'#ffffff'},
+  5:    {R:114, t:16,   color:'#ffffff', tinta:'#151515'},
+  2.5:  {R:95,  t:12,   color:'#1b1c1f', tinta:'#ffffff'},
+  1.25: {R:80,  t:11,   color:'#c3c8cf', tinta:'#151515', metal:true},
+};
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+function estudio(){
+  const s = new THREE.Scene(); s.background = new THREE.Color(0x0a0b0d);
+  const caja = (w, h, pos, int) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({color:new THREE.Color(1, 1, 1).multiplyScalar(int), side:THREE.DoubleSide}));
+    m.position.set(...pos); m.lookAt(0, 0, 0); s.add(m);
+  };
+  caja(1400, 900, [-900, 1100, 900], 8);     // softbox principal, arriba a la izquierda
+  caja(260, 1700, [1300, 300, -300], 4.5);   // tira de recorte, detrás a la derecha
+  caja(1000, 700, [1100, 650, -1100], .8);  // reflejo en las caras de los discos (suave, para no lavar el color)
+  caja(1700, 500, [0, -900, 1100], .22);     // relleno bajo, de frente (flojo: más contraste)
+  caja(3000, 3000, [0, 1700, 0], .05);       // rebote del techo, casi nada
+  return pmrem.fromScene(s, 0.02, 1, 10000).texture;
+}
+scene.environment = estudio();
+const luz = new THREE.DirectionalLight(0xffffff, 1.4);
+luz.position.set(-900, 1100, 900);
+luz.intensity = 1.8;
+luz.castShadow = true;
+luz.shadow.mapSize.set(2048, 2048);
+Object.assign(luz.shadow.camera, {left:-900, right:900, top:900, bottom:-900, near:1, far:4000});
+luz.shadow.radius = 4; luz.shadow.bias = -0.0005;
+scene.add(luz);
+const recorte = new THREE.DirectionalLight(0xffffff, .9);
+recorte.position.set(600, 250, -700);
+scene.add(recorte);
+const fondo = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({opacity:.32}));
+fondo.position.z = -260; fondo.receiveShadow = true;
+const sombra = o => o.traverse(m => { if (m.isMesh && !m.material.transparent) { m.castShadow = true; m.receiveShadow = true; } });
+
+/* Materiales */
+const cromo = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.12});
+const anodizado = new THREE.MeshPhysicalMaterial({color:0x2a2d32, metalness:.7, roughness:.32, clearcoat:.4});
+function moleteado(){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#808080'; g.fillRect(0, 0, 64, 64);
+  g.strokeStyle = '#2a2a2a'; g.lineWidth = 6;
+  g.beginPath(); g.moveTo(-8, 72); g.lineTo(72, -8); g.moveTo(-8, -8); g.lineTo(72, 72); g.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(30, 60);
+  return t;
+}
+const agarreMat = new THREE.MeshPhysicalMaterial({color:0xc4c9d0, metalness:1, roughness:.38, bumpMap:moleteado(), bumpScale:1.2});
+function ruido(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), img = g.createImageData(256, 256);
+  for (let i = 0; i < img.data.length; i += 4) { const v = 150 + Math.random() * 60; img.data[i] = img.data[i+1] = img.data[i+2] = v; img.data[i+3] = 255; }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(6, 2);
+  return t;
+}
+const grano = ruido();
+function mecanizado(){
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const g = c.getContext('2d');
+  for (let y = 0; y < 256; y++) { const v = 110 + Math.random() * 40 + (y % 3 === 0 ? 50 : 0); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(0, y, 4, 1); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 3);
+  return t;
+}
+const cromoBuje = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.2, bumpMap:mecanizado(), bumpScale:.5});
+const pintura = (color, brillo) => new THREE.MeshPhysicalMaterial({color:new THREE.Color(color), metalness:brillo ? .55 : .2, roughness:brillo ? .3 : .42, roughnessMap:grano, clearcoat:.85, clearcoatRoughness:.1, side:THREE.DoubleSide});
+
+/* Pieza de revolución alrededor del eje X a partir de un perfil (radio, posición axial). */
+function torno(perfil, mat, seg = 128){
+  const g = new THREE.LatheGeometry(perfil.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+  g.rotateZ(-Math.PI / 2);
+  const m = mat.side === THREE.DoubleSide ? mat : mat.clone();
+  m.side = THREE.DoubleSide;
+  return new THREE.Mesh(g, m);
+}
+/* Diseño propio de la cara: aro exterior grueso en relieve, anillo intermedio en relieve que separa dos coronas,
+   la marca arriba y abajo y el peso a los lados, y buje cromado con escalón. */
+/* Mismas proporciones en 25, 20, 15 y 10 (escaladas a su diámetro IPF). En los pequeños el buje se estrecha
+   (el agujero es de 50 mm en todos) y el anillo intermedio solo aparece donde cabe: en el de 5. */
+const BUJE = {25:50, 20:50, 15:50, 10:50, 5:40, 2.5:40, 1.25:34};
+function diseno(w){
+  const R = DISCOS[w].R, hub = BUJE[w], borde = .089 * R, an = .018 * R;
+  if (R > 120) { const rc = .42 * R; return {R, hub, borde, anillo:[rc - an, rc + an], corona:[rc + an, R - borde]}; }
+  if (w === 5) { const rc = hub + 12; return {R, hub, borde, anillo:[rc - an, rc + an], corona:[rc + an, R - borde]}; }
+  return {R, hub, borde, anillo:null, corona:[hub + 4, R - borde]};
+}
+/* Rotulación con la tipografía de la app. La marca, con interletraje abierto; el peso, con los decimales al 78 %,
+   la coma pequeña y más aire hasta "KG", en la misma proporción en todos los discos.
+   Se dibuja dos veces: en color (con una sombra corta) y en un mapa de alturas que le da relieve. */
+const FUENTE = '"Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif';
+const MARCA = 'BVNKER';
+/* Interletraje óptico por parejas (en fracción del cuerpo): la V deja huecos a sus lados, así que BV y VN se cierran. */
+const KERN = {BV:-.07, VN:-.075, NK:.04, KE:.035, ER:.04};
+function arco(g, texto, cx, cy, radio, arriba, track, cuerpo = 0){
+  const anchos = [...texto].map((ch, i) => g.measureText(ch).width + track + (KERN[ch + (texto[i + 1] || '')] || 0) * cuerpo);
+  const total = anchos.reduce((a, b) => a + b, 0) / radio;
+  let a = arriba ? -Math.PI / 2 - total / 2 : Math.PI / 2 + total / 2;
+  [...texto].forEach((ch, i) => {
+    const paso = anchos[i] / radio, m = arriba ? a + paso / 2 : a - paso / 2;
+    g.save(); g.translate(cx + radio * Math.cos(m), cy + radio * Math.sin(m)); g.rotate(arriba ? m + Math.PI / 2 : m - Math.PI / 2);
+    g.fillText(ch, 0, 0); g.restore();
+    a = arriba ? a + paso : a - paso;
+  });
+}
+function peso(g, w, x, y, A, girado){
+  const [ent, dec] = String(w).split('.');
+  const f = (k, peso = 800) => `${peso} ${A * k}px ${FUENTE}`;
+  const trozos = [[ent, f(1)]].concat(dec ? [[',', f(.6)], [dec, f(.78)]] : []);
+  const ancho = trozos.reduce((s, [t, fu]) => { g.font = fu; return s + g.measureText(t).width; }, 0) + (dec ? A * -.02 : 0);
+  g.save(); g.translate(x, y); if (girado) g.rotate(Math.PI);
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  let cx = -ancho / 2; const base = A * .26;
+  for (const [t, fu] of trozos) {
+    g.font = fu; g.fillText(t, cx, base);
+    cx += g.measureText(t).width + (t === ',' ? -A * .02 : 0);
+  }
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `700 ${A * (dec ? .44 : .34)}px ${FUENTE}`;
+  g.letterSpacing = `${A * .02}px`;
+  g.fillText('KG', 0, A * (dec ? .68 : .62));
+  g.letterSpacing = '0px';
+  g.restore();
+}
+function textos(g, w, d, N, color, sombra){
+  const mm = N / (2 * d.R), [c0, c1] = diseno(w).corona, rm = (c0 + c1) / 2 * mm, ancho = (c1 - c0) * mm;
+  const capa = (dx, dy, col) => {
+    g.save(); g.translate(dx, dy); g.fillStyle = col;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const tb = ancho * .66;
+    g.font = `800 ${tb}px ${FUENTE}`;
+    arco(g, MARCA, N / 2, N / 2, rm, true, tb * .08, tb);
+    g.save(); g.translate(N / 2, N / 2); g.rotate(Math.PI); g.translate(-N / 2, -N / 2);
+    arco(g, MARCA, N / 2, N / 2, rm, true, tb * .08, tb);
+    g.restore();
+    const A = ancho * .56;
+    peso(g, w, N / 2 - rm, N / 2, A, false);
+    peso(g, w, N / 2 + rm, N / 2, A, true);
+    g.restore();
+  };
+  if (sombra) capa(N * .0025, N * .0035, 'rgba(0,0,0,.35)');
+  capa(0, 0, color);
+}
+function rotulo(w, d){
+  const N = 1024, [c0, c1] = diseno(w).corona;
+  const lienzo = (fondo, tinta, sombra) => {
+    const c = document.createElement('canvas'); c.width = c.height = N;
+    const g = c.getContext('2d'); g.fillStyle = fondo; g.fillRect(0, 0, N, N);
+    textos(g, w, d, N, tinta, sombra);
+    return c;
+  };
+  const k = c1 / d.R, ajusta = t => { t.repeat.set(k, k); t.offset.set((1 - k) / 2, (1 - k) / 2); t.anisotropy = 8; return t; };
+  const color = ajusta(new THREE.CanvasTexture(lienzo(d.color, d.tinta, false))); color.colorSpace = THREE.SRGBColorSpace;
+  const rugoso = ajusta(new THREE.CanvasTexture(lienzo('rgb(107,107,107)', 'rgb(158,158,158)', false)));
+  const malla = new THREE.Mesh(new THREE.RingGeometry(c0 + .4, c1 - .4, 256, 4),
+    new THREE.MeshPhysicalMaterial({map:color, roughnessMap:rugoso, roughness:1, metalness:d.metal ? .55 : .2, clearcoat:.85, clearcoatRoughness:.12}));
+  malla.rotation.y = Math.PI / 2;
+  return malla;
+}
+function redondea(p, radio){
+  const out = [p[0]];
+  for (let i = 1; i < p.length - 1; i++) {
+    const [ax, ay] = p[i - 1], [bx, by] = p[i], [cx, cy] = p[i + 1];
+    const l1 = Math.hypot(bx - ax, by - ay), l2 = Math.hypot(cx - bx, cy - by);
+    if (!l1 || !l2) continue;
+    const d = Math.min(radio, l1 / 3, l2 / 3);
+    const p0 = [bx - (bx - ax) / l1 * d, by - (by - ay) / l1 * d], p2 = [bx + (cx - bx) / l2 * d, by + (cy - by) / l2 * d];
+    for (let k = 0; k <= 4; k++) { const t = k / 4, u = 1 - t; out.push([u*u*p0[0] + 2*u*t*bx + t*t*p2[0], u*u*p0[1] + 2*u*t*by + t*t*p2[1]]); }
+  }
+  out.push(p[p.length - 1]);
+  return out;
+}
+function perfilDisco(w, h, lip){
+  const {R, hub, borde, anillo, corona} = diseno(w);
+  const macizo = anillo ? anillo[1] : corona[0];
+  const zonas = [[macizo, h], [corona[1], h - lip], [R - .018 * R, h]];
+  const frente = [[hub - 3, h]]; let r = hub - 3, z0 = h;
+  for (const [r1, z] of zonas) { if (z !== z0) frente.push([r + 2, z]); frente.push([r1, z]); r = r1; z0 = z; }
+  frente.push([R, h - Math.min(3, h * .45)]);
+  return redondea(frente.concat(frente.slice().reverse().map(([rr, zz]) => [rr, -zz]), [frente[0]]), 1.4);
+}
+function disco(w, t){
+  const d = DISCOS[w], h = t / 2, r0 = 25.25, lip = Math.min(2.2, h - 2), hub = BUJE[w];
+  const g = new THREE.Group();
+  g.add(torno(perfilDisco(w, h, lip), pintura(d.color, d.metal)));
+  g.add(torno([[r0,-h-1],[hub-3,-h-1],[hub-3,-h-.4],[hub,-h-.4],[hub,h+.4],[hub-3,h+.4],[hub-3,h+1],[r0,h+1],[r0,-h-1]], cromoBuje, 96));
+  const r = rotulo(w, d);
+  r.position.x = h - lip + .05;
+  g.add(r);
+  g.userData.t = t;
+  return g;
+}
+
+/* ---------- Equipos: cuatro barras y dos montajes sin barra ----------
+   Todo cuelga de «soporte». */
+const ranuras = mecanizado(); ranuras.repeat.set(1, 26);
+const cromoManga = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.16, bumpMap:ranuras, bumpScale:.35});
+const ranurasTope = mecanizado(); ranurasTope.repeat.set(1, 4);
+const cromoTope = new THREE.MeshPhysicalMaterial({color:0xe3e7ec, metalness:1, roughness:.16, bumpMap:ranurasTope, bumpScale:.4});
+const molePav = moleteado(); molePav.repeat.set(30, 60);
+const pavonado = new THREE.MeshPhysicalMaterial({color:0x2c2e33, metalness:.9, roughness:.36, bumpMap:molePav, bumpScale:1.1, clearcoat:.25});
+const moleZ = moleteado(); moleZ.repeat.set(60, 4);
+const cromoZ = agarreMat.clone(); const moleZ2 = moleteado(); moleZ2.repeat.set(79, 30); cromoZ.bumpMap = moleZ2;
+const pinturaMaquina = new THREE.MeshPhysicalMaterial({color:0x1d1f23, metalness:.35, roughness:.5, clearcoat:.35, clearcoatRoughness:.3});
+const aceroCepillado = new THREE.MeshPhysicalMaterial({color:0xc9ced5, metalness:1, roughness:.32, bumpMap:ranuras, bumpScale:.2});
+const goma = new THREE.MeshPhysicalMaterial({color:0x111214, metalness:0, roughness:.85});
+const pinturaNaranja = new THREE.MeshPhysicalMaterial({color:new THREE.Color('#ff7a1a'), metalness:.15, roughness:.38, clearcoat:.6, clearcoatRoughness:.2});
+const tuerca = (r, h) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 6), aceroCepillado);
+
+const EQUIPOS = {
+  o20:   {nombre:'Olímpica 20 kg', manga:415, agarre:{r:14, mat:agarreMat}},
+  o15:   {nombre:'Olímpica 15 kg', manga:320, agarre:{r:12.5, mat:agarreMat}},
+  recta: {nombre:'Recta', manga:240, agarre:{r:12.5, mat:agarreMat}},
+  z:     {nombre:'Z', manga:240, agarre:{r:12.5, mat:cromoZ, curva:true}},
+  dos:   {nombre:'Máquina (uno o dos puntos)', manga:320, maquina:true, sinCollar:true},
+};
+const soporte = new THREE.Group(), estructura = new THREE.Group(), montaje = new THREE.Group(), suelo = new THREE.Group();
+soporte.add(estructura, montaje); scene.add(soporte, suelo);
+let FIN_MANGA = 415, UTIL = 375, equipo = 'o20';
+
+function manga(F, mat = cromoManga){ return torno([[0,0],[25,0],[25,F-6],[23.5,F],[0,F]], mat, 96); }
+function tope(){ return torno([[14,-30],[27,-30],[30,-27],[30,-3],[27,0],[14,0],[14,-30]], cromoTope, 96); }
+function agarre(a, desde = -360){
+  if (a.curva) {
+    // Quiebros en ángulo, como una barra Z real: tramo recto, bajada, subida y tramo recto hasta el tope.
+    const curva = new THREE.CatmullRomCurve3([[desde,0],[-325,0],[-310,-4],[-282,-24],[-268,-28],[-254,-24],[-200,14],[-186,18],[-172,14],[-150,4],[-138,0],[-30,0]].map(([x, y]) => new THREE.Vector3(x, y, 0)), false, 'centripetal');
+    return new THREE.Mesh(new THREE.TubeGeometry(curva, 160, a.r, 32), a.mat);
+  }
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(a.r, a.r, -30 - desde, 64, 1), a.mat);
+  m.geometry.rotateZ(-Math.PI / 2); m.position.x = (desde - 30) / 2;
+  return m;
+}
+function construye(id){
+  const e = EQUIPOS[id];
+  equipo = id; FIN_MANGA = e.manga; UTIL = e.sinCollar ? e.manga - 10 : e.manga - 40;
+  estructura.clear(); suelo.clear();
+  soporte.position.set(0, 0, 0); soporte.rotation.z = 0; estructura.position.set(0, 0, 0); montaje.position.set(0, 0, 0);
+  if (e.agarre) {
+    estructura.add(agarre(e.agarre), tope(), manga(FIN_MANGA));
+  } else if (e.maquina) {
+    // Máquina de carga por discos (uno o dos puntos). Todo va en la misma línea (el mismo X): brazo, horquilla,
+    // montante y tope. El brazo pasa entre las dos pletinas de la horquilla; el casquillo, soldado a su cara inferior,
+    // gira en el eje. Debajo, el tope con taco de goma donde descansa el brazo. El cuerno sale del costado del brazo.
+    const caja = (w, h, d, r, mat) => new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), mat);
+    const XA = -28, W = 45, T = 28, RC = 11;
+    const curva = new THREE.CatmullRomCurve3([[XA,-620,-375],[XA,-330,-200],[XA,0,0],[XA,320,235],[XA,760,555]].map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    const seccion = new THREE.Shape();
+    seccion.moveTo(-T + RC, -W); seccion.lineTo(T - RC, -W); seccion.absarc(T - RC, -W + RC, RC, -Math.PI / 2, 0, false);
+    seccion.lineTo(T, W - RC); seccion.absarc(T - RC, W - RC, RC, 0, Math.PI / 2, false);
+    seccion.lineTo(-T + RC, W); seccion.absarc(-T + RC, W - RC, RC, Math.PI / 2, Math.PI, false);
+    seccion.lineTo(-T, -W + RC); seccion.absarc(-T + RC, -W + RC, RC, Math.PI, Math.PI * 1.5, false);
+    const brazo = new THREE.Mesh(new THREE.ExtrudeGeometry(seccion, {steps:160, extrudePath:curva, bevelEnabled:false, curveSegments:6}), pinturaNaranja);
+    estructura.add(brazo);
+    // Punto del brazo a una altura dada, su tangente y la normal hacia su cara inferior.
+    const enY = y => { let best = 0, d = 1e9; for (let i = 0; i <= 400; i++) { const q = curva.getPointAt(i / 400); if (Math.abs(q.y - y) < d) { d = Math.abs(q.y - y); best = i / 400; } }
+      const p = curva.getPointAt(best), tg = curva.getTangentAt(best), n = new THREE.Vector3(0, -tg.z, tg.y).normalize(); if (n.y > 0) n.negate(); return {p, tg, n}; };
+    // Pivote bajo el brazo.
+    const piv = enY(300), PV = piv.p.clone().addScaledVector(piv.n, W - 10);
+    const pletinaForma = new THREE.Shape(); pletinaForma.moveTo(-55, -120); pletinaForma.lineTo(55, -120); pletinaForma.lineTo(55, 0);
+    pletinaForma.absarc(0, 0, 55, 0, Math.PI, false); pletinaForma.lineTo(-55, -120);
+    const hueco = new THREE.Path(); hueco.absarc(0, 0, 16, 0, Math.PI * 2, true); pletinaForma.holes.push(hueco);
+    for (const dx of [-46, 46]) {
+      const g = new THREE.ExtrudeGeometry(pletinaForma, {depth:14, bevelEnabled:true, bevelThickness:2.5, bevelSize:2.5, bevelSegments:3, curveSegments:48});
+      g.translate(0, 0, -7); g.rotateY(Math.PI / 2);
+      const m = new THREE.Mesh(g, pinturaMaquina); m.position.set(PV.x + dx, PV.y, PV.z); estructura.add(m);
+    }
+    const puente = caja(110, 22, 112, 5, pinturaMaquina); puente.position.set(PV.x, PV.y - 109, PV.z);
+    const montante = caja(60, 900, 78, 9, pinturaMaquina); montante.position.set(PV.x, PV.y - 120 - 450, PV.z);
+    const casquillo = new THREE.Mesh(new THREE.CylinderGeometry(27, 27, 76, 40), pinturaNaranja); casquillo.rotation.z = Math.PI / 2; casquillo.position.copy(PV);
+    const eje = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, 128, 32), aceroCepillado); eje.rotation.z = Math.PI / 2; eje.position.copy(PV);
+    const arandela = new THREE.Mesh(new THREE.CylinderGeometry(27, 27, 3, 40), aceroCepillado); arandela.rotation.z = Math.PI / 2; arandela.position.set(PV.x + 57, PV.y, PV.z);
+    const cabeza = new THREE.Mesh(new THREE.CylinderGeometry(17, 17, 10, 6), cromo); cabeza.rotation.z = Math.PI / 2; cabeza.position.set(PV.x + 64, PV.y, PV.z);
+    estructura.add(puente, montante, casquillo, eje, arandela, cabeza);
+    // Tope bajo el brazo, entre el pivote y el cuerno, en la misma línea: tubo cuadrado desde el montante y taco de goma.
+    // El tope sale del montante perpendicular al brazo, así el taco de goma queda alineado con su tubo y plano contra el brazo.
+    const ap = enY(140), C = ap.p.clone().addScaledVector(ap.n, W);      // punto de contacto en la cara inferior del brazo
+    const L = Math.max(120, (PV.z - C.z) / ap.n.z);                        // largo hasta la línea del montante
+    const giro = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), ap.n.clone().negate());
+    const topeGoma = caja(58, 44, 84, 9, goma); topeGoma.position.copy(C).addScaledVector(ap.n, 22); topeGoma.quaternion.copy(giro);
+    const capuchon = caja(56, 16, 76, 5, pinturaMaquina); capuchon.position.copy(C).addScaledVector(ap.n, 52); capuchon.quaternion.copy(giro);
+    const ini = C.clone().addScaledVector(ap.n, 60), fin = C.clone().addScaledVector(ap.n, L + 30);
+    const tubo = caja(46, ini.distanceTo(fin), 50, 6, pinturaMaquina);
+    tubo.position.copy(ini).add(fin).multiplyScalar(.5); tubo.quaternion.copy(giro);
+    estructura.add(topeGoma, tubo, capuchon);
+    // Cuerno soldado al costado exterior del brazo (x = 0), con su collar.
+    estructura.add(torno([[25.5,-1],[38,-1],[38,4],[36,6],[25.5,6],[25.5,-1]], cromoTope, 64), manga(FIN_MANGA, cromoManga));
+    // La máquina se retira 6 mm para que la cara del collar quede en x = 0, igual que el tope de las barras:
+    // así el primer disco ocupa exactamente la misma posición en todos los equipos.
+    estructura.position.x = -6;
+  }
+  sombra(soporte); sombra(suelo);
+  objetivo.set(70, 0, 0);
+}
+
+/* Carga elegida, de mayor a menor (como se carga en la realidad). La manga útil es de 375 mm: 415 menos el collarín. */
+let carga = [25, 15, 2.5, 1.25];
+let piezas = [], collar = null;
+const naranjaMat = new THREE.MeshPhysicalMaterial({color:new THREE.Color('#ff8a2a'), metalness:.55, roughness:.28, clearcoat:.5});
+const oscuro = new THREE.MeshStandardMaterial({color:0x050506, roughness:.9});
+const grafito = new THREE.MeshPhysicalMaterial({color:0x5c6269, metalness:.85, roughness:.3, clearcoat:.3});
+
+/* Collarín propio: cuerpo de aluminio anodizado negro con chaflanes, aro interior cromado, ranura de apriete
+   y palanca naranja (el acento de la app) con bisagra. Abierta, la palanca se levanta; cerrada, queda plana. */
+function nuevoCollar(){
+  const g = new THREE.Group(), RE = 40, RI = 25.4, MEDIO = .16;
+  // Anillo partido: un aro de aluminio con una ranura arriba, biselado.
+  const forma = new THREE.Shape();
+  forma.absarc(0, 0, RE, Math.PI / 2 + MEDIO, Math.PI / 2 - MEDIO + Math.PI * 2, false);
+  forma.lineTo(RI * Math.cos(Math.PI / 2 - MEDIO), RI * Math.sin(Math.PI / 2 - MEDIO));
+  forma.absarc(0, 0, RI, Math.PI / 2 - MEDIO + Math.PI * 2, Math.PI / 2 + MEDIO, true);
+  forma.closePath();
+  const geo = new THREE.ExtrudeGeometry(forma, {depth:32, bevelEnabled:true, bevelThickness:1.6, bevelSize:1.2, bevelSegments:3, curveSegments:96});
+  geo.translate(0, 0, -16); geo.rotateY(Math.PI / 2);
+  g.add(new THREE.Mesh(geo, grafito));
+  g.add(torno([[39.6,-5],[41.3,-5],[41.3,5],[39.6,5],[39.6,-5]], naranjaMat, 96));
+  // Orejetas a los lados de la ranura, tornillo pasante y leva con palanca.
+  const orejas = [-1, 1].map(s => { const o = new THREE.Mesh(new THREE.BoxGeometry(30, 15, 7), grafito); o.position.set(0, 44, s * 9); g.add(o); return o; });
+  const tornillo = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 30, 20), cromo); tornillo.rotation.x = Math.PI / 2; tornillo.position.set(0, 47, 0); g.add(tornillo);
+  const piv = new THREE.Group(); piv.position.set(0, 47, 0);
+  const leva = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 12, 32), naranjaMat); leva.rotation.x = Math.PI / 2; piv.add(leva);
+  const brazo = new THREE.Mesh(new THREE.BoxGeometry(65, 8, 14), naranjaMat); brazo.position.set(32.5, 5, 0); piv.add(brazo);
+  const punta = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 16, 24), naranjaMat); punta.rotation.x = Math.PI / 2; punta.position.set(65, 5, 0); piv.add(punta);
+  g.add(piv);
+  g.userData.piv = piv;
+  g.userData.ranura = v => { orejas[0].position.z = -(5.5 + v / 2); orejas[1].position.z = 5.5 + v / 2; };
+  g.userData.ranura(3);
+  sombra(g);
+  return g;
+}
+const ABIERTA = 1.15, RANURA_ABIERTA = 7, RANURA_CERRADA = 3;
+
+/* Línea de tiempo mínima: interpola una propiedad entre dos valores con su curva. */
+let tweens = [];
+const set = (o, k, v) => { if (k === 'x') o.position.x = v; else if (k === 'ranura') o.userData.ranura(v); else o.rotation.z = v; };
+function tw(o, k, desde, hasta, retraso, dur, curva, fin){ tweens.push({o, k, desde, hasta, t0: performance.now() + retraso, dur, curva, fin}); return retraso + dur; }
+const salida = x => x * x * x, entrada = x => 1 - Math.pow(1 - x, 3);
+const rebote = x => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function acaba(){ for (const t of tweens) { set(t.o, t.k, t.hasta); t.fin?.(); } tweens = []; }
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const posiciones = lista => { let x = 1; return lista.map(w => { const t = DISCOS[w].t, c = x + t / 2; x += t; return c; }).concat([x + 18.5]); };
+const fuera = t => FIN_MANGA + 40 + t / 2;
+
+function aplicar(nueva){
+  acaba();
+  const vieja = piezas.map(p => p.w);
+  let k = 0; while (k < vieja.length && k < nueva.length && vieja[k] === nueva[k]) k++;
+  if (k === vieja.length && k === nueva.length) return;
+  const pos = posiciones(nueva), animar = !reduce;
+  let t = 0;
+  // 1. Se abre la palanca y sale el collarín.
+  if (collar) {
+    const c = collar; collar = null;
+    if (animar) {
+      tw(c, 'ranura', RANURA_CERRADA, RANURA_ABIERTA, 60, 160, entrada);
+      t = tw(c.userData.piv, 'z', 0, ABIERTA, 0, 220, entrada);
+      t = tw(c, 'x', c.position.x, FIN_MANGA + 80, t, 280, salida, () => montaje.remove(c));
+    } else montaje.remove(c);
+  }
+  // 2. Salen los discos que cambian, primero el de fuera.
+  const salen = piezas.slice(k).reverse();
+  piezas = piezas.slice(0, k);
+  for (const p of salen) {
+    if (animar) { const d = fuera(DISCOS[p.w].t) - p.o.position.x; t = tw(p.o, 'x', p.o.position.x, fuera(DISCOS[p.w].t) + 40, t * .92, 160 + d * .55, salida, () => montaje.remove(p.o)); }
+    else montaje.remove(p.o);
+  }
+  // 3. Entran los nuevos, del más pesado al más ligero, deslizándose por la manga.
+  for (let i = k; i < nueva.length; i++) {
+    const w = nueva[i], o = disco(w, DISCOS[w].t); sombra(o); montaje.add(o);
+    piezas.push({w, o});
+    if (animar) { const d0 = fuera(DISCOS[w].t); o.position.x = d0; t = tw(o, 'x', d0, pos[i], t * (i > k ? .75 : 1), 220 + (d0 - pos[i]) * .7, entrada); }
+    else o.position.x = pos[i];
+  }
+  // 4. Entra el collarín con la palanca abierta y la cierra al llegar.
+  if (nueva.length && !EQUIPOS[equipo].sinCollar) {
+    const c = nuevoCollar(), cx = pos[nueva.length]; montaje.add(c); collar = c;
+    if (animar) {
+      c.userData.piv.rotation.z = ABIERTA; c.userData.ranura(RANURA_ABIERTA); c.position.x = FIN_MANGA + 80;
+      t = tw(c, 'x', FIN_MANGA + 80, cx, t + 60, 200 + (FIN_MANGA + 80 - cx) * .6, entrada);
+      tw(c.userData.piv, 'z', ABIERTA, 0, t + 40, 340, rebote);
+      tw(c, 'ranura', RANURA_ABIERTA, RANURA_CERRADA, t + 200, 180, entrada);
+    } else c.position.x = cx;
+  }
+}
+
+/* Cámara ortográfica en la vista de la app: la cara del disco se ve como una elipse de 0,3. */
+const camera = new THREE.OrthographicCamera();
+const objetivo = new THREE.Vector3(70, 0, 0);
+const VISTAS = {a:[.30, 0, .954], b:[.45, 0, .893], c:[.45, .16, .878], d:[.6, .16, .784]};
+const dir = new THREE.Vector3(...VISTAS.d).normalize();
+function vistaApp(){ camera.position.copy(objetivo).addScaledVector(dir, 2000); camera.up.set(0, 1, 0); camera.lookAt(objetivo); camera.zoom = 1; camera.updateProjectionMatrix(); }
+function ajusta(){
+  const w = canvas.clientWidth, h = canvas.clientHeight, alto = 560, ancho = alto * w / h;
+  renderer.setSize(w, h, false);
+  camera.left = -ancho / 2; camera.right = ancho / 2; camera.top = alto / 2; camera.bottom = -alto / 2;
+  camera.near = 1; camera.far = 5000; camera.updateProjectionMatrix();
+}
+const controles = new OrbitControls(camera, canvas);
+controles.target.copy(objetivo); controles.enabled = false; controles.enableDamping = true;
+
+function paso(now){
+  tweens = tweens.filter(t => {
+    const k = (now - t.t0) / t.dur;
+    if (k < 0) return true;
+    const kk = Math.min(1, k);
+    set(t.o, t.k, t.desde + (t.hasta - t.desde) * t.curva(kk));
+    if (kk >= 1) { t.fin?.(); return false; }
+    return true;
+  });
+  if (controles.enabled) controles.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(paso);
+}
+
+const $ = id => document.getElementById(id);
+function marca(boton, si){ boton.setAttribute('aria-pressed', String(si)); }
+$('vista').addEventListener('click', () => { controles.enabled = false; controles.target.copy(objetivo); vistaApp(); marca($('vista'), true); marca($('girar'), false); });
+document.querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => {
+  dir.set(...VISTAS[b.dataset.v]).normalize();
+  document.querySelectorAll('[data-v]').forEach(x => marca(x, x === b));
+  controles.enabled = false; controles.target.copy(objetivo); vistaApp(); marca($('vista'), true); marca($('girar'), false);
+}));
+$('girar').addEventListener('click', () => { controles.enabled = true; marca($('girar'), true); marca($('vista'), false); });
+const ORDEN = [25, 20, 15, 10, 5, 2.5, 1.25];
+const fmt = n => n.toLocaleString('es-ES', {maximumFractionDigits:2});
+const ocupado = lista => lista.reduce((a, w) => a + DISCOS[w].t, 0);
+function pintaSelector(){
+  const usado = ocupado(carga);
+  $('selector').innerHTML = ORDEN.map(w => {
+    const n = carga.filter(x => x === w).length, cabe = usado + DISCOS[w].t <= UTIL;
+    return `<div class="pieza"><span class="punto" style="background:${DISCOS[w].color}"></span><span class="peso">${fmt(w)} kg</span>`
+      + `<button data-menos="${w}" aria-label="Quitar un disco de ${fmt(w)} kg"${n ? '' : ' disabled'}>−</button><span class="n">${n}</span>`
+      + `<button data-mas="${w}" aria-label="Añadir un disco de ${fmt(w)} kg"${cabe ? '' : ' disabled'}>+</button></div>`;
+  }).join('');
+  const total = carga.reduce((a, b) => a + b, 0);
+  $('ocupado').textContent = `${fmt(total)} kg por lado · manga ocupada: ${fmt(Math.round(usado) / 10)} de ${fmt(UTIL / 10)} cm`;
+}
+function cambia(nueva){ carga = nueva.sort((a, b) => b - a); pintaSelector(); aplicar(carga.slice()); }
+$('selector').addEventListener('click', e => {
+  const mas = e.target.closest('[data-mas]'), menos = e.target.closest('[data-menos]');
+  if (mas) cambia(carga.concat(Number(mas.dataset.mas)));
+  if (menos) { const w = Number(menos.dataset.menos), i = carga.lastIndexOf(w); if (i >= 0) cambia(carga.filter((_, j) => j !== i)); }
+});
+$('vaciar').addEventListener('click', () => cambia([]));
+function pintaEquipos(){
+  $('equipos').innerHTML = Object.entries(EQUIPOS).map(([id, e]) => `<button class="chip" data-e="${id}" aria-pressed="${id === equipo}">${e.nombre}</button>`).join('');
+}
+$('equipos').addEventListener('click', e => {
+  const b = e.target.closest('[data-e]'); if (!b || b.dataset.e === equipo) return;
+  acaba(); piezas.forEach(p => montaje.remove(p.o)); if (collar) montaje.remove(collar); piezas = []; collar = null;
+  construye(b.dataset.e);
+  while (ocupado(carga) > UTIL) carga.pop();
+  pintaEquipos(); pintaSelector(); aplicar(carga.slice());
+  controles.enabled = false; controles.target.copy(objetivo); vistaApp(); marca($('vista'), true); marca($('girar'), false);
+});
+new ResizeObserver(ajusta).observe(canvas);
+
+await Promise.race([document.fonts.load(`800 64px ${FUENTE}`).then(() => document.fonts.load(`700 64px ${FUENTE}`)), new Promise(r => setTimeout(r, 3000))]);
+construye('o20'); pintaEquipos(); pintaSelector(); aplicar(carga.slice()); acaba(); ajusta(); vistaApp();
+$('estado').hidden = true;
+requestAnimationFrame(paso);
+</script>
