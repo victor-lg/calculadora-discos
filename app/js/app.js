@@ -7,12 +7,13 @@ import {
   elegirModo,
   elegirBarra,
   escribirPesoBarra,
+  escribirTrabajo,
   anadirPorcentaje,
   quitarPorcentaje,
   alternarDisco,
   modeloVista,
 } from './vista.js';
-import { leerPorcentajes, leerDiscos, guardarCambios } from './almacenamiento.js';
+import { leerPorcentajes, leerDiscos, leerAjustes, guardarCambios } from './almacenamiento.js';
 
 function almacenLocal() {
   try {
@@ -23,7 +24,7 @@ function almacenLocal() {
 }
 
 const almacen = almacenLocal();
-let estado = estadoInicial(leerPorcentajes(almacen), leerDiscos(almacen));
+let estado = estadoInicial(leerPorcentajes(almacen), leerDiscos(almacen), leerAjustes(almacen));
 
 const $ = (id) => document.getElementById(id);
 
@@ -141,14 +142,14 @@ function pintar() {
 }
 
 // FR-10: cualquier cambio recalcula al momento. FR-11 y SPEC-CALC-002 FR-08:
-// la lista y los discos se guardan en cada cambio (FR-09 si falla).
+// cada dato guardado se guarda cuando cambia (SPEC-CALC-002 FR-09 si falla).
 function actualizar(nuevo) {
   estado = guardarCambios(almacen, estado, nuevo);
   pintar();
 }
 
 function enlazarCampos() {
-  $('trabajo').addEventListener('input', (e) => actualizar({ ...estado, trabajo: e.target.value }));
+  $('trabajo').addEventListener('input', (e) => actualizar(escribirTrabajo(estado, e.target.value)));
   $('peso-barra').addEventListener('input', (e) => {
     actualizar(escribirPesoBarra(estado, e.target.value));
   });

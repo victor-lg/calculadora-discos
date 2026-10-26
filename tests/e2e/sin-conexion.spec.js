@@ -41,7 +41,7 @@ const CABECERAS_DEL_NAVEGADOR = new Set([
 // navegador podría contenerlos sin que haya fuga. Esas cabeceras, como todas,
 // tienen que coincidir además con un valor del recorrido de referencia.
 const INTRODUCIDOS = ['7,35', '7.35', '7%2C35', '487,35', '487.35', '487%2C35', '48735',
-  '735', '487', 'dos-lados', 'un-punto', 'recta',
+  '735', '487', '8,65', '8.65', '8%2C65', '865', 'dos-lados', 'un-punto', 'recta', 'peso-z',
   '15,10,5,2.5', '15%2C10', '1500,1000', '1500%2C1000', '%5B15', '2.5', '2%2C5',
   '1.25', '1%2C25'];
 const esDeVersion = (n) => n === 'user-agent' || n.startsWith('sec-ch-ua');
@@ -151,6 +151,8 @@ async function recorrido(context, base, conDatos, sockets) {
   if (conDatos) {
     await page.getByLabel('Recta', { exact: true }).check();
     await page.getByLabel('Peso de la barra (kg)').fill('7,35');
+    await page.getByLabel('Z', { exact: true }).check();
+    await page.getByLabel('Peso de la barra (kg)').fill('8,65');
     await page.getByLabel('Collarines de competición').check();
     await page.getByLabel('Peso de trabajo (kg)').fill('487,35');
     await page.getByLabel('Nuevo porcentaje').fill('47');
@@ -167,6 +169,15 @@ async function recorrido(context, base, conDatos, sockets) {
   }
   await page.reload();
   expect(page.url()).toBe(base);
+  // ADR-0004: lo guardado vuelve tras el arranque de cero, sin salir del dispositivo.
+  if (conDatos) {
+    await expect(page.getByLabel('Peso de trabajo (kg)')).toHaveValue('487,35');
+    await expect(page.getByLabel('Collarines de competición')).toBeChecked();
+    await page.getByLabel('Recta', { exact: true }).check();
+    await expect(page.getByLabel('Peso de la barra (kg)')).toHaveValue('7,35');
+    await page.getByLabel('Z', { exact: true }).check();
+    await expect(page.getByLabel('Peso de la barra (kg)')).toHaveValue('8,65');
+  }
   await page.close();
   await new Promise((r) => setTimeout(r, MARGEN_TRAS_CERRAR_MS));
 }

@@ -63,27 +63,42 @@ export const TEXTOS = {
 // FR-04: ordenados de menor a mayor y sin repetidos.
 const ordenarSinRepetidos = (lista) => [...new Set(lista)].sort((a, b) => a - b);
 
-// FR-11: al arrancar de cero, modo Barra, olímpica de 20 kg y peso de trabajo
-// vacío; la recta y la Z, 10 kg (FR-02), sin collarines (FR-15).
+// FR-11: valores de la primera vez, o si el dato guardado falta, no se puede
+// leer o no es válido.
+const TRABAJO_INICIAL = '100';
+
+// FR-11: al arrancar de cero, modo Barra y olímpica de 20 kg, con lo que se
+// haya recuperado (`ajustes`, de almacenamiento.js) o los valores de la primera
+// vez: peso de trabajo "100", recta y Z de 10 kg (FR-02) y sin collarines (FR-15).
 // `discos` son los tipos habilitados, en centésimas y de mayor a menor
 // (SPEC-CALC-002 FR-08). `guardados` es el último valor que se guardó bien de
 // cada dato: al arrancar de cero, el valor con el que arranca (SPEC-CALC-002 FR-09).
-// `barraValida` es el último peso válido de la recta y de la Z (FR-02).
-export function estadoInicial(porcentajes, discos = DISCOS_CENT) {
-  const barraValida = { recta: PESO_BARRA_INICIAL_CENT, z: PESO_BARRA_INICIAL_CENT };
+// `barraValida` es el último peso válido de la recta y de la Z (FR-02), y
+// `trabajoValido`, el último texto válido del peso de trabajo (FR-11).
+export function estadoInicial(porcentajes, discos = DISCOS_CENT, {
+  trabajo = TRABAJO_INICIAL,
+  recta = PESO_BARRA_INICIAL_CENT,
+  z = PESO_BARRA_INICIAL_CENT,
+  collarines = false,
+} = {}) {
+  const barraValida = { recta, z };
   const estado = {
     modo: 'barra',
     barra: '20',
     pesoBarra: textosBarra(barraValida),
     barraValida,
-    trabajo: '',
+    trabajo,
+    trabajoValido: trabajo,
     porcentajes: ordenarSinRepetidos(porcentajes),
     discos: [...discos],
-    collarines: false,
+    collarines,
     textoPorcentaje: '',
     errorPorcentaje: null,
   };
-  return { ...estado, guardados: { porcentajes: estado.porcentajes, discos: estado.discos } };
+  return {
+    ...estado,
+    guardados: { porcentajes: estado.porcentajes, discos: estado.discos, trabajo, recta, z, collarines },
+  };
 }
 
 // FR-02: el campo de la recta y el de la Z muestran su último peso válido con
@@ -111,6 +126,13 @@ export function escribirPesoBarra(estado, texto) {
     pesoBarra: { ...estado.pesoBarra, [estado.barra]: texto },
     barraValida: cent === null ? estado.barraValida : { ...estado.barraValida, [estado.barra]: cent },
   };
+}
+
+// FR-03, FR-11: lo tecleado se conserva tal cual; si es válido, pasa a ser el
+// último peso de trabajo válido, que es el que se guarda.
+export function escribirTrabajo(estado, texto) {
+  const valido = analizarPeso(texto).estado === 'ok';
+  return { ...estado, trabajo: texto, trabajoValido: valido ? texto : estado.trabajoValido };
 }
 
 // FR-04: si es válido y no está, lo añade en su sitio; si no, deja la lista
@@ -144,6 +166,19 @@ export function alternarDisco(estado, cent) {
 }
 
 const iguales = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+// SPEC-CALC-002 FR-09: el aviso se muestra mientras algún dato no coincida con
+// lo último guardado bien. El peso de trabajo se compara por su texto y los
+// pesos de barra, por su valor; de los pesos cuenta el último válido.
+function coincideConGuardado(estado) {
+  const g = estado.guardados;
+  return iguales(estado.porcentajes, g.porcentajes)
+    && iguales(estado.discos, g.discos)
+    && estado.trabajoValido === g.trabajo
+    && estado.barraValida.recta === g.recta
+    && estado.barraValida.z === g.z
+    && estado.collarines === g.collarines;
+}
 
 function barraElegida(estado) {
   return BARRAS.find((b) => b.id === estado.barra);
@@ -253,9 +288,7 @@ export function modeloVista(estado) {
     })),
     // SPEC-CALC-002 FR-06: además de las demás indicaciones, avisos o errores.
     indicacionDiscos: estado.discos.length === 0 ? TEXTOS.habilitarDiscos : null,
-    // SPEC-CALC-002 FR-09: mientras algún dato no coincida con lo último guardado bien.
-    avisoGuardado: iguales(estado.porcentajes, estado.guardados.porcentajes)
-      && iguales(estado.discos, estado.guardados.discos) ? null : TEXTOS.falloGuardar,
+    avisoGuardado: coincideConGuardado(estado) ? null : TEXTOS.falloGuardar,
     series: [],
   };
 

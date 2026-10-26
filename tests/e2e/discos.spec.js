@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 
 const CLAVE_DISCOS = 'calculadora-discos:v1:discos';
 const CLAVE_PORCENTAJES = 'calculadora-discos:v1:porcentajes';
+const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
 const AVISO_GUARDAR = 'No se ha podido guardar: se mantendrá hasta cerrar la app';
 const NOMBRES = ['25 kg', '20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg', '1,25 kg'];
 
@@ -53,6 +54,8 @@ test('SPEC-CALC-002/AC-08 sin tipos no hay series; al habilitar el de 10 kg apar
 });
 
 test('SPEC-CALC-002/AC-09 sin tipos, la indicación aparece junto a las demás', async ({ page }) => {
+  // Con el peso de trabajo vacío: la primera vez es "100" (SPEC-CALC-001 FR-11).
+  await trabajo(page).fill('');
   for (const nombre of NOMBRES) await disco(page, nombre).click();
   await expect(page.locator('#indicacion-trabajo')).toBeVisible();
   await expect(indicacionDiscos(page)).toHaveText('Habilita al menos un disco en Mis discos.');
@@ -76,8 +79,10 @@ test('SPEC-CALC-002/AC-10 deshabilitar y habilitar el de 25 kg recalcula al mome
 });
 
 test('SPEC-CALC-002/AC-11 los tipos se recuperan al arrancar de cero, también ninguno', async ({ page }) => {
-  // Con el peso de trabajo vacío, el cambio también se guarda.
-  await expect(trabajo(page)).toHaveValue('');
+  // Con el peso de trabajo vacío, el cambio también se guarda. La primera vez
+  // es "100" (SPEC-CALC-001 FR-11), así que se vacía antes.
+  await trabajo(page).fill('');
+  await expect(page.locator('#indicacion-trabajo')).toBeVisible();
   await disco(page, '25 kg').click();
   await disco(page, '1,25 kg').click();
   await page.reload();
@@ -184,4 +189,37 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
   // Al guardarse también la lista, desaparece.
   await page.getByRole('button', { name: 'Quitar 50 %' }).click();
   await expect(avisoGuardado(page)).toBeHidden();
+});
+
+test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: aviso mientras no coinciden con lo guardado', async ({ page }) => {
+  // Peso de trabajo guardado "100".
+  await trabajo(page).fill('101');
+  await trabajo(page).fill('100');
+  expect(await page.evaluate((c) => localStorage.getItem(c), CLAVE_TRABAJO)).toBe('"100"');
+  await page.reload();
+  await expect(avisoGuardado(page)).toBeHidden();
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => { throw new DOMException('Lleno', 'QuotaExceededError'); };
+  });
+
+  await trabajo(page).fill('105');
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  await trabajo(page).fill('100');
+  await expect(avisoGuardado(page)).toBeHidden();
+
+  await trabajo(page).fill('105');
+  await trabajo(page).fill('');
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  await trabajo(page).fill('100');
+  await expect(avisoGuardado(page)).toBeHidden();
+
+  await page.getByLabel('Collarines de competición').check();
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  await page.getByLabel('Collarines de competición').uncheck();
+  await expect(avisoGuardado(page)).toBeHidden();
+
+  await page.getByLabel('Z', { exact: true }).check();
+  await page.getByLabel('Peso de la barra (kg)').fill('8,5');
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  expect(await page.evaluate(() => localStorage.getItem('calculadora-discos:v1:peso-z'))).toBeNull();
 });

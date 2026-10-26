@@ -2,6 +2,10 @@
 import { test, expect } from '@playwright/test';
 
 const CLAVE = 'calculadora-discos:v1:porcentajes';
+const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
+const CLAVE_RECTA = 'calculadora-discos:v1:peso-recta';
+const CLAVE_Z = 'calculadora-discos:v1:peso-z';
+const CLAVE_COLLARINES = 'calculadora-discos:v1:collarines';
 
 const trabajo = (page) => page.getByLabel('Peso de trabajo (kg)');
 const pesoBarra = (page) => page.getByLabel('Peso de la barra (kg)');
@@ -87,24 +91,42 @@ test('SPEC-CALC-001/AC-10 las series se actualizan al momento con cada cambio', 
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '52,5 kg', '92,5 kg']);
 });
 
-test('SPEC-CALC-001/AC-11 la lista se recupera al arrancar de cero, también vacía', async ({ page }) => {
+test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo y la barra no', async ({ page }) => {
+  // La primera vez: 40/70/90, "100" con las series de AC-01, Barra, 20 kg, sin collarines y recta y Z de 10 kg.
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
+  await expect(trabajo(page)).toHaveValue('100');
+  await expect(series(page).locator('.total')).toHaveText(['40 kg', '70 kg', '90 kg']);
+  await expect(series(page).locator('.discos strong')).toHaveText(['10', '25', '25 + 10']);
+  await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
+  await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
+  await expect(page.getByLabel('Collarines de competición')).not.toBeChecked();
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('10');
+  await barra(page, 'Z').check();
+  await expect(pesoBarra(page)).toHaveValue('10');
 
   await quitarTodos(page);
   await anadir(page, '50');
   await anadir(page, '75');
-  await trabajo(page).fill('100');
-  await page.getByLabel('Un punto').check();
+  await trabajo(page).fill('102,5');
+  await barra(page, 'Recta').check();
+  await pesoBarra(page).fill('7,5');
+  await barra(page, 'Z').check();
+  await pesoBarra(page).fill('8,5');
+  await page.getByLabel('Collarines de competición').check();
+  await page.getByLabel('Dos lados sin barra').check();
   await page.reload();
-  await expect(porcentajes(page)).toHaveText(['50 %', '75 %']);
 
-  // Al arrancar de cero: Barra, 20 kg y peso vacío con la indicación, sin error.
+  await expect(porcentajes(page)).toHaveText(['50 %', '75 %']);
+  await expect(trabajo(page)).toHaveValue('102,5');
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
   await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
-  // Provisional: con FR-11 v0.6 (siguiente PR de VIC-10) el peso de trabajo vuelve como "100".
-  await expect(trabajo(page)).toHaveValue('');
-  await expect(page.locator('#indicacion-trabajo')).toBeVisible();
-  await expect(page.locator('#error-trabajo')).toBeHidden();
+  await expect(page.getByLabel('Collarines de competición')).toBeChecked();
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+  await barra(page, 'Z').check();
+  await expect(pesoBarra(page)).toHaveValue('8,5');
+  await expect(page.locator('#aviso-guardado')).toBeHidden();
 
   await quitarTodos(page);
   await page.reload();
@@ -112,18 +134,63 @@ test('SPEC-CALC-001/AC-11 la lista se recupera al arrancar de cero, también vac
   await expect(page.locator('#indicacion-porcentajes')).toBeVisible();
 });
 
-test('SPEC-CALC-001/AC-11 datos guardados que faltan, rotos o no válidos: 40, 70 y 90', async ({ page }) => {
-  for (const crudo of [null, '{roto', '[150]', '["40"]']) {
-    await page.evaluate(([clave, valor]) => {
-      if (valor === null) localStorage.removeItem(clave);
-      else localStorage.setItem(clave, valor);
-    }, [CLAVE, crudo]);
+test('SPEC-CALC-001/AC-33 datos guardados que faltan, rotos o no válidos: cada uno por separado', async ({ page }) => {
+  const guardar = (datos) => page.evaluate((d) => {
+    localStorage.clear();
+    for (const [clave, valor] of Object.entries(d)) localStorage.setItem(clave, valor);
+  }, datos);
+
+  for (const crudo of [null, '{roto', '[150]', '[40.5]', '["40"]']) {
+    await guardar(crudo === null ? {} : { [CLAVE]: crudo });
     await page.reload();
     await expect(porcentajes(page), String(crudo)).toHaveText(['40 %', '70 %', '90 %']);
-    // Provisional, como el anterior: el siguiente PR de VIC-10 lo cambia a "100".
-    await expect(trabajo(page)).toHaveValue('');
+    await expect(trabajo(page)).toHaveValue('100');
     await expect(page.locator('#error-trabajo')).toBeHidden();
   }
+
+  await guardar({ [CLAVE]: '[90,40,40]' });
+  await page.reload();
+  await expect(porcentajes(page)).toHaveText(['40 %', '90 %']);
+
+  for (const crudo of ['"abc"', '"600"', '{roto']) {
+    await guardar({ [CLAVE_TRABAJO]: crudo });
+    await page.reload();
+    await expect(trabajo(page), crudo).toHaveValue('100');
+  }
+
+  await guardar({ [CLAVE_RECTA]: '60', [CLAVE_Z]: '8.5', [CLAVE_COLLARINES]: '{roto' });
+  await page.reload();
+  await expect(page.getByLabel('Collarines de competición')).not.toBeChecked();
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('10');
+  await barra(page, 'Z').check();
+  await expect(pesoBarra(page)).toHaveValue('8,5');
+
+  await guardar({ [CLAVE]: '{roto', [CLAVE_TRABAJO]: '"102,5"', [CLAVE_COLLARINES]: 'true' });
+  await page.reload();
+  await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
+  await expect(trabajo(page)).toHaveValue('102,5');
+  await expect(page.getByLabel('Collarines de competición')).toBeChecked();
+});
+
+test('SPEC-CALC-001/AC-34 solo se guarda un peso válido', async ({ page }) => {
+  await trabajo(page).fill('105');
+  await trabajo(page).fill('');
+  await page.reload();
+  await expect(trabajo(page)).toHaveValue('105');
+
+  await trabajo(page).fill('100,12');
+  await trabajo(page).pressSequentially('3');
+  await expect(page.locator('#error-trabajo')).toBeVisible();
+  await page.reload();
+  await expect(trabajo(page)).toHaveValue('100,12');
+
+  await barra(page, 'Recta').check();
+  await pesoBarra(page).fill('7,5');
+  await pesoBarra(page).fill('0,5');
+  await page.reload();
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
 });
 
 test('SPEC-CALC-001/AC-22 volver de otra app conserva todo el estado sin recargar', async ({ page, context }) => {
@@ -160,6 +227,8 @@ test('SPEC-CALC-001/AC-32 el campo conserva exactamente lo tecleado', async ({ p
   await quitarTodos(page);
   await anadir(page, '70');
 
+  // La primera vez el campo trae "100" (FR-11): se vacía antes de teclear.
+  await trabajo(page).fill('');
   await trabajo(page).pressSequentially('102.5');
   await expect(trabajo(page)).toHaveValue('102.5');
   await expect(series(page).locator('.diferencia summary')).toHaveText('−1,75 kg');
@@ -213,6 +282,13 @@ test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último pes
   await expect(pesoBarra(page)).toHaveValue('7,5');
   await expect(page.locator('#error-barra')).toBeHidden();
   await expect(series(page)).toHaveCount(3);
+
+  // Al arrancar de cero, cada barra muestra su último peso válido guardado.
+  await page.reload();
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+  await barra(page, 'Z').check();
+  await expect(pesoBarra(page)).toHaveValue('8,5');
 });
 
 test('SPEC-CALC-001/AC-02 la marca "−1 kg" va junto al porcentaje y abre la explicación', async ({ page }) => {
