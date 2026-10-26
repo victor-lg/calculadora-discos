@@ -1,7 +1,7 @@
 ---
 id: ADR-0003
 titulo: Dibujo 3D en vivo con three.js y un solo renderizador
-estado: Propuesto          # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-10-26
 sustituye: null
 sustituido_por: null
@@ -15,6 +15,8 @@ Redactado por Claude (VIC-9) a partir de docs/diseno/notas-diseno-interfaz.md §
 Víctor de las sesiones de diseño del 23 al 25 de octubre. Cambia solo ADR-0001
 §3.1; el resto de ADR-0001 sigue vigente y no se edita. Datos de three.js
 consultados en el registro de npm el 2026-10-26 (§7).
+Revisado en G4 en el PR #17 (dos revisores, sin nada que corregir tras bcb26c3).
+Aceptado con el merge del PR #17.
 -->
 
 # ADR-0003 — Dibujo 3D en vivo con three.js y un solo renderizador
