@@ -27,19 +27,21 @@ test.beforeEach(async ({ page }) => {
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
 });
 
-test('SPEC-CALC-001/AC-04 las barras de 20 y 15 kg no permiten cambiar su peso', async ({ page }) => {
+const barra = (page, nombre) => page.getByLabel(nombre, { exact: true });
+
+test('SPEC-CALC-001/AC-04 las olímpicas de 20 y 15 kg no permiten cambiar su peso', async ({ page }) => {
   const radios = page.locator('input[name="barra"]');
   await expect(radios).toHaveCount(4);
-  await expect(page.locator('#barras label.opcion')).toHaveText([
-    'Barra de 20 kg', 'Barra de 15 kg', 'Recta pequeña', 'Barra Z',
+  await expect(page.locator('#lista-barras label.opcion')).toHaveText([
+    'Olímpica 20 kg', 'Olímpica 15 kg', 'Recta', 'Z',
   ]);
-  for (const [nombre, fijo] of [['Barra de 20 kg', '20 kg'], ['Barra de 15 kg', '15 kg']]) {
-    await page.getByLabel(nombre).check();
+  for (const [nombre, fijo] of [['Olímpica 20 kg', '20 kg'], ['Olímpica 15 kg', '15 kg']]) {
+    await barra(page, nombre).check();
     await expect(pesoBarra(page)).toBeHidden();
     await expect(page.locator('#peso-barra-fijo')).toHaveText(`Peso de la barra: ${fijo}`);
   }
-  for (const nombre of ['Recta pequeña', 'Barra Z']) {
-    await page.getByLabel(nombre).check();
+  for (const nombre of ['Recta', 'Z']) {
+    await barra(page, nombre).check();
     await expect(pesoBarra(page)).toBeVisible();
     await expect(pesoBarra(page)).toBeEditable();
   }
@@ -57,19 +59,32 @@ test('SPEC-CALC-001/AC-10 las series se actualizan al momento con cada cambio', 
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '72,5 kg', '92,5 kg']);
 
   await anadir(page, '50');
-  await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '70 %', '90 %', '50 %']);
+  await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '50 %', '70 %', '90 %']);
 
   await page.getByRole('button', { name: 'Quitar 70 %' }).click();
-  await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '90 %', '50 %']);
+  await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '50 %', '90 %']);
 
-  await page.getByLabel('Barra de 15 kg').check();
-  await expect(series(page).locator('.total')).toHaveText(['40 kg', '92,5 kg', '52,5 kg']);
+  await barra(page, 'Olímpica 15 kg').check();
+  await expect(series(page).locator('.total')).toHaveText(['40 kg', '52,5 kg', '92,5 kg']);
+  await expect(series(page).locator('.discos strong')).toHaveText(['10 + 2,5', '15 + 2,5 + 1,25', '25 + 10 + 2,5 + 1,25']);
+
+  await page.getByLabel('Collarines de competición').check();
+  await expect(series(page).locator('.discos strong')).toHaveText(['10', '15 + 1,25', '25 + 10 + 1,25']);
+  await expect(series(page).locator('.collarin')).toHaveCount(3);
+
+  await page.getByLabel('Collarines de competición').uncheck();
+  await expect(series(page).locator('.collarin')).toHaveCount(0);
+  await barra(page, 'Recta').check();
+  await expect(series(page).locator('.discos strong')).toHaveText(['15', '20 + 1,25', '25 + 15 + 1,25']);
+
+  await pesoBarra(page).fill('12,5');
+  await expect(series(page).locator('.discos strong')).toHaveText(['10 + 2,5 + 1,25', '20', '25 + 15']);
 
   await page.getByLabel('Un punto').check();
-  await expect(series(page).locator('.total')).toHaveText(['41,25 kg', '93,75 kg', '52,5 kg']);
+  await expect(series(page).locator('.total')).toHaveText(['41,25 kg', '52,5 kg', '93,75 kg']);
 
   await page.getByLabel('Dos lados sin barra').check();
-  await expect(series(page).locator('.total')).toHaveText(['40 kg', '92,5 kg', '52,5 kg']);
+  await expect(series(page).locator('.total')).toHaveText(['40 kg', '52,5 kg', '92,5 kg']);
 });
 
 test('SPEC-CALC-001/AC-11 la lista se recupera al arrancar de cero, también vacía', async ({ page }) => {
@@ -85,7 +100,8 @@ test('SPEC-CALC-001/AC-11 la lista se recupera al arrancar de cero, también vac
 
   // Al arrancar de cero: Barra, 20 kg y peso vacío con la indicación, sin error.
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
-  await expect(page.getByLabel('Barra de 20 kg')).toBeChecked();
+  await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
+  // Provisional: con FR-11 v0.6 (siguiente PR de VIC-10) el peso de trabajo vuelve como "100".
   await expect(trabajo(page)).toHaveValue('');
   await expect(page.locator('#indicacion-trabajo')).toBeVisible();
   await expect(page.locator('#error-trabajo')).toBeHidden();
@@ -104,13 +120,14 @@ test('SPEC-CALC-001/AC-11 datos guardados que faltan, rotos o no válidos: 40, 7
     }, [CLAVE, crudo]);
     await page.reload();
     await expect(porcentajes(page), String(crudo)).toHaveText(['40 %', '70 %', '90 %']);
+    // Provisional, como el anterior: el siguiente PR de VIC-10 lo cambia a "100".
     await expect(trabajo(page)).toHaveValue('');
     await expect(page.locator('#error-trabajo')).toBeHidden();
   }
 });
 
 test('SPEC-CALC-001/AC-22 volver de otra app conserva todo el estado sin recargar', async ({ page, context }) => {
-  await page.getByLabel('Barra Z').check();
+  await barra(page, 'Z').check();
   await pesoBarra(page).fill('8,5');
   await trabajo(page).fill('50');
   const antes = await series(page).allTextContents();
@@ -132,7 +149,7 @@ test('SPEC-CALC-001/AC-22 volver de otra app conserva todo el estado sin recarga
 
   expect(await page.evaluate(() => window.marcaSinRecarga)).toBe(true);
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
-  await expect(page.getByLabel('Barra Z')).toBeChecked();
+  await expect(barra(page, 'Z')).toBeChecked();
   await expect(pesoBarra(page)).toHaveValue('8,5');
   await expect(trabajo(page)).toHaveValue('50');
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
@@ -145,8 +162,10 @@ test('SPEC-CALC-001/AC-32 el campo conserva exactamente lo tecleado', async ({ p
 
   await trabajo(page).pressSequentially('102.5');
   await expect(trabajo(page)).toHaveValue('102.5');
-  await expect(series(page).locator('.redondeo')).toHaveText(
-    'Redondeo: objetivo 71,75 kg, diferencia −1,75 kg',
+  await expect(series(page).locator('.diferencia summary')).toHaveText('−1,75 kg');
+  await series(page).locator('.diferencia summary').click();
+  await expect(series(page).locator('.diferencia p')).toHaveText(
+    'El 70 % de 102,5 kg son 71,75 kg. Con tus discos, lo más cercano sin pasarte es 70 kg: 1,75 kg menos.',
   );
 
   for (const texto of [' 100 ', '100,', ',5']) {
@@ -163,4 +182,62 @@ test('SPEC-CALC-001/AC-30 añadir un porcentaje vacío no cambia nada ni muestra
   await anadir(page, '   ');
   await expect(page.locator('#error-porcentaje')).toBeHidden();
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
+});
+
+test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último peso válido', async ({ page }) => {
+  await trabajo(page).fill('100');
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('10');
+  await pesoBarra(page).fill('7,50');
+  await barra(page, 'Z').check();
+  await pesoBarra(page).fill('8.5');
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+  await barra(page, 'Z').check();
+  await expect(pesoBarra(page)).toHaveValue('8,5');
+
+  await barra(page, 'Recta').check();
+  await pesoBarra(page).fill('0,5');
+  await expect(page.locator('#error-barra')).toHaveText(
+    'Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo.',
+  );
+  await expect(series(page)).toHaveCount(0);
+  await barra(page, 'Z').check();
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+  await expect(page.locator('#error-barra')).toBeHidden();
+
+  await pesoBarra(page).fill('0,5');
+  await page.getByLabel('Dos lados sin barra').check();
+  await page.getByLabel('Barra', { exact: true }).check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+  await expect(page.locator('#error-barra')).toBeHidden();
+  await expect(series(page)).toHaveCount(3);
+});
+
+test('SPEC-CALC-001/AC-02 la marca "−1 kg" va junto al porcentaje y abre la explicación', async ({ page }) => {
+  await quitarTodos(page);
+  await anadir(page, '70');
+  await trabajo(page).fill('105');
+  const cabecera = series(page).locator('.cabecera');
+  await expect(cabecera.locator('.porcentaje + .diferencia summary')).toHaveText('−1 kg');
+  await expect(series(page).locator('.diferencia p')).toBeHidden();
+  await cabecera.locator('.diferencia summary').click();
+  await expect(series(page).locator('.diferencia p')).toHaveText(
+    'El 70 % de 105 kg son 73,5 kg. Con tus discos, lo más cercano sin pasarte es 72,5 kg: 1 kg menos.',
+  );
+});
+
+test('SPEC-CALC-001/AC-35 SPEC-CALC-001/AC-39 discos agrupados y aviso de capacidad en pantalla', async ({ page }) => {
+  await quitarTodos(page);
+  await anadir(page, '100');
+  await trabajo(page).fill('120');
+  await expect(series(page).locator('.discos')).toHaveText('Por lado: 25 ×2');
+  await expect(series(page)).not.toContainText('kg por lado');
+  await expect(series(page).locator('.capacidad')).toHaveCount(0);
+
+  await trabajo(page).fill('500');
+  await page.getByLabel('Un punto').check();
+  await expect(series(page).locator('.discos')).toHaveText('Total en discos: 25 ×20');
+  await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
 });

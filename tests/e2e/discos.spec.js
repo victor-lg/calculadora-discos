@@ -48,17 +48,14 @@ test('SPEC-CALC-002/AC-08 sin tipos no hay series; al habilitar el de 10 kg apar
   await disco(page, '10 kg').click();
   await expect(indicacionDiscos(page)).toBeHidden();
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '60 kg', '80 kg']);
-  await expect(series(page).locator('.discos strong')).toHaveText(['10', '10 + 10', '10 + 10 + 10']);
-  await expect(series(page).locator('.redondeo')).toHaveText([
-    'Redondeo: objetivo 70 kg, diferencia −10 kg',
-    'Redondeo: objetivo 90 kg, diferencia −10 kg',
-  ]);
+  await expect(series(page).locator('.discos strong')).toHaveText(['10', '10 ×2', '10 ×3']);
+  await expect(series(page).locator('.diferencia summary')).toHaveText(['−10 kg', '−10 kg']);
 });
 
 test('SPEC-CALC-002/AC-09 sin tipos, la indicación aparece junto a las demás', async ({ page }) => {
   for (const nombre of NOMBRES) await disco(page, nombre).click();
   await expect(page.locator('#indicacion-trabajo')).toBeVisible();
-  await expect(indicacionDiscos(page)).toBeVisible();
+  await expect(indicacionDiscos(page)).toHaveText('Habilita al menos un disco en Mis discos.');
   await expect(page.locator('#error-trabajo')).toBeHidden();
 
   await trabajo(page).fill('15');
@@ -178,7 +175,7 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
   // Falla la lista; vuelve a poder guardar y se guardan los discos: el aviso sigue.
   await page.getByLabel('Nuevo porcentaje').fill('50');
   await page.getByRole('button', { name: 'Añadir' }).click();
-  await expect(series(page).locator('.porcentaje')).toHaveText(['90 %', '50 %']);
+  await expect(series(page).locator('.porcentaje')).toHaveText(['50 %', '90 %']);
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
   await page.evaluate(() => window.romperAlmacen(false));
   await disco(page, '25 kg').click();
