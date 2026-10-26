@@ -221,5 +221,5 @@ test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: aviso mien
   await page.getByLabel('Z', { exact: true }).check();
   await page.getByLabel('Peso de la barra (kg)').fill('8,5');
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
-  expect(await page.evaluate((c) => localStorage.getItem(c), CLAVE_TRABAJO)).toBe('"100"');
+  expect(await page.evaluate(() => localStorage.getItem('calculadora-discos:v1:peso-z'))).toBeNull();
 });

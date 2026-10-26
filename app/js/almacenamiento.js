@@ -84,8 +84,8 @@ export function leerAjustes(almacen) {
   const trabajo = leer(almacen, CLAVE_TRABAJO, (v) => typeof v === 'string' && analizarPeso(v).estado === 'ok');
   if (trabajo !== null) ajustes.trabajo = trabajo;
   for (const [barra, clave] of Object.entries(CLAVES_BARRA)) {
-    const cent = centDeKg(leer(almacen, clave, (v) => centDeKg(v) !== null));
-    if (cent !== null) ajustes[barra] = cent;
+    const kg = leer(almacen, clave, (v) => centDeKg(v) !== null);
+    if (kg !== null) ajustes[barra] = centDeKg(kg);
   }
   const collarines = leer(almacen, CLAVE_COLLARINES, (v) => typeof v === 'boolean');
   if (collarines !== null) ajustes.collarines = collarines;

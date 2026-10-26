@@ -170,7 +170,14 @@ async function recorrido(context, base, conDatos, sockets) {
   await page.reload();
   expect(page.url()).toBe(base);
   // ADR-0004: lo guardado vuelve tras el arranque de cero, sin salir del dispositivo.
-  if (conDatos) await expect(page.getByLabel('Peso de trabajo (kg)')).toHaveValue('487,35');
+  if (conDatos) {
+    await expect(page.getByLabel('Peso de trabajo (kg)')).toHaveValue('487,35');
+    await expect(page.getByLabel('Collarines de competición')).toBeChecked();
+    await page.getByLabel('Recta', { exact: true }).check();
+    await expect(page.getByLabel('Peso de la barra (kg)')).toHaveValue('7,35');
+    await page.getByLabel('Z', { exact: true }).check();
+    await expect(page.getByLabel('Peso de la barra (kg)')).toHaveValue('8,65');
+  }
   await page.close();
   await new Promise((r) => setTimeout(r, MARGEN_TRAS_CERRAR_MS));
 }
