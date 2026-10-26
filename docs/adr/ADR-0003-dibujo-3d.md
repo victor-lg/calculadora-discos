@@ -90,6 +90,7 @@ Sin esta decisión no se puede implementar SPEC-CALC-003.
    - Hay un único `WebGLRenderer` sobre un lienzo fuera de la página, con `preserveDrawingBuffer`.
    - Cada tarjeta tiene su lienzo 2D y su grupo en la escena. Para pintar una tarjeta, se deja visible solo su grupo, se renderiza y se copia la imagen a su lienzo con `drawImage`.
    - Solo se repintan las tarjetas con una animación en curso o marcadas como pendientes.
+   - Las miniaturas de las fichas de barra se pintan una vez con el mismo renderizador y se conservan en sus propios lienzos 2D, no como imágenes `data:` o `blob:`. Así la CSP de ADR-0001 §3.4 (`img-src 'self'`) no cambia.
 6. **Robustez.**
    - Si WebGL no está disponible o falla al crearse, la app no carga el dibujo y sigue con la vista de solo texto (SPEC-CALC-003 FR-14).
    - Si se pierde el contexto, los lienzos 2D conservan lo pintado. Al recuperarlo, se rehace el entorno y se repintan todas las tarjetas (FR-15).
