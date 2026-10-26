@@ -90,7 +90,8 @@ test('SPEC-CALC-001/AC-04 las olímpicas de 20 y 15 kg tienen peso fijo y el cat
 test('SPEC-CALC-001/AC-05 modo Dos lados: 100 kg y 70 %, sin peso de discos por lado', () => {
   const s = serie({ modo: 'dos-lados', trabajo: '100', porcentajes: [70] });
   assert.deepEqual(resumen(s), ['70 %', '70 kg', null, 'Por lado', ['25', '10']]);
-  assert.equal(Object.values(s).includes('35 kg'), false);
+  // FR-08: ningún texto de la serie dice el peso de discos por lado (35 kg).
+  assert.doesNotMatch(JSON.stringify(s), /35/);
 });
 
 test('SPEC-CALC-001/AC-06 modo Un punto: 60 kg y 70 %', () => {
@@ -145,7 +146,8 @@ test('SPEC-CALC-001/AC-09 85 y 87 %: se muestran las dos aunque carguen lo mismo
   assert.deepEqual([b.porcentaje, b.total, b.diferencia], ['87 %', '85 kg', '−2 kg']);
 });
 
-test('SPEC-CALC-001/AC-11 arranque de cero: Barra, olímpica de 20 kg, sin collarines y recta y Z de 10 kg', () => {
+// Parte de SPEC-CALC-001/AC-11: el peso de trabajo "100" y lo guardado llegan con FR-11 (siguiente PR de VIC-10).
+test('FR-02, FR-15: al empezar, Barra, olímpica de 20 kg, sin collarines y recta y Z de 10 kg', () => {
   const v = modeloVista(estadoInicial([50, 75]));
   assert.equal(v.modo, 'barra');
   assert.equal(v.barra, '20');
@@ -337,7 +339,7 @@ test('SPEC-CALC-001/AC-28 la recta escrita como ",5" (0,5 kg): mensaje y sin ser
 });
 
 test('SPEC-CALC-001/AC-31 tabulador, espacio duro o salto de línea alrededor del peso', () => {
-  for (const trabajo of ['\t100\t', ' 100 ', '\n100\n', '\r\n100\r\n']) {
+  for (const trabajo of ['\t100\t', '\u00a0100\u00a0', '\n100\n', '\r\n100\r\n']) {
     const v = vista({ trabajo, porcentajes: [40, 70, 90] });
     assert.equal(v.errorTrabajo, null, JSON.stringify(trabajo));
     assert.deepEqual(AC01(v), SERIES_AC01, JSON.stringify(trabajo));

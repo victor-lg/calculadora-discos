@@ -101,6 +101,7 @@ test('SPEC-CALC-001/AC-11 la lista se recupera al arrancar de cero, también vac
   // Al arrancar de cero: Barra, 20 kg y peso vacío con la indicación, sin error.
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
   await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
+  // Provisional: con FR-11 v0.6 (siguiente PR de VIC-10) el peso de trabajo vuelve como "100".
   await expect(trabajo(page)).toHaveValue('');
   await expect(page.locator('#indicacion-trabajo')).toBeVisible();
   await expect(page.locator('#error-trabajo')).toBeHidden();
@@ -119,6 +120,7 @@ test('SPEC-CALC-001/AC-11 datos guardados que faltan, rotos o no válidos: 40, 7
     }, [CLAVE, crudo]);
     await page.reload();
     await expect(porcentajes(page), String(crudo)).toHaveText(['40 %', '70 %', '90 %']);
+    // Provisional, como el anterior: el siguiente PR de VIC-10 lo cambia a "100".
     await expect(trabajo(page)).toHaveValue('');
     await expect(page.locator('#error-trabajo')).toBeHidden();
   }
@@ -211,4 +213,31 @@ test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último pes
   await expect(pesoBarra(page)).toHaveValue('7,5');
   await expect(page.locator('#error-barra')).toBeHidden();
   await expect(series(page)).toHaveCount(3);
+});
+
+test('SPEC-CALC-001/AC-02 la marca "−1 kg" va junto al porcentaje y abre la explicación', async ({ page }) => {
+  await quitarTodos(page);
+  await anadir(page, '70');
+  await trabajo(page).fill('105');
+  const cabecera = series(page).locator('.cabecera');
+  await expect(cabecera.locator('.porcentaje + .diferencia summary')).toHaveText('−1 kg');
+  await expect(series(page).locator('.diferencia p')).toBeHidden();
+  await cabecera.locator('.diferencia summary').click();
+  await expect(series(page).locator('.diferencia p')).toHaveText(
+    'El 70 % de 105 kg son 73,5 kg. Con tus discos, lo más cercano sin pasarte es 72,5 kg: 1 kg menos.',
+  );
+});
+
+test('SPEC-CALC-001/AC-35 SPEC-CALC-001/AC-39 discos agrupados y aviso de capacidad en pantalla', async ({ page }) => {
+  await quitarTodos(page);
+  await anadir(page, '100');
+  await trabajo(page).fill('120');
+  await expect(series(page).locator('.discos')).toHaveText('Por lado: 25 ×2');
+  await expect(series(page)).not.toContainText('kg por lado');
+  await expect(series(page).locator('.capacidad')).toHaveCount(0);
+
+  await trabajo(page).fill('500');
+  await page.getByLabel('Un punto').check();
+  await expect(series(page).locator('.discos')).toHaveText('Total en discos: 25 ×20');
+  await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
 });

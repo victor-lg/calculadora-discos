@@ -31,7 +31,7 @@ function guardar(almacen, clave, valor) {
   }
 }
 
-// Lo guardado solo es válido si es un array de enteros del 1 al 99, de tipo
+// Lo guardado solo es válido si es un array de enteros del 1 al 100, de tipo
 // número. Si falta, no se puede leer o no es válido, se usa la lista inicial.
 export function leerPorcentajes(almacen) {
   const lista = leer(almacen, CLAVE_PORCENTAJES, (v) => Array.isArray(v) && v.every(esPorcentajeValido));

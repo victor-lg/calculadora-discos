@@ -151,6 +151,7 @@ async function recorrido(context, base, conDatos, sockets) {
   if (conDatos) {
     await page.getByLabel('Recta', { exact: true }).check();
     await page.getByLabel('Peso de la barra (kg)').fill('7,35');
+    await page.getByLabel('Collarines de competición').check();
     await page.getByLabel('Peso de trabajo (kg)').fill('487,35');
     await page.getByLabel('Nuevo porcentaje').fill('47');
     await page.getByRole('button', { name: 'Añadir' }).click();

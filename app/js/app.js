@@ -74,7 +74,15 @@ function valorCampo(id, valor) {
 function pintarSerie(s) {
   const li = crear('li', 'serie');
   const cabecera = crear('div', 'cabecera');
-  cabecera.append(crear('span', 'porcentaje', s.porcentaje), crear('span', 'total', s.total));
+  const izquierda = crear('div', null);
+  izquierda.append(crear('span', 'porcentaje', s.porcentaje));
+  // FR-06: la diferencia junto al porcentaje, con una explicación que se puede abrir.
+  if (s.diferencia) {
+    const detalle = crear('details', 'diferencia');
+    detalle.append(crear('summary', null, s.diferencia), crear('p', null, s.detalleDiferencia));
+    izquierda.append(detalle);
+  }
+  cabecera.append(izquierda, crear('span', 'total', s.total));
   li.append(cabecera);
   // FR-09: sin discos, la línea y su explicación, siempre visible.
   if (s.linea) li.append(crear('p', 'linea', s.linea), crear('p', 'explicacion', s.explicacion));
@@ -84,12 +92,6 @@ function pintarSerie(s) {
     li.append(discos);
   }
   if (s.collarin) li.append(crear('p', 'collarin', s.collarin));
-  // FR-06: la diferencia y una explicación que se puede abrir.
-  if (s.diferencia) {
-    const detalle = crear('details', 'diferencia');
-    detalle.append(crear('summary', null, s.diferencia), crear('p', null, s.detalleDiferencia));
-    li.append(detalle);
-  }
   if (s.avisoCapacidad) li.append(crear('p', 'capacidad', s.avisoCapacidad));
   return li;
 }
@@ -120,8 +122,7 @@ function pintar() {
     const li = crear('li', null);
     const quitar = crear('button', 'quitar', '×');
     quitar.type = 'button';
-    // La posición hace único el nombre accesible aunque el porcentaje se repita (AC-09).
-    quitar.setAttribute('aria-label', `Quitar ${p}, posición ${i + 1}`);
+    quitar.setAttribute('aria-label', `Quitar ${p}`);
     quitar.addEventListener('click', () => {
       actualizar(quitarPorcentaje(estado, i));
     });
