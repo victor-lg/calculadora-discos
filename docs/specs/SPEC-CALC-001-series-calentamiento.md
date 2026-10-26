@@ -37,7 +37,9 @@ de porcentaje dice "entre 1 y 100" y una lista guardada se ordena y se quitan
 los repetidos al leerla; SPEC-CALC-002 se ajusta en el mismo PR. En la revisión
 del PR #16 fijó el texto de FR-03 para un peso mal escrito y confirmó como reglas
 el descarte del peso no válido al cambiar de barra (FR-02) y el redondeo hacia
-arriba del exceso de la manga (FR-16).
+arriba del exceso de la manga (FR-16). Tras la ronda 1 de G4 decidió que un
+peso de barra no válido también se descarta al cambiar de modo (FR-02) y que,
+mientras no es válido, no se muestra el aviso de FR-12.
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -88,7 +90,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - se escribe con las mismas reglas que el peso de trabajo (FR-03): cifras, un separador decimal, espacios al principio y al final, separador al final o al principio sin cifras y campo que se trata como vacío;
   - es propio de cada barra: la recta y la Z tienen cada una el suyo. La primera vez, los dos son 10 kg (FR-11);
   - cuando la persona elige la recta o la Z, y al arrancar de cero, el campo muestra el último peso válido de esa barra con el formato de FR-14;
-  - si la persona deja un peso no válido y cambia de barra, ese texto se descarta: la barra conserva su último peso válido.
+  - si la persona deja un peso no válido y cambia de barra o de modo, ese texto se descarta: la barra conserva su último peso válido.
 
   Mientras el peso de la barra elegida no es válido, también vacío, la app muestra bajo el campo "Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo." y no muestra series.
 - **FR-03:** el peso de trabajo es mayor que 0 y como máximo 500 kg, con hasta dos decimales.
@@ -163,7 +165,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - Los tipos de disco habilitados se guardan y se recuperan según SPEC-CALC-002 FR-08. Si un dato no se puede guardar, se aplica SPEC-CALC-002 FR-09.
 
   Esta regla se aplica solo al arranque de cero. Cuando la app vuelve de segundo plano sin haberse cerrado, conserva todo su estado: modo, barra, pesos de las barras, peso de trabajo, porcentajes, opción de collarines y tipos de disco habilitados (SPEC-CALC-002 FR-08). Si iOS la cerró mientras estaba en segundo plano, la vuelta es un arranque de cero (ADR-0001).
-- **FR-12:** en el modo Barra, si el peso de trabajo es menor que el peso de la barra elegida, la app muestra el aviso general "El peso de trabajo es inferior a la barra: elige una barra más ligera o revisa el peso.". Las series se calculan igualmente según FR-09, salvo que no haya ningún tipo habilitado (SPEC-CALC-002 FR-06).
+- **FR-12:** en el modo Barra, si el peso de trabajo es menor que el peso de la barra elegida, la app muestra el aviso general "El peso de trabajo es inferior a la barra: elige una barra más ligera o revisa el peso.". Las series se calculan igualmente según FR-09, salvo que no haya ningún tipo habilitado (SPEC-CALC-002 FR-06). Mientras el peso de la recta o de la Z elegida no es válido (FR-02), este aviso no se muestra.
 - **FR-13:** cuando la lista de porcentajes está vacía, la app no muestra ninguna serie y muestra la indicación "Añade al menos un porcentaje.".
 - **FR-14:** formato de los números:
   - al escribir un peso, la app acepta como separador decimal tanto la coma como el punto, con como mucho dos cifras escritas tras él y sin separador de miles (FR-03);
@@ -182,7 +184,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 
   Cada equipo tiene una manga útil: la olímpica de 20 kg, 375 mm; la olímpica de 15 kg, 280 mm; la recta y la Z, 200 mm; y la máquina de los modos Dos lados y Un punto, 310 mm. La manga útil es la de cada lado en los modos Barra y Dos lados, y la del único punto en el modo Un punto.
 
-  Si la suma de los grosores de los discos de un lado (o del único punto) supera la manga útil, el cálculo no cambia y la serie muestra "No caben en la manga: faltan X cm. Se dibujan los que caben.". X es el exceso redondeado hacia arriba al milímetro y expresado en centímetros (FR-14). Qué discos se dibujan lo fija SPEC-CALC-003.
+  Si la suma de los grosores de los discos de un lado (o del único punto) supera la manga útil, el cálculo no cambia y la serie muestra "No caben en la manga: faltan X cm. Se dibujan los que caben.". X es el exceso redondeado hacia arriba al milímetro y expresado en centímetros (FR-14). Qué discos se dibujan lo fija SPEC-CALC-003. Si la app no muestra dibujos (SPEC-CALC-003 FR-14), el aviso es solo "No caben en la manga: faltan X cm.".
 
 ## 5. Criterios de aceptación
 
@@ -283,7 +285,8 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
   - en el modo Un punto, con 500 kg y el 100 % (20 discos de 25, 540 mm sobre 310), la serie muestra los 20 discos y "No caben en la manga: faltan 23 cm. Se dibujan los que caben.";
   - en el modo Un punto, con solo el de 20 kg habilitado, 300 kg y el 100 % (15 discos de 20, 337,5 mm, 27,5 mm de exceso), muestra "faltan 2,8 cm";
   - con la olímpica de 20 kg, 500 kg y el 90 % (25 ×8 + 15 por lado, 237 mm sobre 375), no muestra el aviso de capacidad.
-- **AC-40 → FR-02:** con la recta de 7,5 kg y la Z de 8,5 kg guardadas, al elegir la recta el campo muestra "7,5" y al elegir la Z muestra "8,5". Si la persona escribe "0,5" con la recta (mensaje de error), elige la Z y vuelve a la recta, el campo muestra "7,5", sin mensaje de error.
+- **AC-40 → FR-02:** con la recta de 7,5 kg y la Z de 8,5 kg guardadas, al elegir la recta el campo muestra "7,5" y al elegir la Z muestra "8,5". Si la persona escribe "0,5" con la recta (mensaje de error), elige la Z y vuelve a la recta, el campo muestra "7,5", sin mensaje de error. Lo mismo si, en lugar de elegir la Z, pasa al modo Dos lados y vuelve al modo Barra.
+- **AC-41 → FR-12, FR-02:** con la Z y un peso de trabajo de 5 kg, con un peso de barra de 8,5 kg la app muestra el aviso de que el peso de trabajo es inferior a la barra; al cambiar el peso de barra a 0,5, ese aviso desaparece y solo queda el mensaje de peso de barra no válido.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
@@ -303,7 +306,9 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
   - tipos de disco habilitados guardados y fallo al guardar: los cubren SPEC-CALC-002 FR-08 y FR-09 (FR-11);
   - vuelta de segundo plano: se conserva todo el estado, incluidos los tipos de disco habilitados (SPEC-CALC-002 FR-08); FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
   - pesos o porcentajes con espacios al principio o al final, y pesos con un separador al final o al principio sin cifras ("100,", ",5"): se aceptan, y un peso que solo tiene espacios o el separador se trata como vacío; un peso con más de un separador o que vale 0 se sigue rechazando, también como paso intermedio (FR-03, FR-04);
-  - al escribir un peso de barra, los pasos intermedios por debajo de 1 kg o el campo vacío muestran el mensaje de peso de barra no válido (FR-02);
+  - al escribir un peso de barra, los pasos intermedios por debajo de 1 kg o el campo vacío muestran el mensaje de peso de barra no válido, y mientras tanto no se muestra el aviso de FR-12 (FR-02, FR-12, AC-41);
+  - peso de barra no válido al cambiar de barra o de modo: se descarta y la barra conserva su último peso válido (FR-02, AC-40);
+  - discos que no caben sin dibujo 3D: el aviso de capacidad omite "Se dibujan los que caben." (FR-16);
   - porcentaje vacío o solo con espacios: no se añade y no hay mensaje (FR-04);
   - lo tecleado en un campo no se reescribe nunca; el formato de FR-14 solo afecta a lo que la app muestra. Al elegir la recta o la Z, el campo muestra el peso guardado de esa barra (FR-02, FR-14);
   - pesos con más de dos cifras tras el separador o con separador de miles, y porcentajes con separador decimal: se rechazan con mensaje (FR-03, FR-04);
