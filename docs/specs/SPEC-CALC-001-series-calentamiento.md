@@ -92,7 +92,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - cuando la persona elige la recta o la Z, y al arrancar de cero, el campo muestra el último peso válido de esa barra con el formato de FR-14;
   - si la persona deja un peso no válido y cambia de barra o de modo, ese texto se descarta: la barra conserva su último peso válido.
 
-  Mientras el peso de la barra elegida no es válido, también vacío, la app muestra bajo el campo "Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo." y no muestra series.
+  Mientras el peso de la barra elegida no es válido, también vacío, la app muestra bajo el campo "Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo." y no muestra series. Con el panel de la barra plegado, lo indica además un aviso general (SPEC-CALC-003 FR-05).
 - **FR-03:** el peso de trabajo es mayor que 0 y como máximo 500 kg, con hasta dos decimales.
   - Se escribe solo con cifras y, si lleva decimales, un separador decimal (coma o punto) seguido como mucho de dos cifras escritas. No se admite separador de miles. Por ejemplo, "100,10" vale (equivale a 100,1); "100,120" y "1.000" se rechazan.
   - Antes de validar, y para que el recálculo al momento (FR-10) no muestre errores a mitad de escribir en los casos habituales:
@@ -182,9 +182,9 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   | --- | --- | --- | --- | --- | --- | --- | --- |
   | Grosor (mm) | 27 | 22,5 | 21 | 21 | 16 | 12 | 11 |
 
-  Cada equipo tiene una manga útil: la olímpica de 20 kg, 375 mm; la olímpica de 15 kg, 280 mm; la recta y la Z, 200 mm; y la máquina de los modos Dos lados y Un punto, 310 mm. La manga útil es la de cada lado en los modos Barra y Dos lados, y la del único punto en el modo Un punto.
+  Cada equipo tiene una manga útil, que en las barras ya descuenta el espacio del collarín: la olímpica de 20 kg, 375 mm; la olímpica de 15 kg, 280 mm; la recta y la Z, 200 mm; y la máquina de los modos Dos lados y Un punto, 310 mm. La manga útil es la de cada lado en los modos Barra y Dos lados, y la del único punto en el modo Un punto.
 
-  Si la suma de los grosores de los discos de un lado (o del único punto) supera la manga útil, el cálculo no cambia y la serie muestra "No caben en la manga: faltan X cm. Se dibujan los que caben.". X es el exceso redondeado hacia arriba al milímetro y expresado en centímetros (FR-14). Qué discos se dibujan lo fija SPEC-CALC-003. Si la app no muestra dibujos (SPEC-CALC-003 FR-14), el aviso es solo "No caben en la manga: faltan X cm.".
+  Si la suma de los grosores de los discos de un lado (o del único punto) supera la manga útil, el cálculo no cambia y la serie muestra "No caben en la manga: faltan X cm. Se dibujan los que caben.". X es el exceso redondeado hacia arriba al milímetro y expresado en centímetros (FR-14). Qué discos se dibujan lo fija SPEC-CALC-003. Si la tarjeta no muestra dibujo (SPEC-CALC-003 FR-14 y FR-15), el aviso es solo "No caben en la manga: faltan X cm.".
 
 ## 5. Criterios de aceptación
 

@@ -35,6 +35,9 @@ perder el foco al pasar a segundo plano no confirma (FR-09) y la pulsación larg
 como alternativa al gesto de borrar (FR-08, WCAG 2.5.7). Son propuestas de Claude
 los 500 ms de la pulsación larga, a quién pasa el foco (FR-08, FR-09) y cómo
 reaparecen las series (FR-10).
+Tras la ronda 3 de G4 (2026-10-26), Víctor decidió que el aviso de "Deshacer" no
+tiene plazo y dura hasta la siguiente acción (FR-08, WCAG 2.2.1). El resto de
+los cambios de esa ronda son aclaraciones, sin otra ronda de revisión.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -126,11 +129,11 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - la referencia visual (escena, medidas de discos, barras, máquina y collarín) es la de §11.
 - **FR-08:** borrar una serie:
   - la persona desliza la tarjeta hacia la izquierda; deslizar en vertical sigue desplazando la página. Mientras arrastra, debajo aparece un fondo con "Borrar" en rojo claro sobre un granate tenue; pasado el 35 % del ancho de la tarjeta, el fondo pasa a rojo vivo, el texto a blanco y el icono crece;
-  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer" durante 5 s. El aviso se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
+  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta la siguiente acción de la persona que cambie algo (añadir o borrar una serie, cambiar un peso, el modo, la barra, los collarines o los discos habilitados) o hasta que pulse "Deshacer". Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
   - si la suelta sin pasar el 35 %, la tarjeta vuelve a su sitio y la lista no cambia;
-  - cada tarjeta tiene un botón "Quitar la serie del P %", que hace lo mismo que el gesto, aviso incluido. Está oculto a la vista salvo cuando recibe el foco o cuando la persona mantiene pulsada la tarjeta 500 ms sin moverla; así se puede borrar con un toque, sin arrastrar (WCAG 2.5.7). Mostrado por la pulsación larga, se oculta al tocar fuera de él. Si el dedo se mueve antes de los 500 ms, es el gesto de deslizar;
-  - tras borrar con este botón, el foco pasa a "Deshacer". Si el foco sigue en el aviso cuando desaparece o cuando se pulsa "Deshacer", pasa al botón "+ Añadir porcentaje". Si la persona ha llevado el foco a otro sitio, no se mueve;
-  - "Deshacer" vuelve a poner el porcentaje en la lista, en su orden. Si ese porcentaje ya está otra vez en la lista, "Deshacer" no añade nada. Al pulsarlo, el aviso se cierra. Solo se puede deshacer el último borrado: un borrado nuevo sustituye el aviso anterior y sus 5 s empiezan de nuevo. Al pasar los 5 s, el aviso desaparece y ya no se puede deshacer.
+  - cada tarjeta tiene un botón "Quitar la serie del P %", que hace lo mismo que el gesto, aviso incluido. Está oculto a la vista salvo cuando recibe el foco o cuando la persona mantiene pulsada la tarjeta 500 ms sin moverla; así se puede borrar con un toque, sin arrastrar (WCAG 2.5.7). Si el dedo se mueve antes de los 500 ms, es el gesto de deslizar; si se mueve después, no pasa nada más. Al soltar tras la pulsación larga, no se activa nada de la tarjeta (ni la marca de diferencia), y durante la pulsación no aparecen la selección de texto ni el menú del sistema. Mostrado por la pulsación larga, se oculta al tocar fuera de él;
+  - tras borrar con este botón, el foco pasa a "Deshacer". Si el foco sigue en el aviso cuando desaparece o cuando se pulsa "Deshacer", pasa al botón "+ Añadir porcentaje" o, si el campo de añadir está abierto, a ese campo. Si la persona ha llevado el foco a otro sitio, no se mueve;
+  - "Deshacer" vuelve a poner el porcentaje en la lista, en su orden. Si ese porcentaje ya está otra vez en la lista, "Deshacer" no añade nada. Al pulsarlo, el aviso se cierra. Solo se puede deshacer el último borrado: un borrado nuevo sustituye el aviso anterior. Cuando el aviso desaparece, ya no se puede deshacer.
 - **FR-09:** añadir una serie:
   - al pulsar "+ Añadir porcentaje", un botón con el borde discontinuo y a todo el ancho, se convierte en un campo con "Porcentaje" como texto de ayuda, "%" pegado a la cifra, un botón "✕", anunciado como "Cancelar", y un botón "Añadir";
   - el campo abre el teclado numérico, sin coma, y no deja teclear más de 3 caracteres. Un texto pegado más largo no se recorta: se conserva entero y se valida (SPEC-CALC-001 FR-04);
@@ -141,9 +144,9 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - perder el foco porque la app pasa a segundo plano o se bloquea el teléfono no confirma: al volver, el campo sigue abierto con lo escrito;
   - una misma confirmación añade el porcentaje una sola vez, aunque la persona pulse "Añadir" o Intro y eso haga además perder el foco al campo. Cerrar el campo no confirma otra vez;
   - cuando el campo se cierra con Intro, "Añadir", Escape o "✕", el foco vuelve al botón "+ Añadir porcentaje". Si se cierra porque la persona tocó otro elemento, el foco se queda en ese elemento.
-- **FR-10:** las tarjetas nuevas, las añadidas y las que vuelven con "Deshacer", entran con un fundido y un pequeño desplazamiento, y su dibujo aparece ya cargado, sin animación de discos. Cuando las series dejan de mostrarse por una regla de SPEC-CALC-001 o SPEC-CALC-002 (peso vacío o no válido, lista vacía, ningún disco habilitado), desaparecen sin animación; cuando vuelven, aparecen como al arrancar: sin entrada y con el dibujo ya cargado.
+- **FR-10:** las tarjetas nuevas, las añadidas y las que vuelven con "Deshacer", entran con un fundido y un pequeño desplazamiento, y su dibujo aparece ya cargado, sin animación de discos. Cuando las series dejan de mostrarse por una regla de SPEC-CALC-001 o SPEC-CALC-002 (peso vacío o no válido, lista vacía, ningún disco habilitado), desaparecen sin animación; cuando vuelven por corregirse esa regla, aparecen como al arrancar: sin entrada y con el dibujo ya cargado. Una tarjeta que aparece porque la persona añade un porcentaje o pulsa "Deshacer" entra siempre como añadida, aunque la lista estuviera vacía.
 - **FR-11:** el dibujo sigue los cambios de la carga:
-  - las series y sus textos se actualizan al momento (SPEC-CALC-001 FR-10). Mientras se escribe el peso de trabajo o el de la barra, el dibujo espera 400 ms desde la última tecla. Durante esa espera y la animación, el dibujo puede ir por detrás del texto;
+  - las series y sus textos se actualizan al momento (SPEC-CALC-001 FR-10). Mientras se escribe el peso de trabajo o el de la barra, el dibujo espera 400 ms desde la última tecla. Los demás cambios (añadir, collarines, modo, barra, discos habilitados) se dibujan al momento. Con "Reducir movimiento" la espera es la misma. Durante esa espera y la animación, el dibujo puede ir por detrás del texto;
   - al cambiar la carga de una tarjeta, se conservan los discos interiores que no cambian y solo se anima lo que cambia, en este orden: sale el collarín, salen los discos que sobran de fuera hacia dentro y de uno en uno, entran los nuevos del más pesado al más ligero y entra el collarín, que se cierra;
   - cada tarjeta empieza su animación 90 ms después de la anterior;
   - al cambiar de equipo (de barra, o entre barra y máquina), todas las tarjetas se vacían y se cargan de nuevo;
@@ -155,24 +158,26 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - los dibujos ya pintados se siguen viendo mientras correspondan a la carga de su serie;
   - una tarjeta cuya carga cambia sin contexto oculta su dibujo en el mismo momento en que cambia su texto, y queda como en FR-14 (solo texto, en una columna, con el aviso de capacidad sin "Se dibujan los que caben.") hasta que se repinta. Sin contexto, nunca se ve un dibujo que no corresponde al texto;
   - cuando el contexto vuelve, y cuando la app vuelve a primer plano, todas las tarjetas se repintan con su carga actual;
+  - una tarjeta que aparece sin contexto queda como en FR-14 hasta que se pinta. Las miniaturas de las fichas de barra, ya pintadas, se siguen viendo;
   - si al volver a primer plano el contexto no se puede recuperar, la app pasa a la vista de FR-14 hasta el siguiente arranque.
-- **FR-16:** cada dibujo expone a los tests, sin cambiar lo que se ve, si tiene una animación en curso y qué carga muestra. Su etiqueta accesible (FR-07) describe la carga dibujada: cambia cuando el dibujo termina de cambiar.
+- **FR-16:** cada dibujo expone a los tests, sin cambiar lo que se ve, si tiene una animación en curso y qué carga muestra, collarín incluido. Su etiqueta accesible (FR-07) describe la carga dibujada: cambia cuando el dibujo termina de cambiar.
 
 ## 5. Criterios de aceptación
 
 Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app (SPEC-CALC-001 AC-11: 100 kg, 40, 70 y 90 %, modo Barra con la olímpica de 20 kg), con una pantalla de 390 px de ancho.
 
 - **AC-01 → FR-01:** al abrir, la pantalla muestra, de arriba abajo, el peso de trabajo, el panel Carga plegado, el panel Mis discos plegado, las tarjetas del 40, 70 y 90 % en ese orden y el botón "+ Añadir porcentaje".
-- **AC-02 → FR-02:** el campo del peso de trabajo muestra "100" con "kg" al lado, tiene la etiqueta accesible "Peso de trabajo", no deja teclear más de 6 caracteres y pide el teclado decimal. Al escribir "102,55", el campo se ensancha y muestra el texto entero. Al pegar "100,125", el campo muestra "100,125" y la app muestra "El peso de trabajo admite como máximo dos decimales.", sin series.
+- **AC-02 → FR-02:** el campo del peso de trabajo muestra "100" con "kg" al lado, tiene la etiqueta accesible "Peso de trabajo", no deja teclear más de 6 caracteres y pide el teclado decimal. Al escribir "102,55", el campo se ensancha y muestra el texto entero. Al pegar de verdad (no asignando el valor por programa) "100,125", el campo muestra "100,125" y la app muestra "El peso de trabajo admite como máximo dos decimales.", sin series.
 - **AC-03 → FR-03:** el resumen de Carga dice "Barra · Olímpica 20 kg". Al desplegarlo:
   - se ven los tres modos, con "Barra" seleccionado, las cuatro fichas de barra, con "Olímpica 20 kg" seleccionada, y el interruptor de collarines desactivado, con su texto;
   - al activar los collarines, el resumen dice "Barra · Olímpica 20 kg · collarines";
   - al elegir la Z, aparece el campo "Peso de la barra" con "10"; al escribir "0,5", aparece debajo "Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo." y el resumen sigue diciendo "Barra · Z 10 kg · collarines";
   - al elegir "Dos lados", desaparecen las fichas, el interruptor y el campo, aparece "Los discos se cargan en el cuerno de la máquina." y el resumen dice "Dos lados · máquina"; con "Un punto", "Un punto · máquina";
+  - con la Z y "0,5", se ven a la vez el mensaje bajo el campo y "Revisa el peso de la barra en Carga." entre los avisos;
   - cada panel se anuncia como plegado o desplegado.
 - **AC-04 → FR-04:** el resumen de Mis discos muestra 7 puntos encendidos y ningún "N de 7", y se anuncia como "Mis discos: 7 de 7 habilitados". Al desplegarlo y tocar los de 25 y 1,25 kg, esos dos se ven grises, con el peso tachado y anunciados como no activados, y el resumen muestra dos puntos apagados y "5 de 7" y se anuncia como "Mis discos: 5 de 7 habilitados". Al deshabilitar los siete, muestra "0 de 7".
 - **AC-05 → FR-05:** sin ningún tipo habilitado, con la lista vacía y el peso de trabajo vacío, la región de avisos muestra, en este orden, "Escribe el peso de trabajo.", "Añade al menos un porcentaje." y "Habilita al menos un disco en Mis discos.", y la región está marcada para que los lectores de pantalla la anuncien. Con la Z elegida y un peso de barra de 0,5, la lista vacía, ningún tipo habilitado y el aviso de fallo al guardar presente (SPEC-CALC-002 FR-09), muestra en este orden "Revisa el peso de la barra en Carga.", "Añade al menos un porcentaje.", "Habilita al menos un disco en Mis discos." y "No se ha podido guardar: se mantendrá hasta cerrar la app". Con la olímpica de 20 kg, un peso de trabajo de 15 kg y ningún tipo habilitado, muestra "Habilita al menos un disco en Mis discos." y después "El peso de trabajo es inferior a la barra: elige una barra más ligera o revisa el peso.".
-- **AC-06 → FR-06:** con 105 kg, la tarjeta del 70 % muestra "70 %", la marca "−1 kg", "72,5 kg", "Por lado" y los discos "25" y "1,25", cada uno con su punto de color. Al pulsar la marca, aparece dentro de la tarjeta "El 70 % de 105 kg son 73,5 kg. Con tus discos, lo más cercano sin pasarte es 72,5 kg: 1 kg menos.", la tarjeta crece y la marca se anuncia como desplegada; al pulsarla otra vez, la explicación desaparece.
+- **AC-06 → FR-06:** con 105 kg, la tarjeta del 70 % muestra "70 %", la marca "−1 kg", "72,5 kg", "Por lado" y los discos "25" y "1,25", cada uno con su punto de color. Al pulsar la marca, aparece dentro de la tarjeta "El 70 % de 105 kg son 73,5 kg. Con tus discos, lo más cercano sin pasarte es 72,5 kg: 1 kg menos.", la tarjeta crece y la marca se anuncia como "1 kg menos que el objetivo. Ver detalle", desplegada; al pulsarla otra vez, la explicación desaparece.
 - **AC-07 → FR-06:** con 40 kg, la tarjeta del 40 % muestra "Solo la barra", "20 kg" y "El 40 % son 16 kg, menos que la barra (20 kg).", sin marca de diferencia ni "Por lado". Con 120 kg y el 100 %, la tarjeta muestra "25" con "×2", anunciado como "2 discos de 25 kg". Con los collarines activados y 100 kg, la tarjeta del 70 % muestra "+ collarín de 2,5 kg".
 - **AC-08 → FR-06:** con un ancho de 360 px, el texto y el dibujo de cada tarjeta van en una sola columna; con 390 px, en dos.
 - **AC-09 → FR-07:** cada tarjeta tiene un dibujo con su etiqueta accesible: el 90 % de 100 kg, "Carga: 25 + 10 kg"; el 40 % de 40 kg, "Sin discos"; con 120 kg y el 100 %, "Carga: 2 de 25 kg".
@@ -181,32 +186,36 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
   - un 20 % del ancho y soltar: la tarjeta vuelve a su sitio y siguen las tres series;
   - un 50 % del ancho y soltar: la tarjeta desaparece, la lista es 40 y 90 y aparece "Serie del 70 % borrada" con "Deshacer". Al pulsar "Deshacer", vuelve la tarjeta del 70 % entre la del 40 y la del 90 y el aviso se cierra;
   - mantener pulsada la tarjeta del 70 % 500 ms sin moverla muestra "Quitar la serie del 70 %"; al tocarlo se borra la serie, con el mismo aviso. Si en vez de eso se toca fuera, el botón se oculta y la lista no cambia.
-- **AC-12 → FR-08:** con el teclado, al llevar el foco al botón "Quitar la serie del 70 %", el botón se ve; al activarlo, se borra la serie, aparece el mismo aviso y el foco pasa a "Deshacer", que la recupera; entonces el foco pasa a "+ Añadir porcentaje". Si tras borrar la persona lleva el foco al peso de trabajo y pasan los 5 s, el foco sigue en el peso de trabajo.
+- **AC-12 → FR-08:** con el teclado, al llevar el foco al botón "Quitar la serie del 70 %", el botón se ve; al activarlo, se borra la serie, aparece el mismo aviso y el foco pasa a "Deshacer", que la recupera; entonces el foco pasa a "+ Añadir porcentaje". Si tras borrar la persona lleva el foco al peso de trabajo y escribe 105, el aviso desaparece y el foco sigue en el peso de trabajo.
 - **AC-13 → FR-08:** "Deshacer" no duplica ni recupera de más:
   - al borrar el 70 %, añadir 70 y pulsar "Deshacer", la lista es 40, 70 y 90, con un solo 70;
-  - al borrar el 70 % y, 3 s después, el 40 %, el aviso dice "Serie del 40 % borrada", sigue visible 5 s desde el segundo borrado y "Deshacer" recupera solo el 40;
-  - al borrar el 70 % y esperar 5 s, el aviso desaparece y la lista sigue siendo 40 y 90.
-- **AC-14 → FR-09:** al pulsar "+ Añadir porcentaje", aparece el campo con "Porcentaje", "%", "✕" y "Añadir", que admite como máximo 3 caracteres y pide el teclado numérico:
+  - al borrar el 70 % y después el 40 %, el aviso dice "Serie del 40 % borrada" y "Deshacer" recupera solo el 40;
+  - al borrar el 70 % y esperar un minuto sin hacer nada, el aviso sigue visible y "Deshacer" lo recupera;
+  - al borrar el 70 % y activar los collarines, el aviso desaparece y la lista sigue siendo 40 y 90.
+- **AC-14 → FR-09:** al pulsar "+ Añadir porcentaje", aparece el campo con "Porcentaje", "%", "✕" y "Añadir", que no deja teclear más de 3 caracteres y pide el teclado numérico. Cada punto parte de ese estado:
   - al escribir 50 y pulsar Intro, la lista es 40, 50, 70 y 90, el campo se cierra y el foco está en "+ Añadir porcentaje";
   - al escribir 60 y pulsar "Añadir", la lista gana un solo 60;
   - al escribir 55 y tocar el campo del peso de trabajo, se añade el 55 y el foco queda en el peso de trabajo;
   - al escribir 5 y pasar la app a segundo plano, al volver el campo sigue abierto con "5" y la lista no cambia;
   - al escribir 0 (aparece el error) y cambiar a 05, el error desaparece hasta volver a confirmar;
+  - al escribir 30, pulsar Escape y volver a abrir el campo, está vacío;
+  - al pegar "1000", el campo muestra "1000" y, al confirmar, "Escribe un porcentaje entre 1 y 100.";
   - al escribir 30 y pulsar Escape, o tocar "✕" (que antes quita el foco al campo), la lista no cambia y el campo se cierra;
   - al dejar el campo vacío y tocar fuera, el campo se cierra sin mensaje;
   - al escribir 0 y tocar fuera, el campo sigue abierto, con el borde rojo y "Escribe un porcentaje entre 1 y 100." debajo;
   - al escribir 70 y pulsar Intro, el campo sigue abierto, con el borde rojo y "Ya tienes una serie del 70 %." debajo.
-- **AC-15 → FR-10, FR-13, FR-16:** sin "Reducir movimiento", una tarjeta añadida entra con una transición de opacidad y su dibujo no tiene animación en curso. Con "Reducir movimiento" activado, ninguna tarjeta, ningún panel y ningún dibujo tienen animaciones ni transiciones en curso al añadir, borrar, deshacer, desplegar la explicación o un panel o cambiar el peso de trabajo.
+- **AC-15 → FR-10, FR-13, FR-16:** sin "Reducir movimiento", una tarjeta añadida entra con una transición de opacidad y su dibujo no tiene animación en curso. Con "Reducir movimiento" activado, ninguna tarjeta, ningún panel y ningún dibujo tienen animaciones ni transiciones en curso al añadir, borrar, deshacer, desplegar la explicación o un panel o cambiar el peso de trabajo. Al borrar el peso de trabajo y volver a escribir 100, las tarjetas vuelven sin transición y con el dibujo sin animación en curso; con la lista vacía, al añadir 50, su tarjeta entra con la transición de opacidad.
 - **AC-16 → FR-11, FR-16:** al cambiar el peso de trabajo de 100 a 105, el texto de las tarjetas cambia en cuanto se teclea, y la carga que muestra el dibujo no cambia ni empieza a animarse hasta 400 ms después de la última tecla. Al abrir la app, ningún dibujo tiene una animación en curso.
 - **AC-17 → FR-12:** con 100 kg, al cambiar el peso de trabajo a 200 y, mientras el dibujo del 70 % se anima, a 105, cuando el dibujo del 70 % deja de tener una animación en curso, la carga que muestra y su etiqueta son "Carga: 25 + 1,25 kg" (SPEC-CALC-001 AC-02). El segundo cambio se hace más de 400 ms después del primero; los tests controlan el reloj.
 - **AC-18 → FR-14:** sin poder dibujar en 3D, la app muestra las series de SPEC-CALC-001 AC-01 solo con texto y en una columna, sin dibujos, las fichas de barra con su dibujo plano y, en el modo Un punto con 500 kg y el 100 %, el aviso "No caben en la manga: faltan 23 cm.", y añadir, borrar, deshacer, cambiar de modo y de barra y habilitar discos funcionan igual que con el dibujo 3D.
-- **AC-19 → FR-15:** al perderse el contexto gráfico, los dibujos siguen visibles. Si entonces el peso de trabajo pasa de 100 a 105, la tarjeta del 70 % oculta su dibujo en ese momento y muestra solo el texto, en una columna. Al recuperar el contexto, todas las tarjetas se repintan y sus etiquetas coinciden con su carga, también la del 70 %.
+- **AC-19 → FR-15:** al perderse el contexto gráfico, los dibujos siguen visibles. Si entonces el peso de trabajo pasa de 100 a 105, las tarjetas del 70 y del 90 %, cuya carga cambia, ocultan su dibujo en ese momento y muestran solo el texto, en una columna; la del 40 %, que no cambia, conserva el suyo. Al recuperar el contexto, todas las tarjetas se repintan y sus etiquetas coinciden con su carga. Si al volver a primer plano el contexto no se recupera, la app muestra la vista de FR-14.
 - **AC-20 → NFR-01:** a 390 px de ancho, con los paneles plegados y desplegados, el campo de añadir abierto y el aviso de "Deshacer" visible, los botones, campos, interruptores, fichas de barra, marcas de diferencia y tipos de Mis discos, incluido el botón "Quitar la serie del P %" con el foco, miden al menos 44 × 44 px.
-- **AC-21 → NFR-02:** cada pareja de texto y fondo, incluidos "Borrar" sobre su fondo y el peso de un tipo deshabilitado, cumple 4,5:1, y el texto grande 3:1. Los bordes de los campos, el indicador de foco y el estado de los interruptores y de los tipos de Mis discos cumplen 3:1 frente a su fondo. Los puntos de color y el dibujo 3D no se miden. Se mide sobre los estilos calculados de los textos y controles visibles en los estados de AC-20; es texto grande el de 24 px o más, o de 18,66 px o más en negrita.
+- **AC-21 → NFR-02:** cada pareja de texto y fondo, incluidos "Borrar" sobre su fondo y el peso de un tipo deshabilitado, cumple 4,5:1, y el texto grande 3:1. Los bordes de los campos, el indicador de foco y el estado de los interruptores y de los tipos de Mis discos cumplen 3:1 frente a su fondo. Los puntos de color y el dibujo 3D no se miden. Se mide sobre los estilos calculados de los textos y controles visibles en los estados de AC-20 y además en estos: el fondo de borrar antes y después del 35 %, un campo con error (borde y mensaje), la marca de diferencia plegada y desplegada, la explicación desplegada, "+ collarín de 2,5 kg", un tipo deshabilitado y el peso de trabajo con el foco; es texto grande el de 24 px o más, o de 18,66 px o más en negrita.
 - **AC-22 → NFR-03:** con el zoom de página al 200 % sobre una pantalla de 390 px de ancho (equivale a 195 px CSS), no hay desplazamiento horizontal, ningún texto se corta ni se solapa, y se pueden añadir, borrar y deshacer series y abrir los paneles Carga y Mis discos. La prueba en el iPhone está en AC-24.
 - **AC-23 → NFR-04:** en el iPhone 15 Pro Max, con 6 series y la animación activa, Víctor anota en el PR que la animación y el gesto de borrar son fluidos.
 - **AC-24 → FR-01, FR-02, FR-06, FR-07, FR-08, FR-10, FR-11, FR-13, FR-15, NFR-03:** en el iPhone, registrado en el PR con la versión de iOS:
-  - el gesto de borrar funciona con el dedo, con su umbral;
+  - el gesto de borrar funciona con el dedo, con su umbral, sin chocar con el gesto de volver del sistema, y la pulsación larga muestra "Quitar" sin seleccionar texto;
+  - con el campo de añadir abierto y "5" escrito, pasar a otra app y volver no añade nada;
   - la animación se ve y desaparece con "Reducir movimiento";
   - tras dejar la app un rato en segundo plano y volver, los dibujos se ven bien;
   - con la app abierta en Safari y el zoom de página al 200 %, se cumple AC-22;
@@ -219,7 +228,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 - **Casos límite y errores:**
   - varios avisos generales a la vez: se muestran todos, en el orden de FR-05 (AC-05);
   - deslizar sin pasar el umbral: la tarjeta vuelve y no se borra nada (AC-11);
-  - deshacer cuando el porcentaje ya volvió a la lista, o tras otro borrado, o pasados 5 s: no se duplica nada (AC-13);
+  - deshacer cuando el porcentaje ya volvió a la lista o tras otro borrado: no se duplica nada; el aviso no tiene plazo y se cierra con la siguiente acción (AC-13);
   - confirmar con "Añadir" o con Intro, que a la vez quitan el foco al campo: se añade una sola vez (AC-14);
   - perder el foco con un porcentaje vacío, no válido o repetido: se cierra sin mensaje, o se queda abierto con el error (AC-14);
   - más discos de los que caben: se dibujan los que caben y la etiqueta cita solo esos (AC-10);
@@ -232,7 +241,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
   - la app pasa a segundo plano con el campo de añadir abierto: no se añade nada (AC-14);
   - las series desaparecen y vuelven al corregir el peso: sin animación (FR-10);
   - muchas series: la lista no tiene tope y cada tarjeta se dibuja. El rendimiento se comprueba con 6 series (NFR-04); con más, es un riesgo aceptado.
-- **Decisiones pendientes:** ninguna crítica. La duración de 5 s del aviso de "Deshacer" no se amplía con el foco; si VoiceOver la hace corta en el uso real, se revisa en otra versión.
+- **Decisiones pendientes:** ninguna crítica.
 
 ---
 
@@ -249,4 +258,4 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 - La tecnología del dibujo la fija ADR-0003, que modifica la regla de "cero dependencias en tiempo de ejecución" de ADR-0001 §3.1. Esta spec no se fusiona antes que ADR-0003.
 - Todo lo que usa la presentación (fuentes, librería 3D e iconos) se sirve desde el propio origen de la app, sin red de terceros (SPEC-CALC-001 NFR-01 y NFR-02, ADR-0001 §3.4).
 - **Referencia visual:** `docs/diseno/maqueta-interfaz.html`, `docs/diseno/discos-3d.html` (banco del modelado) y `docs/diseno/notas-diseno-interfaz.md` §3.2, §3.6, §4 y §6 (iconos, colores, tipografía, radios, márgenes, escena, medidas IPF de los discos, barras, máquina, collarín y duraciones). Son la referencia que acepta Víctor en la prueba manual (AC-24), no requisitos con AC propio. Donde la maqueta contradiga SPEC-CALC-001, SPEC-CALC-002 o esta spec (por ejemplo, en el contraste de NFR-02, en cómo elige los discos, en qué guarda, en que reescribe lo tecleado en el campo de porcentaje o en que no tiene pulsación larga), mandan las specs. Sus fuentes y three.js se cargan de terceros; eso no pasa a la app.
-- **Pruebas:** la lógica, con tests unitarios; los AC de esta spec, salvo AC-23 y AC-24, con E2E de Playwright, sin comparar el dibujo píxel a píxel: basta con que haya dibujo, que su etiqueta sea la correcta y que su estado observable (FR-16) sea el esperado. AC-23 y AC-24 son pruebas manuales en el iPhone.
+- **Pruebas:** la lógica, con tests unitarios; los AC de esta spec, salvo AC-23 y AC-24, con E2E de Playwright, sin comparar el dibujo píxel a píxel: basta con que haya dibujo, que su etiqueta sea la correcta y que su estado observable (FR-16) sea el esperado. AC-23 y AC-24 son pruebas manuales en el iPhone. Los AC del dibujo (AC-09, AC-10, AC-15 a AC-17 y AC-19) solo cuentan en un navegador de la CI que dibuje en 3D: el test comprueba antes que el dibujo está activo, para no pasar en falso por la vista de FR-14.

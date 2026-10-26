@@ -97,7 +97,7 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
   - con la lista de porcentajes vacía y 100 kg, muestra la indicación de añadir porcentajes y la de habilitar al menos un disco;
   - con la barra de 20 kg y 15 kg, muestra el aviso de que el peso de trabajo es inferior a la barra y la indicación de habilitar al menos un disco, sin ninguna serie;
   - con un peso de trabajo de 0, muestra el mensaje que dice qué falla y la indicación de habilitar al menos un disco, sin ninguna serie;
-  - con la Z, un peso de barra de 0 y 50 kg, muestra el mensaje que dice qué falla en el peso de barra y la indicación de habilitar al menos un disco, sin ninguna serie.
+  - con la Z, un peso de barra de 0 y 50 kg, muestra el mensaje de peso de barra no válido (SPEC-CALC-001 FR-02, con el aviso general de SPEC-CALC-003 FR-05) y la indicación de habilitar al menos un disco, sin ninguna serie.
 - **AC-10 → FR-07, FR-04:** con la barra de 20 kg, 100 kg y el 90 %, la serie muestra 25 + 10 por lado. Al deshabilitar el de 25 kg, sin ninguna otra acción, muestra 20 + 15 por lado; al volver a habilitarlo, otra vez 25 + 10.
 - **AC-11 → FR-08:** al recuperar los tipos habilitados en un arranque de cero:
   - la primera vez que se abre la app, los 7 tipos están habilitados;
