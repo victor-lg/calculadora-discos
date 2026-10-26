@@ -21,7 +21,7 @@ function vista({ modo = 'barra', barra = '20', pesoBarra = {}, trabajo, porcenta
     ...estadoInicial(porcentajes, discos),
     modo,
     barra,
-    pesoBarra: { recta: '', z: '', ...pesoBarra },
+    pesoBarra: { recta: '10', z: '10', ...pesoBarra },
     trabajo,
   });
 }
@@ -63,81 +63,76 @@ test('SPEC-CALC-002/AC-01 la vista muestra los 7 tipos con su estado y tocar uno
   assert.deepEqual(e.discos, DISCOS_CENT);
 });
 
-test('SPEC-CALC-002/AC-02 sin el de 25 kg, 90 % de 100 kg con barra de 20: 20 + 15 por lado', () => {
+test('SPEC-CALC-002/AC-02 sin el de 25 kg, 90 % de 100 kg con la olímpica de 20: 20 + 15 por lado', () => {
   const s = serie({ trabajo: '100', porcentajes: [90], discos: SIN_25 });
-  assert.equal(s.total, '90 kg');
-  assert.equal(s.discos, '20 + 15');
-  assert.equal(s.pesoDiscos, '35 kg por lado');
-  assert.equal(s.aviso, null);
+  assert.deepEqual([s.total, s.discos, s.diferencia], ['90 kg', ['20', '15'], null]);
 });
 
 test('SPEC-CALC-002/AC-03 solo 25 y 20: la mejor combinación, no la voraz', () => {
   const discos = kg(25, 20);
   const dos = serie({ modo: 'dos-lados', trabajo: '100', porcentajes: [80], discos });
-  assert.deepEqual([dos.total, dos.discos, dos.aviso], ['80 kg', '20 + 20', null]);
+  assert.deepEqual([dos.total, dos.discos, dos.diferencia], ['80 kg', ['20 ×2'], null]);
   const uno = serie({ modo: 'un-punto', trabajo: '100', porcentajes: [40], discos });
-  assert.deepEqual([uno.total, uno.discos, uno.aviso], ['40 kg', '20 + 20', null]);
-  assert.equal(uno.etiquetaDiscos, 'Discos en el único punto');
+  assert.deepEqual([uno.total, uno.discos, uno.diferencia], ['40 kg', ['20 ×2'], null]);
 });
 
 test('SPEC-CALC-002/AC-04 menos discos y, si empatan, el disco más grande', () => {
   const a = serie({ modo: 'dos-lados', trabajo: '100', porcentajes: [60], discos: kg(25, 15, 10, 5) });
-  assert.equal(a.discos, '25 + 5');
+  assert.deepEqual(a.discos, ['25', '5']);
   const b = serie({ modo: 'dos-lados', trabajo: '100', porcentajes: [80], discos: kg(25, 20, 5) });
-  assert.equal(b.discos, '20 + 20');
+  assert.deepEqual(b.discos, ['20 ×2']);
 });
 
-test('SPEC-CALC-002/AC-05 solo 20 y 10, 70 % de 100 kg: carga 60 kg y avisa', () => {
+test('SPEC-CALC-002/AC-05 solo 20 y 10, 70 % de 100 kg: carga 60 kg y muestra la diferencia', () => {
   const s = serie({ trabajo: '100', porcentajes: [70], discos: kg(20, 10) });
-  assert.equal(s.total, '60 kg');
-  assert.equal(s.discos, '20');
-  assert.equal(s.aviso, 'Redondeo: objetivo 70 kg, diferencia −10 kg');
+  assert.deepEqual([s.total, s.discos, s.diferencia], ['60 kg', ['20'], '−10 kg']);
+  assert.match(s.detalleDiferencia, /son 70 kg\./);
 });
 
-test('SPEC-CALC-002/AC-06 solo el de 25 kg: el mínimo es 25 kg en los tres modos', () => {
+test('SPEC-CALC-002/AC-06 solo el de 25 kg: el disco más pequeño es de 25 kg en los tres modos', () => {
   const discos = kg(25);
   const barra = serie({ trabajo: '100', porcentajes: [40], discos });
-  assert.equal(barra.mensaje, 'Solo barra (20 kg) · 0 kg por lado');
-  assert.equal(barra.objetivo, 'Objetivo: 40 kg');
-  assert.equal(barra.aviso, null);
+  assert.equal(barra.linea, 'Solo la barra');
+  assert.equal(barra.explicacion, 'El 40 % son 40 kg: faltan 30 kg para poner el disco más pequeño (25 kg) a cada lado.');
+  assert.equal(barra.diferencia, null);
 
   const dos = serie({ modo: 'dos-lados', trabajo: '100', porcentajes: [40], discos });
-  assert.equal(dos.mensaje, 'Peso por lado demasiado pequeño: el disco mínimo es de 25 kg');
-  assert.equal(dos.objetivo, 'Objetivo: 40 kg');
-  assert.deepEqual([dos.total, dos.aviso], [null, null]);
+  assert.deepEqual([dos.linea, dos.total, dos.diferencia], ['Sin discos', '0 kg', null]);
+  assert.equal(dos.explicacion, 'El 40 % son 40 kg: faltan 10 kg para poner el disco más pequeño (25 kg) a cada lado.');
 
   const uno = serie({ modo: 'un-punto', trabajo: '100', porcentajes: [20], discos });
-  assert.equal(uno.mensaje, 'Peso demasiado pequeño: el disco mínimo es de 25 kg');
-  assert.equal(uno.objetivo, 'Objetivo: 20 kg');
-  assert.deepEqual([uno.total, uno.aviso], [null, null]);
+  assert.deepEqual([uno.linea, uno.total, uno.diferencia], ['Sin discos', '0 kg', null]);
+  assert.equal(uno.explicacion, 'El 20 % son 20 kg: faltan 5 kg para poner el disco más pequeño (25 kg).');
 
   const justo = serie({ modo: 'un-punto', trabajo: '100', porcentajes: [25], discos });
-  assert.deepEqual([justo.total, justo.discos, justo.aviso], ['25 kg', '25', null]);
+  assert.deepEqual([justo.total, justo.discos, justo.diferencia], ['25 kg', ['25'], null]);
 });
 
 test('SPEC-CALC-002/AC-07 frontera con disco mínimo de 5 kg en el modo Barra', () => {
   const discos = kg(25, 20, 15, 10, 5);
   const justo = serie({ trabajo: '60', porcentajes: [50], discos });
-  assert.deepEqual([justo.total, justo.discos, justo.aviso], ['30 kg', '5', null]);
+  assert.deepEqual([justo.total, justo.discos, justo.diferencia], ['30 kg', ['5'], null]);
   const corto = serie({ trabajo: '59,98', porcentajes: [50], discos });
-  assert.equal(corto.mensaje, 'Solo barra (20 kg) · 0 kg por lado');
-  assert.equal(corto.objetivo, 'Objetivo: 29,99 kg');
-  assert.equal(corto.aviso, null);
+  assert.equal(corto.linea, 'Solo la barra');
+  assert.equal(corto.explicacion, 'El 50 % son 29,99 kg: faltan 0,01 kg para poner el disco más pequeño (5 kg) a cada lado.');
+  assert.equal(corto.diferencia, null);
 });
 
 test('SPEC-CALC-002/AC-08 sin tipos no hay series; al habilitar el de 10 kg aparecen', () => {
   const sin = { ...estadoInicial([40, 70, 90], []), trabajo: '100' };
   const v = modeloVista(sin);
   assert.deepEqual(v.series, []);
-  assert.equal(v.indicacionDiscos, TEXTOS.habilitarDiscos);
+  assert.equal(v.indicacionDiscos, 'Habilita al menos un disco en Mis discos.');
 
   const con = modeloVista(alternarDisco(sin, 1000));
   assert.equal(con.indicacionDiscos, null);
-  assert.deepEqual(con.series.map((s) => [s.total, s.discos, s.aviso]), [
-    ['40 kg', '10', null],
-    ['60 kg', '10 + 10', 'Redondeo: objetivo 70 kg, diferencia −10 kg'],
-    ['80 kg', '10 + 10 + 10', 'Redondeo: objetivo 90 kg, diferencia −10 kg'],
+  assert.deepEqual(con.series.map((s) => [s.total, s.discos, s.diferencia]), [
+    ['40 kg', ['10'], null],
+    ['60 kg', ['10 ×2'], '−10 kg'],
+    ['80 kg', ['10 ×3'], '−10 kg'],
   ]);
+  assert.match(con.series[1].detalleDiferencia, /son 70 kg\./);
+  assert.match(con.series[2].detalleDiferencia, /son 90 kg\./);
 });
 
 test('SPEC-CALC-002/AC-09 sin tipos, la indicación se suma a las demás', () => {
@@ -153,10 +148,10 @@ test('SPEC-CALC-002/AC-09 sin tipos, la indicación se suma a las demás', () =>
       assert.equal(v.avisoBarra, TEXTOS.trabajoInferiorBarra);
     }],
     [{ trabajo: '0', porcentajes: [40] }, (v) => {
-      assert.match(v.errorTrabajo ?? '', /mayor que 0/);
+      assert.equal(v.errorTrabajo, 'El peso de trabajo debe estar entre 0 y 500 kg.');
     }],
     [{ barra: 'z', pesoBarra: { z: '0' }, trabajo: '50', porcentajes: [40] }, (v) => {
-      assert.match(v.errorBarra ?? '', /^El peso de la barra/);
+      assert.equal(v.errorBarra, TEXTOS.errorBarra);
     }],
   ];
   for (const [opciones, comprobar] of casos) {
@@ -169,11 +164,11 @@ test('SPEC-CALC-002/AC-09 sin tipos, la indicación se suma a las demás', () =>
 
 test('SPEC-CALC-002/AC-10 deshabilitar y volver a habilitar el de 25 kg recalcula al momento', () => {
   let e = { ...estadoInicial([90]), trabajo: '100' };
-  assert.equal(modeloVista(e).series[0].discos, '25 + 10');
+  assert.deepEqual(modeloVista(e).series[0].discos, ['25', '10']);
   e = alternarDisco(e, 2500);
-  assert.equal(modeloVista(e).series[0].discos, '20 + 15');
+  assert.deepEqual(modeloVista(e).series[0].discos, ['20', '15']);
   e = alternarDisco(e, 2500);
-  assert.equal(modeloVista(e).series[0].discos, '25 + 10');
+  assert.deepEqual(modeloVista(e).series[0].discos, ['25', '10']);
 });
 
 // Mejor combinación por fuerza bruta, implementada aparte: recorre todas las
@@ -332,13 +327,13 @@ test('SPEC-CALC-002/AC-14 SPEC-CALC-001/FR-11 si no se puede guardar, sigue con 
   let p = partida();
   let v = p.cambiar((e) => alternarDisco(e, 2500));
   assert.equal(v.discos[0].habilitado, false);
-  assert.equal(v.series[0].discos, '20 + 15');
+  assert.deepEqual(v.series[0].discos, ['20', '15']);
   assert.equal(v.avisoGuardado, 'No se ha podido guardar: se mantendrá hasta cerrar la app');
   assert.equal(p.almacen.getItem(CLAVE_DISCOS), null);
 
   p = partida();
   v = p.cambiar((e) => anadirPorcentaje(conTexto('50')(e)));
-  assert.deepEqual(v.series.map((s) => s.porcentaje), ['90 %', '50 %']);
+  assert.deepEqual(v.series.map((s) => s.porcentaje), ['50 %', '90 %']);
   assert.equal(v.avisoGuardado, TEXTOS.falloGuardar);
 
   p = partida();
@@ -353,7 +348,7 @@ test('SPEC-CALC-002/AC-14 SPEC-CALC-001/FR-11 el aviso sigue hasta que los dos d
   p.cambiar((e) => alternarDisco(e, 2500));
   p.almacen.lleno = false;
   let v = p.cambiar((e) => anadirPorcentaje(conTexto('50')(e)));
-  assert.equal(p.almacen.getItem(CLAVE_PORCENTAJES), '[90,50]');
+  assert.equal(p.almacen.getItem(CLAVE_PORCENTAJES), '[50,90]');
   assert.equal(v.avisoGuardado, TEXTOS.falloGuardar);
   v = p.cambiar((e) => alternarDisco(e, 2500));
   assert.equal(p.almacen.getItem(CLAVE_DISCOS), '[25,20,15,10,5,2.5,1.25]');

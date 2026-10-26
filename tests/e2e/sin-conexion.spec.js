@@ -137,10 +137,7 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
   await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '70 %', '90 %']);
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '70 kg', '90 kg']);
   await expect(series(page).locator('.discos strong')).toHaveText(['10', '25', '25 + 10']);
-  await expect(series(page).locator('.peso-discos')).toHaveText([
-    '10 kg por lado', '25 kg por lado', '35 kg por lado',
-  ]);
-  await expect(series(page).locator('.redondeo')).toHaveCount(0);
+  await expect(series(page).locator('.diferencia')).toHaveCount(0);
   expect(llegadas.slice(antes)).toEqual([]);
 });
 
@@ -152,7 +149,7 @@ async function recorrido(context, base, conDatos, sockets) {
   await page.goto(base);
   await esperarServiceWorker(page);
   if (conDatos) {
-    await page.getByLabel('Recta pequeña').check();
+    await page.getByLabel('Recta', { exact: true }).check();
     await page.getByLabel('Peso de la barra (kg)').fill('7,35');
     await page.getByLabel('Peso de trabajo (kg)').fill('487,35');
     await page.getByLabel('Nuevo porcentaje').fill('47');

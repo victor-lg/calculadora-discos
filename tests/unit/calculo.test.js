@@ -1,8 +1,8 @@
 // Reglas de cálculo y formato sobre muchas entradas (FR-05, FR-06, FR-07, FR-09, FR-14).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { objetivoCent, calcularSerie, DISCOS_CENT } from '../../app/js/calculo.js';
-import { analizarPeso } from '../../app/js/entrada.js';
+import { objetivoCent, calcularSerie, excesoMangaMm, COLLARIN_CENT, DISCOS_CENT } from '../../app/js/calculo.js';
+import { analizarPeso, analizarPesoBarra } from '../../app/js/entrada.js';
 import { formatearKg } from '../../app/js/formato.js';
 
 test('FR-05: el objetivo se redondea a dos decimales con la mitad hacia arriba', () => {
@@ -82,4 +82,68 @@ test('FR-06, FR-07 y FR-09: la carga es la mayor posible sin pasar del objetivo'
     }
   }
   assert.ok(casos > 50000);
+});
+
+test('FR-03: el motivo de un peso no válido es la primera regla que se cumple', () => {
+  for (const t of ['100,123', '1.000', '1,000', ',123', '100,120']) {
+    assert.equal(analizarPeso(t).causa, 'decimales', JSON.stringify(t));
+  }
+  for (const t of ['abc', '-5', '1e2', '1.000,5', '100kg', '10 0', '100,5,', '100,,', ',,', '.,', ',5,', '1 ,5', '1, 5']) {
+    assert.equal(analizarPeso(t).causa, 'formato', JSON.stringify(t));
+  }
+  for (const t of ['0', '0,00', '0,', ',0', ',00', '500,01', '600']) {
+    assert.equal(analizarPeso(t).causa, 'rango', JSON.stringify(t));
+  }
+});
+
+test('FR-02: el peso de la recta y de la Z va de 1 a 50 kg', () => {
+  assert.equal(analizarPesoBarra('1'), 100);
+  assert.equal(analizarPesoBarra('50'), 5000);
+  assert.equal(analizarPesoBarra(' 7,5 '), 750);
+  for (const t of ['0,99', '50,01', '', ',', '0', 'abc', '10,123']) {
+    assert.equal(analizarPesoBarra(t), null, JSON.stringify(t));
+  }
+});
+
+// FR-15: con collarines, la carga es la mayor posible sin pasar del objetivo
+// contando la barra y los dos collarines; sin discos, tampoco hay collarines.
+test('FR-15: con collarines, la carga es la mayor posible sin pasar del objetivo', () => {
+  for (let trabajoCent = 1; trabajoCent <= 50000; trabajoCent += 53) {
+    for (const porcentaje of [7, 40, 50, 70, 99, 100]) {
+      for (const barraCent of [2000, 1500, 850, 100]) {
+        const s = calcularSerie({ modo: 'barra', barraCent, trabajoCent, porcentaje, collarines: true });
+        const objetivo = objetivoCent(trabajoCent, porcentaje);
+        const base = barraCent + 2 * COLLARIN_CENT;
+        if (s.minimo) {
+          assert.ok(objetivo < base + 2 * 125);
+          continue;
+        }
+        assert.equal(s.collarines, true);
+        assert.equal(s.cargado, base + 2 * s.discosCent);
+        assert.ok(s.cargado <= objetivo);
+        assert.ok(s.cargado + 2 * 125 > objetivo);
+      }
+    }
+  }
+});
+
+test('FR-15: en Dos lados y Un punto los collarines no tienen efecto', () => {
+  for (const modo of ['dos-lados', 'un-punto']) {
+    for (const porcentaje of [10, 40, 70, 100]) {
+      const sin = calcularSerie({ modo, barraCent: 0, trabajoCent: 10000, porcentaje });
+      const con = calcularSerie({ modo, barraCent: 0, trabajoCent: 10000, porcentaje, collarines: true });
+      assert.deepEqual({ ...con, collarines: false }, { ...sin, collarines: false });
+      if (!con.minimo) assert.equal(con.collarines, false);
+    }
+  }
+});
+
+test('FR-16: el exceso sobre la manga se redondea hacia arriba al milímetro', () => {
+  assert.equal(excesoMangaMm(Array(20).fill(2500), 3100), 230);
+  assert.equal(excesoMangaMm(Array(15).fill(2000), 3100), 28); // 337,5 − 310 = 27,5
+  assert.equal(excesoMangaMm([...Array(8).fill(2500), 1500], 3750), 0);
+  // Los 7 tipos suman 130,5 mm.
+  assert.equal(excesoMangaMm([2500, 2000, 1500, 1000, 500, 250, 125], 1305), 0);
+  assert.equal(excesoMangaMm([2500, 2000, 1500, 1000, 500, 250, 125], 1300), 1); // 0,5 mm → 1
+  assert.equal(excesoMangaMm([], 2000), 0);
 });

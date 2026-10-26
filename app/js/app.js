@@ -4,6 +4,9 @@ import {
   MODOS,
   BARRAS,
   estadoInicial,
+  elegirModo,
+  elegirBarra,
+  escribirPesoBarra,
   anadirPorcentaje,
   quitarPorcentaje,
   alternarDisco,
@@ -44,10 +47,10 @@ function opcion(nombreGrupo, valor, texto, alCambiar, tipo = 'radio') {
 
 function montarOpciones() {
   for (const m of MODOS) {
-    $('modos').append(opcion('modo', m.id, m.nombre, (modo) => actualizar({ ...estado, modo })));
+    $('modos').append(opcion('modo', m.id, m.nombre, (modo) => actualizar(elegirModo(estado, modo))));
   }
   for (const b of BARRAS) {
-    $('lista-barras').append(opcion('barra', b.id, b.nombre, (barra) => actualizar({ ...estado, barra })));
+    $('lista-barras').append(opcion('barra', b.id, b.nombre, (barra) => actualizar(elegirBarra(estado, barra))));
   }
   // SPEC-CALC-002 FR-02: cada tipo se habilita o deshabilita al tocarlo.
   for (const d of modeloVista(estado).discos) {
@@ -71,17 +74,23 @@ function valorCampo(id, valor) {
 function pintarSerie(s) {
   const li = crear('li', 'serie');
   const cabecera = crear('div', 'cabecera');
-  cabecera.append(crear('span', 'porcentaje', s.porcentaje));
-  if (s.total) cabecera.append(crear('span', 'total', s.total));
+  cabecera.append(crear('span', 'porcentaje', s.porcentaje), crear('span', 'total', s.total));
   li.append(cabecera);
-  if (s.mensaje) li.append(crear('p', 'minimo', s.mensaje));
-  if (s.objetivo) li.append(crear('p', 'objetivo', s.objetivo));
+  // FR-09: sin discos, la línea y su explicación, siempre visible.
+  if (s.linea) li.append(crear('p', 'linea', s.linea), crear('p', 'explicacion', s.explicacion));
   if (s.discos) {
     const discos = crear('p', 'discos');
-    discos.append(crear('span', 'etiqueta', `${s.etiquetaDiscos}: `), crear('strong', null, s.discos));
-    li.append(discos, crear('p', 'peso-discos', s.pesoDiscos));
+    discos.append(crear('span', 'etiqueta', `${s.etiquetaDiscos}: `), crear('strong', null, s.discos.join(' + ')));
+    li.append(discos);
   }
-  if (s.aviso) li.append(crear('p', 'redondeo', s.aviso));
+  if (s.collarin) li.append(crear('p', 'collarin', s.collarin));
+  // FR-06: la diferencia y una explicación que se puede abrir.
+  if (s.diferencia) {
+    const detalle = crear('details', 'diferencia');
+    detalle.append(crear('summary', null, s.diferencia), crear('p', null, s.detalleDiferencia));
+    li.append(detalle);
+  }
+  if (s.avisoCapacidad) li.append(crear('p', 'capacidad', s.avisoCapacidad));
   return li;
 }
 
@@ -97,9 +106,9 @@ function pintar() {
   $('barras').hidden = !v.mostrarBarras;
   texto('peso-barra-fijo', v.pesoBarraFijo && `Peso de la barra: ${v.pesoBarraFijo}`);
   $('campo-peso-barra').hidden = !v.barraEditable;
+  $('collarines').checked = v.collarines;
   valorCampo('peso-barra', v.pesoBarraTexto);
   texto('error-barra', v.errorBarra);
-  texto('indicacion-barra', v.indicacionBarra);
   $('peso-barra').setAttribute('aria-invalid', String(Boolean(v.errorBarra)));
 
   valorCampo('trabajo', v.trabajo);
@@ -140,8 +149,9 @@ function actualizar(nuevo) {
 function enlazarCampos() {
   $('trabajo').addEventListener('input', (e) => actualizar({ ...estado, trabajo: e.target.value }));
   $('peso-barra').addEventListener('input', (e) => {
-    actualizar({ ...estado, pesoBarra: { ...estado.pesoBarra, [estado.barra]: e.target.value } });
+    actualizar(escribirPesoBarra(estado, e.target.value));
   });
+  $('collarines').addEventListener('change', (e) => actualizar({ ...estado, collarines: e.target.checked }));
   $('nuevo-porcentaje').addEventListener('input', (e) => {
     actualizar({ ...estado, textoPorcentaje: e.target.value });
   });

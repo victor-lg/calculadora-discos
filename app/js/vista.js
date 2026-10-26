@@ -1,7 +1,7 @@
 // Modelo de vista: a partir del estado en memoria, decide qué se muestra y con
 // qué textos. La interfaz lo pinta tal cual, sin lógica propia.
-import { analizarPeso, analizarPorcentaje } from './entrada.js';
-import { calcularSerie, DISCOS_CENT } from './calculo.js';
+import { analizarPeso, analizarPesoBarra, analizarPorcentaje } from './entrada.js';
+import { calcularSerie, excesoMangaMm, COLLARIN_CENT, DISCOS_CENT } from './calculo.js';
 import { formatearKg } from './formato.js';
 
 export const MODOS = Object.freeze([
@@ -11,53 +11,121 @@ export const MODOS = Object.freeze([
 ]);
 
 // FR-02: catálogo fijo. `cent` es null cuando el peso lo escribe la persona.
+// FR-16: `mangaDmm` es la manga útil de cada lado, en décimas de milímetro.
 export const BARRAS = Object.freeze([
-  Object.freeze({ id: '20', nombre: 'Barra de 20 kg', cent: 2000 }),
-  Object.freeze({ id: '15', nombre: 'Barra de 15 kg', cent: 1500 }),
-  Object.freeze({ id: 'recta', nombre: 'Recta pequeña', cent: null }),
-  Object.freeze({ id: 'z', nombre: 'Barra Z', cent: null }),
+  Object.freeze({ id: '20', nombre: 'Olímpica 20 kg', cent: 2000, mangaDmm: 3750 }),
+  Object.freeze({ id: '15', nombre: 'Olímpica 15 kg', cent: 1500, mangaDmm: 2800 }),
+  Object.freeze({ id: 'recta', nombre: 'Recta', cent: null, mangaDmm: 2000 }),
+  Object.freeze({ id: 'z', nombre: 'Z', cent: null, mangaDmm: 2000 }),
 ]);
+// FR-16: la máquina de los modos Dos lados y Un punto.
+const MANGA_MAQUINA_DMM = 3100;
+// FR-02: la primera vez, la recta y la Z pesan 10 kg.
+const PESO_BARRA_INICIAL_CENT = 1000;
 
 export const TEXTOS = {
-  rellenarTrabajo: 'Escribe el peso de trabajo para ver las series.',
-  rellenarBarra: 'Escribe el peso de la barra para ver las series.',
-  anadirPorcentajes: 'Añade al menos un porcentaje para ver las series.',
-  trabajoInferiorBarra:
-    'El peso de trabajo es inferior a la barra: conviene elegir una barra más ligera o revisar el peso.',
-  // SPEC-CALC-002 FR-05: Y es el tipo habilitado más pequeño.
-  minimoDosLados: (y) => `Peso por lado demasiado pequeño: el disco mínimo es de ${y} kg`,
-  minimoUnPunto: (y) => `Peso demasiado pequeño: el disco mínimo es de ${y} kg`,
-  habilitarDiscos: 'Habilita al menos un disco para ver las series.',
+  rellenarTrabajo: 'Escribe el peso de trabajo.',
+  // FR-03: el primer motivo que se cumple (entrada.js).
+  errorTrabajo: {
+    decimales: 'El peso de trabajo admite como máximo dos decimales.',
+    formato: 'Escribe el peso solo con cifras y, si hace falta, una coma decimal.',
+    rango: 'El peso de trabajo debe estar entre 0 y 500 kg.',
+  },
+  errorBarra: 'Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo.',
+  errorPorcentaje: 'Escribe un porcentaje entre 1 y 100.',
+  porcentajeRepetido: (p) => `Ya tienes una serie del ${p} %.`,
+  anadirPorcentajes: 'Añade al menos un porcentaje.',
+  trabajoInferiorBarra: 'El peso de trabajo es inferior a la barra: elige una barra más ligera o revisa el peso.',
+  habilitarDiscos: 'Habilita al menos un disco en Mis discos.',
   falloGuardar: 'No se ha podido guardar: se mantendrá hasta cerrar la app',
+  // FR-06: P porcentaje, W peso de trabajo, O objetivo, C cargado y D diferencia.
+  detalleDiferencia: (p, w, o, c, d) =>
+    `El ${p} % de ${w} kg son ${o} kg. Con tus discos, lo más cercano sin pasarte es ${c} kg: ${d} kg menos.`,
+  // FR-08.
+  porLado: 'Por lado',
+  totalEnDiscos: 'Total en discos',
+  collarin: '+ collarín de 2,5 kg',
+  // FR-09: P porcentaje, O objetivo, B barra, F lo que falta e Y el disco más
+  // pequeño (SPEC-CALC-002 FR-05).
+  soloBarra: 'Solo la barra',
+  sinDiscos: 'Sin discos',
+  menosQueBarra: (p, o, b) => `El ${p} % son ${o} kg, menos que la barra (${b} kg).`,
+  faltaPorLado: (p, o, f, y) =>
+    `El ${p} % son ${o} kg: faltan ${f} kg para poner el disco más pequeño (${y} kg) a cada lado.`,
+  faltaConCollarin: (p, o, f, y) =>
+    `El ${p} % son ${o} kg: faltan ${f} kg para poner el disco más pequeño (${y} kg) y el collarín a cada lado.`,
+  faltaUnPunto: (p, o, f, y) =>
+    `El ${p} % son ${o} kg: faltan ${f} kg para poner el disco más pequeño (${y} kg).`,
+  // FR-16, sin "Se dibujan los que caben.": esta interfaz no dibuja la carga.
+  noCaben: (x) => `No caben en la manga: faltan ${x} cm.`,
 };
 
-// FR-11: al arrancar de cero, modo Barra, barra de 20 kg y peso de trabajo vacío.
+// FR-04: ordenados de menor a mayor y sin repetidos.
+const ordenarSinRepetidos = (lista) => [...new Set(lista)].sort((a, b) => a - b);
+
+// FR-11: al arrancar de cero, modo Barra, olímpica de 20 kg y peso de trabajo
+// vacío; la recta y la Z, 10 kg (FR-02), sin collarines (FR-15).
 // `discos` son los tipos habilitados, en centésimas y de mayor a menor
 // (SPEC-CALC-002 FR-08). `guardados` es el último valor que se guardó bien de
 // cada dato: al arrancar de cero, el valor con el que arranca (SPEC-CALC-002 FR-09).
+// `barraValida` es el último peso válido de la recta y de la Z (FR-02).
 export function estadoInicial(porcentajes, discos = DISCOS_CENT) {
+  const barraValida = { recta: PESO_BARRA_INICIAL_CENT, z: PESO_BARRA_INICIAL_CENT };
   const estado = {
     modo: 'barra',
     barra: '20',
-    pesoBarra: { recta: '', z: '' },
+    pesoBarra: textosBarra(barraValida),
+    barraValida,
     trabajo: '',
-    porcentajes: [...porcentajes],
+    porcentajes: ordenarSinRepetidos(porcentajes),
     discos: [...discos],
+    collarines: false,
     textoPorcentaje: '',
     errorPorcentaje: null,
   };
   return { ...estado, guardados: { porcentajes: estado.porcentajes, discos: estado.discos } };
 }
 
-// FR-04: añade al final si es válido; si no, deja la lista como estaba y guarda el mensaje.
+// FR-02: el campo de la recta y el de la Z muestran su último peso válido con
+// el formato de FR-14.
+function textosBarra(barraValida) {
+  return { recta: formatearKg(barraValida.recta), z: formatearKg(barraValida.z) };
+}
+
+// FR-02: al cambiar de modo o de barra, un peso de barra no válido se descarta
+// y el campo vuelve a mostrar el último válido.
+export function elegirModo(estado, modo) {
+  return { ...estado, modo, pesoBarra: textosBarra(estado.barraValida) };
+}
+
+export function elegirBarra(estado, barra) {
+  return { ...estado, barra, pesoBarra: textosBarra(estado.barraValida) };
+}
+
+// FR-02: lo tecleado se conserva tal cual; si es válido, pasa a ser el último
+// peso válido de esa barra.
+export function escribirPesoBarra(estado, texto) {
+  const cent = analizarPesoBarra(texto);
+  return {
+    ...estado,
+    pesoBarra: { ...estado.pesoBarra, [estado.barra]: texto },
+    barraValida: cent === null ? estado.barraValida : { ...estado.barraValida, [estado.barra]: cent },
+  };
+}
+
+// FR-04: si es válido y no está, lo añade en su sitio; si no, deja la lista
+// como estaba y guarda el mensaje.
 export function anadirPorcentaje(estado) {
   const r = analizarPorcentaje(estado.textoPorcentaje);
   // Vacío o solo espacios: la lista no cambia y no hay mensaje.
   if (r.estado === 'vacio') return { ...estado, errorPorcentaje: null };
-  if (r.estado === 'invalido') return { ...estado, errorPorcentaje: r.mensaje };
+  if (r.estado === 'invalido') return { ...estado, errorPorcentaje: TEXTOS.errorPorcentaje };
+  if (estado.porcentajes.includes(r.valor)) {
+    return { ...estado, errorPorcentaje: TEXTOS.porcentajeRepetido(r.valor) };
+  }
   return {
     ...estado,
-    porcentajes: [...estado.porcentajes, r.valor],
+    porcentajes: ordenarSinRepetidos([...estado.porcentajes, r.valor]),
     textoPorcentaje: '',
     errorPorcentaje: null,
   };
@@ -81,44 +149,78 @@ function barraElegida(estado) {
   return BARRAS.find((b) => b.id === estado.barra);
 }
 
-function textoDiscos(discos) {
-  return discos.map(formatearKg).join(' + ');
+// FR-08: cada tipo una vez, de mayor a menor, con "×n" si se repite.
+function gruposDiscos(discos) {
+  const grupos = [];
+  for (const d of discos) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.cent === d) ultimo.n++;
+    else grupos.push({ cent: d, n: 1 });
+  }
+  return grupos.map(({ cent, n }) => (n > 1 ? `${formatearKg(cent)} ×${n}` : formatearKg(cent)));
 }
 
-function modeloSerie(estado, barraCent, trabajoCent, porcentaje) {
+// FR-09: la línea, el peso total y la explicación de una serie sin discos.
+function serieSinDiscos(estado, barraCent, objetivo, porcentaje) {
   const tipos = estado.discos;
-  const s = calcularSerie({ modo: estado.modo, barraCent, trabajoCent, porcentaje, tipos });
+  const y = tipos[tipos.length - 1];
+  const kg = formatearKg;
+  const o = kg(objetivo);
+  if (estado.modo === 'un-punto') {
+    return { linea: TEXTOS.sinDiscos, total: '0 kg', explicacion: TEXTOS.faltaUnPunto(porcentaje, o, kg(y - objetivo), kg(y)) };
+  }
+  if (estado.modo === 'dos-lados') {
+    return { linea: TEXTOS.sinDiscos, total: '0 kg', explicacion: TEXTOS.faltaPorLado(porcentaje, o, kg(2 * y - objetivo), kg(y)) };
+  }
+  const b = kg(barraCent);
+  let explicacion;
+  if (objetivo < barraCent) explicacion = TEXTOS.menosQueBarra(porcentaje, o, b);
+  else if (estado.collarines) {
+    explicacion = TEXTOS.faltaConCollarin(porcentaje, o, kg(barraCent + 2 * (y + COLLARIN_CENT) - objetivo), kg(y));
+  } else explicacion = TEXTOS.faltaPorLado(porcentaje, o, kg(barraCent + 2 * y - objetivo), kg(y));
+  return { linea: TEXTOS.soloBarra, total: `${b} kg`, explicacion };
+}
+
+function modeloSerie(estado, barra, barraCent, trabajoCent, porcentaje) {
+  const s = calcularSerie({
+    modo: estado.modo,
+    barraCent,
+    trabajoCent,
+    porcentaje,
+    tipos: estado.discos,
+    collarines: estado.collarines,
+  });
   const serie = {
     porcentaje: `${porcentaje} %`,
     total: null,
-    discos: null,
+    diferencia: null,
+    detalleDiferencia: null,
+    linea: null,
+    explicacion: null,
     etiquetaDiscos: null,
-    pesoDiscos: null,
-    aviso: null,
-    mensaje: null,
-    objetivo: null,
+    discos: null,
+    collarin: null,
+    avisoCapacidad: null,
   };
-  if (s.minimo) {
-    // FR-09: el objetivo que salía, sin diferencia ni aviso de redondeo.
-    const minimo = formatearKg(tipos[tipos.length - 1]);
-    serie.mensaje = {
-      barra: `Solo barra (${formatearKg(barraCent)} kg) · 0 kg por lado`,
-      'dos-lados': TEXTOS.minimoDosLados(minimo),
-      'un-punto': TEXTOS.minimoUnPunto(minimo),
-    }[estado.modo];
-    serie.objetivo = `Objetivo: ${formatearKg(s.objetivo)} kg`;
-    return serie;
-  }
-  const unPunto = estado.modo === 'un-punto';
+  // FR-09: sin discos ni collarines, y sin diferencia.
+  if (s.minimo) return { ...serie, ...serieSinDiscos(estado, barraCent, s.objetivo, porcentaje) };
   serie.total = `${formatearKg(s.cargado)} kg`;
-  serie.discos = textoDiscos(s.discos);
-  serie.etiquetaDiscos = unPunto ? 'Discos en el único punto' : 'Discos por lado';
-  serie.pesoDiscos = unPunto
-    ? `${formatearKg(s.discosCent)} kg de discos`
-    : `${formatearKg(s.discosCent)} kg por lado`;
+  serie.etiquetaDiscos = estado.modo === 'un-punto' ? TEXTOS.totalEnDiscos : TEXTOS.porLado;
+  serie.discos = gruposDiscos(s.discos);
+  if (s.collarines) serie.collarin = TEXTOS.collarin;
   if (s.diferencia !== 0) {
-    serie.aviso = `Redondeo: objetivo ${formatearKg(s.objetivo)} kg, diferencia ${formatearKg(s.diferencia)} kg`;
+    serie.diferencia = `${formatearKg(s.diferencia)} kg`;
+    serie.detalleDiferencia = TEXTOS.detalleDiferencia(
+      porcentaje,
+      formatearKg(trabajoCent),
+      formatearKg(s.objetivo),
+      formatearKg(s.cargado),
+      formatearKg(-s.diferencia),
+    );
   }
+  // FR-16: el exceso, en milímetros, se muestra en centímetros (FR-14).
+  const exceso = excesoMangaMm(s.discos, estado.modo === 'barra' ? barra.mangaDmm : MANGA_MAQUINA_DMM);
+  if (exceso > 0) serie.avisoCapacidad = TEXTOS.noCaben(formatearKg(exceso * 10));
   return serie;
 }
 
@@ -134,11 +236,11 @@ export function modeloVista(estado) {
     barraEditable,
     pesoBarraTexto: barraEditable ? estado.pesoBarra[estado.barra] : '',
     pesoBarraFijo: enBarra && !barraEditable ? `${formatearKg(barra.cent)} kg` : null,
+    collarines: estado.collarines,
     trabajo: estado.trabajo,
     errorTrabajo: null,
     indicacionTrabajo: null,
     errorBarra: null,
-    indicacionBarra: null,
     avisoBarra: null,
     porcentajes: estado.porcentajes.map((p) => `${p} %`),
     textoPorcentaje: estado.textoPorcentaje,
@@ -159,29 +261,21 @@ export function modeloVista(estado) {
 
   const trabajo = analizarPeso(estado.trabajo);
   if (trabajo.estado === 'vacio') vista.indicacionTrabajo = TEXTOS.rellenarTrabajo;
-  if (trabajo.estado === 'invalido') vista.errorTrabajo = `El peso de trabajo ${trabajo.motivo}.`;
+  if (trabajo.estado === 'invalido') vista.errorTrabajo = TEXTOS.errorTrabajo[trabajo.causa];
 
   let barraCent = 0;
-  let barraLista = true;
-  if (enBarra) {
-    if (barraEditable) {
-      const pb = analizarPeso(vista.pesoBarraTexto);
-      if (pb.estado === 'vacio') vista.indicacionBarra = TEXTOS.rellenarBarra;
-      if (pb.estado === 'invalido') vista.errorBarra = `El peso de la barra ${pb.motivo}.`;
-      barraLista = pb.estado === 'ok';
-      barraCent = barraLista ? pb.cent : 0;
-    } else {
-      barraCent = barra.cent;
-    }
-  }
+  if (enBarra) barraCent = barraEditable ? analizarPesoBarra(vista.pesoBarraTexto) : barra.cent;
+  // FR-02: vacío o no válido, el mismo mensaje.
+  if (barraCent === null) vista.errorBarra = TEXTOS.errorBarra;
 
-  if (trabajo.estado !== 'ok' || !barraLista) return vista;
+  // FR-12: mientras el peso de barra no es válido, tampoco se muestra el aviso.
+  if (trabajo.estado !== 'ok' || barraCent === null) return vista;
 
   // FR-12: solo si el peso de trabajo es estrictamente menor que la barra.
   if (enBarra && trabajo.cent < barraCent) vista.avisoBarra = TEXTOS.trabajoInferiorBarra;
 
   // SPEC-CALC-002 FR-06: sin ningún tipo habilitado no hay series.
   if (estado.discos.length === 0) return vista;
-  vista.series = estado.porcentajes.map((p) => modeloSerie(estado, barraCent, trabajo.cent, p));
+  vista.series = estado.porcentajes.map((p) => modeloSerie(estado, barra, barraCent, trabajo.cent, p));
   return vista;
 }
