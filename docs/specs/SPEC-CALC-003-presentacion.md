@@ -1,8 +1,8 @@
 ---
 id: SPEC-CALC-003
 titulo: Presentación de la calculadora
-estado: aprobada
-version: 0.1
+estado: en-revision
+version: 0.2
 riesgo: R1
 sustituye: null
 adr: [ADR-0001, ADR-0003]
@@ -38,6 +38,10 @@ reaparecen las series (FR-10).
 Tras la ronda 3 de G4 (2026-10-26), Víctor decidió que el aviso de "Deshacer" no
 tiene plazo y dura hasta la siguiente acción (FR-08, WCAG 2.2.1). El resto de
 los cambios de esa ronda son aclaraciones, sin otra ronda de revisión.
+La versión 0.2 (VIC-13) solo cambia el peso de la recta y la Z en el resumen de
+Carga plegado (FR-03): es el confirmado de SPEC-CALC-001 v0.7 FR-11 y no el último
+válido tecleado. Decisión de Víctor del 2026-10-29, en la ronda 1 de G4 del PR #22,
+que ajusta esta spec en el mismo PR que SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -87,7 +91,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - su línea inferior toma el color de acento cuando tiene el foco;
   - si el número no cabe en el ancho disponible (por ejemplo, con el zoom de página de NFR-03), su tamaño se reduce hasta caber.
 - **FR-03:** el panel Carga:
-  - plegado, muestra un resumen en una línea: "Barra · <nombre> <peso> kg", con los nombres "Olímpica", "Recta" y "Z", con " · collarines" al final si están activados (SPEC-CALC-001 FR-15), en el modo Barra, o "Dos lados · máquina" y "Un punto · máquina" en los demás modos. En la recta y la Z, el peso es el último válido (SPEC-CALC-001 FR-02). Por ejemplo, "Barra · Olímpica 20 kg · collarines";
+  - plegado, muestra un resumen en una línea: "Barra · <nombre> <peso> kg", con los nombres "Olímpica", "Recta" y "Z", con " · collarines" al final si están activados (SPEC-CALC-001 FR-15), en el modo Barra, o "Dos lados · máquina" y "Un punto · máquina" en los demás modos. En la recta y la Z, el peso es el confirmado (SPEC-CALC-001 FR-02 y FR-11), también mientras el campo tiene un texto vacío o no válido. Por ejemplo, "Barra · Olímpica 20 kg · collarines";
   - desplegado, muestra los tres modos como un control segmentado de tres botones con icono y texto: "Barra", "Dos lados" y "Un punto". El modo elegido se distingue visualmente y se anuncia como seleccionado;
   - solo en el modo Barra, muestra:
     - una ficha por barra (Olímpica 20 kg, Olímpica 15 kg, Recta y Z), con su miniatura, su nombre y su peso; la elegida se distingue y se anuncia como seleccionada;
@@ -254,7 +258,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 
 ## 11. Dependencias y restricciones
 
-- Las reglas y los textos de las series vienen de SPEC-CALC-001 v0.6 y SPEC-CALC-002 v0.2. Esta spec no los cambia.
+- Las reglas y los textos de las series vienen de SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3. Esta spec no los cambia.
 - La tecnología del dibujo la fija ADR-0003, que modifica la regla de "cero dependencias en tiempo de ejecución" de ADR-0001 §3.1. Esta spec no se fusiona antes que ADR-0003.
 - Todo lo que usa la presentación (fuentes, librería 3D e iconos) se sirve desde el propio origen de la app, sin red de terceros (SPEC-CALC-001 NFR-01 y NFR-02, ADR-0001 §3.4).
 - **Referencia visual:** `docs/diseno/maqueta-interfaz.html`, `docs/diseno/discos-3d.html` (banco del modelado) y `docs/diseno/notas-diseno-interfaz.md` §3.2, §3.6, §4 y §6 (iconos, colores, tipografía, radios, márgenes, escena, medidas IPF de los discos, barras, máquina, collarín y duraciones). Son la referencia que acepta Víctor en la prueba manual (AC-24), no requisitos con AC propio. Donde la maqueta contradiga SPEC-CALC-001, SPEC-CALC-002 o esta spec (por ejemplo, en el contraste de NFR-02, en cómo elige los discos, en qué guarda, en que reescribe lo tecleado en el campo de porcentaje o en que no tiene pulsación larga), mandan las specs. Sus fuentes y three.js se cargan de terceros; eso no pasa a la app.

@@ -25,7 +25,9 @@ La versión 0.3 (VIC-13) adapta el aviso de FR-09 a SPEC-CALC-001 v0.7, que guar
 los pesos al terminar de editarlos: en los pesos, el aviso compara el valor
 confirmado con el último guardado bien y no cambia mientras se escribe (FR-09,
 AC-14, AC-15). Decisión de Víctor del 2026-10-26, confirmada el 2026-10-29: este
-ajuste va en el mismo PR que SPEC-CALC-001 v0.7. Enlaza ADR-0005.
+ajuste va en el mismo PR que SPEC-CALC-001 v0.7. Enlaza ADR-0005. Tras la ronda 1
+de G4 del PR #22 decidió que, tras un fallo, cada peso se reintenta en cada final
+de su edición (SPEC-CALC-001 FR-11).
 -->
 
 # SPEC-CALC-002 — Inventario de discos disponibles
@@ -69,8 +71,9 @@ Víctor, único usuario, en su iPhone. Los discos habilitados son un dato introd
   - Los datos guardados de los tipos solo son válidos si son una lista de números sin repetidos en la que cada número es el peso en kg de uno de los 7 tipos. El orden de la lista no importa y la lista vacía es válida (ningún tipo habilitado). Cualquier otra cosa no es válida: por ejemplo, un peso que no es uno de los 7, un peso repetido, un peso escrito como texto o un valor que no es una lista.
   - Los tipos habilitados y cada dato de SPEC-CALC-001 FR-11 se recuperan por separado: si los datos de uno faltan o no son válidos, los demás se recuperan igualmente.
   - Cuando la app vuelve de segundo plano sin haberse cerrado, conserva los tipos habilitados. Si iOS la cerró mientras estaba en segundo plano, la vuelta es un arranque de cero (ADR-0001).
-- **FR-09:** si la app no puede guardar un cambio de alguno de los datos guardados (los tipos habilitados y los datos de SPEC-CALC-001 FR-11: la lista de porcentajes, el peso de trabajo, los pesos de la recta y de la Z y la opción de collarines), sigue funcionando con los valores que tiene en memoria y muestra un aviso discreto: "No se ha podido guardar: se mantendrá hasta cerrar la app". Las series se calculan con esos valores como si se hubiera guardado.
+- **FR-09:** si la app no puede guardar un cambio de alguno de los datos guardados (los tipos habilitados y los datos de SPEC-CALC-001 FR-11: la lista de porcentajes, el peso de trabajo, los pesos de la recta y de la Z y la opción de collarines), sigue funcionando con los valores que tiene en memoria y muestra un aviso discreto: "No se ha podido guardar: se mantendrá hasta cerrar la app". Las series se calculan como si se hubiera guardado: con los valores en memoria y, en los pesos, con lo que muestran los campos (SPEC-CALC-001 FR-10).
   - El aviso se muestra mientras el valor actual de alguno de los datos guardados no coincida con el último que se guardó bien, y desaparece cuando todos coinciden. En los pesos, que solo se guardan al terminar de editarlos y si son válidos (SPEC-CALC-001 FR-11), el valor actual es el confirmado, no lo que hay escrito en el campo: mientras se escribe, el aviso no aparece ni desaparece. El peso de trabajo se compara por su texto ("100" y "100,0" no coinciden) y los pesos de barra, por su valor. La app lo sabe sin volver a leer el almacenamiento: al arrancar de cero, el último guardado de cada dato es el valor con el que arranca. Por ejemplo, si se deshace el cambio que no se pudo guardar, el aviso desaparece aunque el almacenamiento siga sin poder guardar.
+  - Tras un fallo, cada dato se vuelve a intentar en su propio guardado: un peso, en cada final de su edición, aunque el campo esté vacío o no sea válido (SPEC-CALC-001 FR-11); los demás datos, en su siguiente cambio.
   - El aviso solo aparece al guardar; en los pesos, al terminar de editarlos (SPEC-CALC-001 FR-11). Un fallo al leer los datos al arrancar de cero se trata según FR-08 y SPEC-CALC-001 FR-11, sin aviso.
 
 ## 5. Criterios de aceptación
@@ -132,9 +135,11 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
 - **AC-15 → FR-09:** con la barra de 20 kg, el peso de trabajo guardado "100", sin el aviso de fallo al guardar y con el almacenamiento sin poder guardar:
   - al cambiar el peso de trabajo a "105", el aviso no aparece mientras se escribe; al salir del campo, aparece; al volver a escribir "100" y salir del campo, desaparece;
   - al cambiar el peso de trabajo a "105" y salir del campo (aparece el aviso), y después borrar el campo y salir de él, el aviso sigue, porque el peso confirmado, "105", no coincide con el guardado;
-  - al cambiar el peso de trabajo a "105" y salir del campo (aparece el aviso), si después el almacenamiento vuelve a poder guardar y la persona entra en el campo y sale sin cambiar nada, se guarda "105" y el aviso desaparece;
+  - al cambiar el peso de trabajo a "105" y salir del campo (aparece el aviso), si después la persona vuelve a escribir "100" sin salir del campo, el aviso sigue; al salir del campo, desaparece;
+  - al cambiar el peso de trabajo a "105" y salir del campo (aparece el aviso), si después el almacenamiento vuelve a poder guardar y la persona entra en el campo y sale sin cambiar nada, se guarda "105" y el aviso desaparece. Lo mismo si, en lugar de no cambiar nada, borra el campo y sale con el campo vacío;
+  - al escribir "105" en el peso de trabajo y, sin salir del campo, pasar la app a segundo plano, al volver la app muestra el aviso;
   - al activar los collarines, aparece el aviso; al desactivarlos, desaparece;
-  - al cambiar a la Z, escribir 8,5 kg en su peso y salir del campo, aparece el aviso.
+  - al cambiar a la Z, escribir 8,5 kg en su peso y salir del campo, aparece el aviso. Si después el almacenamiento vuelve a poder guardar y la persona elige la recta, el aviso sigue, porque el peso de la Z no se ha vuelto a intentar; al volver a la Z, entrar en su campo y salir, se guarda 8,5 kg y el aviso desaparece.
 
 ## 6. Casos límite, errores y decisiones pendientes
 

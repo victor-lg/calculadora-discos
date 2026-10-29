@@ -47,6 +47,12 @@ cada tecla, para que borrar "105" con la tecla de retroceso no guarde "10" ni "1
 pasar la app a segundo plano; con el campo vacío o no válido se conserva el último
 valor confirmado, también al volver a una barra; el cambio de ADR-0004 va en
 ADR-0005, que se fusiona antes, y SPEC-CALC-002 FR-09 se ajusta en el mismo PR.
+Tras la ronda 1 de G4 del PR #22 (2026-10-29) decidió además: plegar el panel
+Carga también termina la edición, sin descartar el texto; cambiar de barra o de
+modo termina también la edición del peso de trabajo, que nunca se descarta; el
+resumen del panel plegado muestra el peso confirmado (SPEC-CALC-003 FR-03, en el
+mismo PR); y tras un fallo al guardar, cada final de edición de un peso reintenta
+guardar su valor confirmado, aunque el campo esté vacío o no sea válido.
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -97,7 +103,8 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   - se escribe con las mismas reglas que el peso de trabajo (FR-03): cifras, un separador decimal, espacios al principio y al final, separador al final o al principio sin cifras y campo que se trata como vacío;
   - es propio de cada barra: la recta y la Z tienen cada una el suyo. La primera vez, los dos son 10 kg (FR-11);
   - cuando la persona elige la recta o la Z, y al arrancar de cero, el campo muestra el peso confirmado de esa barra (FR-11) con el formato de FR-14;
-  - cambiar de barra o de modo termina la edición del peso de la barra (FR-11): un peso válido se confirma y se guarda, y un texto vacío o no válido se descarta, de modo que la barra conserva su peso confirmado. Por ejemplo, con la recta confirmada en 7,5 kg, si la persona borra hasta "7," (que vale 7), después hasta vaciar el campo y elige la Z, al volver a la recta el campo muestra "7,5".
+  - cambiar de barra o de modo termina la edición del peso de la barra (FR-11): un peso válido se confirma y, si hace falta, se guarda. Además, si el texto del peso de la barra está vacío o no es válido, se descarta, de modo que la barra conserva su peso confirmado. Por ejemplo, con la recta confirmada en 7,5 kg, si la persona borra hasta "7," (que vale 7), después hasta vaciar el campo y elige la Z, al volver a la recta el campo muestra "7,5";
+  - plegar el panel Carga también termina la edición del peso de la barra (FR-11), pero no descarta el texto: el campo conserva lo escrito y, mientras no es válido, se aplica lo que sigue.
 
   Mientras el peso de la barra elegida no es válido, también vacío, la app muestra bajo el campo "Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo." y no muestra series. Con el panel de la barra plegado, lo indica además un aviso general (SPEC-CALC-003 FR-05).
 - **FR-03:** el peso de trabajo es mayor que 0 y como máximo 500 kg, con hasta dos decimales.
@@ -165,13 +172,16 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
   | La opción de collarines (FR-15) | Al cambiar | Desactivada |
 
   - Al arrancar de cero se recupera la lista guardada, aunque esté vacía.
-  - Los pesos se guardan al terminar de editarlos, nunca con cada tecla. Terminar de editar un peso es cualquiera de estos momentos:
+  - Los pesos se guardan al terminar de editarlos, nunca con cada tecla. Un peso está en edición desde que la persona entra en su campo hasta que termina de editarlo, en cualquiera de estos momentos:
     - la persona sale del campo;
     - la persona cambia de barra o de modo;
+    - la persona pliega el panel Carga (SPEC-CALC-003 FR-03);
     - la app pasa a segundo plano, por ejemplo al cambiar de app, al bloquear el teléfono o al abrir el selector de apps para cerrarla.
+
+    Cada uno de esos momentos termina la edición del peso que esté en edición, sea el de trabajo o el de la barra. Los demás controles (los collarines, los tipos de disco, añadir o quitar un porcentaje) no la terminan si el campo conserva el foco. Al contrario que en el campo de añadir porcentaje (SPEC-CALC-003 FR-09), pasar a segundo plano sí termina la edición de un peso.
   - Cada peso tiene un valor confirmado. Al arrancar de cero, es el valor con el que arranca: el guardado o, si falta, no se puede leer o no es válido, el de la primera vez. Después, es el último valor válido que tenía el campo al terminar de editarlo. Al terminar de editar:
-    - si el valor del campo es válido, pasa a ser el confirmado, y se guarda si es distinto del último que se guardó bien. Así, tras un fallo al guardar (SPEC-CALC-002 FR-09), el siguiente final de edición lo vuelve a intentar. El peso de trabajo se compara por su texto ("100" y "100,0" son distintos) y los pesos de barra, por su valor;
-    - si el campo está vacío o no es válido, el confirmado no cambia y no se guarda nada. Lo que muestra el campo tampoco cambia (FR-14), salvo al cambiar de barra o de modo (FR-02).
+    - si el valor del campo es válido, pasa a ser el confirmado; si está vacío o no es válido, el confirmado no cambia. Lo que muestra el campo no cambia en ningún caso (FR-14), salvo el descarte del peso de barra al cambiar de barra o de modo (FR-02). El peso de trabajo no se descarta nunca;
+    - después, si el confirmado es distinto del último que se guardó bien, se guarda. Así, tras un fallo al guardar (SPEC-CALC-002 FR-09), cada final de edición de ese peso vuelve a intentarlo, aunque el campo esté vacío o no sea válido. Los demás pesos no se reintentan. El peso de trabajo se compara por su texto ("100" y "100,0" son distintos) y los pesos de barra, por su valor.
   - Mientras se escribe, los valores intermedios no se guardan aunque sean válidos: al borrar "105" con la tecla de retroceso, no se guardan ni "10" ni "1". Las series sí se recalculan con cada tecla (FR-10).
   - Si la app pasa a segundo plano a mitad de una edición, se guarda el valor que tenga el campo en ese momento, si es válido, aunque sea un paso intermedio.
   - Una lista guardada es válida si es una lista de enteros del 1 al 100. Al leerla, se ordena de menor a mayor y se quitan los repetidos. Un peso de trabajo guardado es válido si cumple FR-03; un peso de barra guardado, si cumple FR-02. Cualquier otra cosa no es válida y se trata igual que un dato que no se puede leer.
@@ -203,7 +213,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 
 ## 5. Criterios de aceptación
 
-Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines desactivados, salvo que se diga otra cosa. "25 + 10 por lado" describe la combinación de discos; cómo se muestra lo fija FR-08. "Muestra la diferencia −D kg (objetivo O kg)" significa que la serie muestra la marca de FR-06 y que su explicación cita ese objetivo. Algunos ejemplos de escritura superan el número de caracteres que admiten los campos (SPEC-CALC-003): describen la regla de validación y se comprueban en los tests de la lógica.
+Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines desactivados, salvo que se diga otra cosa. "25 + 10 por lado" describe la combinación de discos; cómo se muestra lo fija FR-08. "Muestra la diferencia −D kg (objetivo O kg)" significa que la serie muestra la marca de FR-06 y que su explicación cita ese objetivo. Algunos ejemplos de escritura superan el número de caracteres que admiten los campos (SPEC-CALC-003): describen la regla de validación y se comprueban en los tests de la lógica. "Cierra la app y la vuelve a abrir" es cerrarla desde el selector de apps, lo que antes la pasa a segundo plano (FR-11), y volver a abrirla en un arranque de cero.
 
 - **AC-01 → FR-05, FR-07, FR-08:** dado el modo Barra con la olímpica de 20 kg, un peso de trabajo de 100 kg y los porcentajes 40, 70 y 90, la app muestra estas tres series, sin diferencia:
 
@@ -283,7 +293,7 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
   - con la lista ilegible, un peso de trabajo guardado de "102,5" y los collarines activados, la lista es 40, 70 y 90 y se recuperan el peso "102,5" y los collarines activados.
 - **AC-34 → FR-11, FR-02, FR-03:** solo se guarda un peso válido, al terminar de editarlo:
   - con el peso de trabajo guardado "100", si la persona escribe "105", sale del campo, después borra el campo, sale del campo, cierra la app y la vuelve a abrir, el peso de trabajo es "105";
-  - si la persona escribe "100,12", sale del campo, después lo cambia a "100,123", sale del campo, cierra la app y la vuelve a abrir, el peso de trabajo es "100,12";
+  - si la persona escribe "100,12", sale del campo, después lo cambia a "100,123" y sale del campo, el campo sigue mostrando "100,123" con el mensaje "El peso de trabajo admite como máximo dos decimales."; si cierra la app y la vuelve a abrir, el peso de trabajo es "100,12";
   - si la persona escribe 7,5 en el peso de la recta, sale del campo, después lo cambia a 0,5, sale del campo, cierra la app y la vuelve a abrir, la recta pesa 7,5 kg.
 - **AC-35 → FR-08:** con la olímpica de 20 kg y 120 kg, el 100 % (50 kg por lado) muestra "Por lado" y "25 ×2". En el modo Un punto, con 100 kg y el 70 %, la serie muestra "Total en discos" y "25 ×2" y "20".
 - **AC-36 → FR-15, FR-08:** con la olímpica de 20 kg, los collarines activados y 100 kg:
@@ -303,13 +313,16 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
 - **AC-40 → FR-02:** con la recta de 7,5 kg y la Z de 8,5 kg guardadas, al elegir la recta el campo muestra "7,5" y al elegir la Z muestra "8,5". Si la persona escribe "0,5" con la recta (mensaje de error), elige la Z y vuelve a la recta, el campo muestra "7,5", sin mensaje de error. Lo mismo si, en lugar de elegir la Z, pasa al modo Dos lados y vuelve al modo Barra.
 - **AC-41 → FR-12, FR-02:** con la Z y un peso de trabajo de 5 kg, con un peso de barra de 8,5 kg la app muestra el aviso de que el peso de trabajo es inferior a la barra; al cambiar el peso de barra a 0,5, ese aviso desaparece y solo queda el mensaje de peso de barra no válido.
 - **AC-42 → FR-11, FR-02, FR-03:** borrar tecla a tecla no guarda los pasos intermedios:
-  - con el peso de trabajo guardado "105", si la persona lo borra con la tecla de retroceso hasta vaciar el campo ("10", "1" y vacío), el peso de trabajo guardado sigue siendo "105" en cada paso; si después cierra la app y la vuelve a abrir, el peso de trabajo es "105";
+  - con el peso de trabajo guardado "105", si la persona lo borra con la tecla de retroceso hasta vaciar el campo ("10", "1" y vacío), lo guardado en el almacenamiento sigue siendo "105" en cada paso; si después cierra la app y la vuelve a abrir, el peso de trabajo es "105";
   - con la recta guardada en 7,5 kg y elegida, si la persona borra su peso con la tecla de retroceso hasta vaciar el campo ("7,", "7" y vacío), cierra la app y la vuelve a abrir, la recta pesa 7,5 kg.
 - **AC-43 → FR-11, FR-02:** la edición de un peso también termina al pasar a segundo plano y al cambiar de barra o de modo:
   - con el peso de trabajo guardado "100", si la persona escribe "105" y, sin salir del campo, pasa la app a segundo plano, se guarda "105": al volver, el campo sigue mostrando "105", y si cierra la app y la vuelve a abrir, el peso de trabajo es "105";
   - con el peso de trabajo guardado "105", si la persona borra el campo hasta vaciarlo y pasa la app a segundo plano, al volver el campo sigue vacío, con la indicación "Escribe el peso de trabajo.", y si cierra la app y la vuelve a abrir, el peso de trabajo es "105";
   - con la recta guardada en 7,5 kg y elegida, si la persona cambia su peso a 8 y elige la Z, la recta queda guardada en 8 kg: al volver a ella el campo muestra "8", y si cierra la app y la vuelve a abrir, la recta pesa 8 kg. Lo mismo si, en lugar de elegir la Z, pasa al modo Dos lados;
-  - con la recta guardada en 7,5 kg y elegida, si la persona borra su peso hasta "7,", después hasta vaciar el campo y elige la Z, al volver a la recta el campo muestra "7,5", sin mensaje de error.
+  - con la recta guardada en 7,5 kg y elegida, si la persona borra su peso hasta "7,", después hasta vaciar el campo y elige la Z, al volver a la recta el campo muestra "7,5", sin mensaje de error;
+  - con el peso de trabajo guardado "105", si la persona lo borra hasta "1" y, sin salir del campo, pasa la app a segundo plano, se guarda "1": si cierra la app y la vuelve a abrir, el peso de trabajo es "1";
+  - con el foco en el peso de trabajo, si la persona escribe "110" y pasa al modo Dos lados, se guarda "110". Si en lugar de eso borra el campo y pasa al modo Dos lados, el campo sigue vacío, con la indicación "Escribe el peso de trabajo.", y lo guardado no cambia;
+  - con la recta guardada en 7,5 kg y elegida, si la persona cambia su peso a 0,5 y pliega el panel Carga, el campo conserva "0,5", la región de avisos muestra "Revisa el peso de la barra en Carga.", el resumen dice "Barra · Recta 7,5 kg" y la recta sigue guardada en 7,5 kg. Si en lugar de eso cambia su peso a 8 y pliega el panel, el resumen dice "Barra · Recta 8 kg" y la recta queda guardada en 8 kg.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
@@ -326,7 +339,10 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
   - lista guardada vacía: se recupera vacía; 40/70/90 solo la primera vez o si los datos faltan, no se pueden leer o no son válidos; una lista guardada desordenada o con repetidos se ordena y se quitan los repetidos (FR-11);
   - los pesos se guardan solo al terminar de editarlos (salir del campo, cambiar de barra o de modo, pasar a segundo plano), nunca con cada tecla; si en ese momento el campo está vacío o no es válido, no se guarda y se conserva el valor confirmado (FR-11, AC-34, AC-43);
   - borrar un peso tecla a tecla no guarda los pasos intermedios (FR-11, AC-42);
-  - pasar a segundo plano a mitad de una edición guarda el valor válido de ese momento, aunque sea un paso intermedio (FR-11);
+  - pasar a segundo plano a mitad de una edición guarda el valor válido de ese momento, aunque sea un paso intermedio (FR-11, AC-43);
+  - plegar el panel Carga termina la edición sin descartar el texto; el resumen muestra el peso confirmado (FR-02, FR-11, AC-43, SPEC-CALC-003 FR-03);
+  - cambiar de barra o de modo con el foco en el peso de trabajo termina su edición; el peso de trabajo no se descarta nunca (FR-11, AC-43);
+  - tras un fallo al guardar, cada final de edición de un peso reintenta guardar su confirmado, aunque el campo esté vacío o no sea válido (FR-11, SPEC-CALC-002 FR-09 y AC-15);
   - cada dato guardado se recupera por separado (FR-11, AC-33);
   - tipos de disco habilitados guardados y fallo al guardar: los cubren SPEC-CALC-002 FR-08 y FR-09 (FR-11);
   - vuelta de segundo plano: se conserva todo el estado, incluidos los tipos de disco habilitados (SPEC-CALC-002 FR-08); FR-11 solo se aplica al arranque de cero (AC-22), y si iOS cerró la app en segundo plano, la vuelta es un arranque de cero (FR-11);
@@ -354,5 +370,5 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
 
 - Solo iPhone (iOS). Sin Mac y sin publicar en la App Store. La tecnología la fija ADR-0001: una PWA sin framework, instalable en la pantalla de inicio y publicada en GitHub Pages, que encaja con NFR-01.
 - Tipos de disco del gimnasio de Víctor, fijos: 25, 20, 15, 10, 5, 2,5 y 1,25 kg. Cuáles están disponibles lo decide la persona (SPEC-CALC-002).
-- Qué se guarda en el dispositivo y dónde lo fijan ADR-0002, que modifica ADR-0001 §3.2, ADR-0004, que amplía ADR-0002 con el peso de trabajo, los pesos de la recta y de la Z y la opción de collarines (FR-11), y ADR-0005, que modifica ADR-0004 para que los pesos se escriban al terminar de editarlos. Esta versión no se fusiona antes que ADR-0005.
+- Qué se guarda en el dispositivo y dónde lo fijan ADR-0002, que modifica ADR-0001 §3.2, ADR-0004, que amplía ADR-0002 con el peso de trabajo, los pesos de la recta y de la Z y la opción de collarines (FR-11), y ADR-0005, que modifica ADR-0004 para que los pesos se escriban al terminar de editarlos. Esta versión no se fusiona antes que ADR-0005. AC-42 y AC-43 no se dan por cumplidos sin la prueba manual de ADR-0005 §5, a la que se añade un paso: escribir "110" en el peso de trabajo sin salir del campo, bloquear el teléfono, cerrar la app desde el selector de apps y volver a abrirla; el peso de trabajo es "110".
 - La presentación (estructura de la pantalla, dibujo de la carga, movimiento y accesibilidad) la fija SPEC-CALC-003, que coloca los textos de esta spec sin cambiarlos.
