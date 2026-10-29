@@ -94,8 +94,10 @@ export function leerAjustes(almacen) {
 
 // SPEC-CALC-002 FR-09: guarda los datos que han cambiado de `anterior` a
 // `nuevo` y anota en `guardados` el último valor que se guardó bien de cada uno.
-// Si guardar falla, la app sigue con el valor en memoria. De los pesos solo se
-// guarda el último válido (SPEC-CALC-001 FR-11).
+// Si guardar falla, la app sigue con el valor en memoria. Un peso solo se
+// escribe al terminar su edición y si su confirmado no coincide con el último
+// guardado bien; así, tras un fallo, cada final de su edición lo reintenta
+// (SPEC-CALC-001 FR-11, ADR-0005 §3).
 export function guardarCambios(almacen, anterior, nuevo) {
   const guardados = { ...nuevo.guardados };
   if (nuevo.porcentajes !== anterior.porcentajes && guardarPorcentajes(almacen, nuevo.porcentajes)) {
@@ -104,12 +106,14 @@ export function guardarCambios(almacen, anterior, nuevo) {
   if (nuevo.discos !== anterior.discos && guardarDiscos(almacen, nuevo.discos)) {
     guardados.discos = nuevo.discos;
   }
-  if (nuevo.trabajoValido !== anterior.trabajoValido && guardar(almacen, CLAVE_TRABAJO, nuevo.trabajoValido)) {
-    guardados.trabajo = nuevo.trabajoValido;
+  const terminado = (peso) => nuevo.finales[peso] !== anterior.finales[peso];
+  const trabajo = nuevo.trabajoConfirmado;
+  if (terminado('trabajo') && trabajo !== guardados.trabajo && guardar(almacen, CLAVE_TRABAJO, trabajo)) {
+    guardados.trabajo = trabajo;
   }
   for (const [barra, clave] of Object.entries(CLAVES_BARRA)) {
-    const cent = nuevo.barraValida[barra];
-    if (cent !== anterior.barraValida[barra] && guardar(almacen, clave, cent / 100)) guardados[barra] = cent;
+    const cent = nuevo.barraConfirmada[barra];
+    if (terminado(barra) && cent !== guardados[barra] && guardar(almacen, clave, cent / 100)) guardados[barra] = cent;
   }
   if (nuevo.collarines !== anterior.collarines && guardar(almacen, CLAVE_COLLARINES, nuevo.collarines)) {
     guardados.collarines = nuevo.collarines;

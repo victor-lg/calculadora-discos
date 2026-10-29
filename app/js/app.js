@@ -8,6 +8,7 @@ import {
   elegirBarra,
   escribirPesoBarra,
   escribirTrabajo,
+  terminarEdicion,
   anadirPorcentaje,
   quitarPorcentaje,
   alternarDisco,
@@ -46,12 +47,23 @@ function opcion(nombreGrupo, valor, texto, alCambiar, tipo = 'radio') {
   return label;
 }
 
+// FR-11: el peso cuyo campo tiene el foco ('trabajo' o 'barra'), o null.
+function pesoConFoco() {
+  const id = document.activeElement?.id;
+  if (id === 'trabajo') return 'trabajo';
+  return id === 'peso-barra' ? 'barra' : null;
+}
+
 function montarOpciones() {
+  // FR-11: en iOS, tocar otro control no siempre quita el foco del campo
+  // (ADR-0005 §3), así que el cambio de modo o de barra termina su edición.
   for (const m of MODOS) {
-    $('modos').append(opcion('modo', m.id, m.nombre, (modo) => actualizar(elegirModo(estado, modo))));
+    $('modos').append(opcion('modo', m.id, m.nombre, (modo) => actualizar(elegirModo(estado, modo, pesoConFoco()))));
   }
   for (const b of BARRAS) {
-    $('lista-barras').append(opcion('barra', b.id, b.nombre, (barra) => actualizar(elegirBarra(estado, barra))));
+    $('lista-barras').append(opcion('barra', b.id, b.nombre, (barra) => {
+      actualizar(elegirBarra(estado, barra, pesoConFoco()));
+    }));
   }
   // SPEC-CALC-002 FR-02: cada tipo se habilita o deshabilita al tocarlo.
   for (const d of modeloVista(estado).discos) {
@@ -142,10 +154,20 @@ function pintar() {
 }
 
 // FR-10: cualquier cambio recalcula al momento. FR-11 y SPEC-CALC-002 FR-08:
-// cada dato guardado se guarda cuando cambia (SPEC-CALC-002 FR-09 si falla).
+// cada dato guardado se guarda cuando cambia, y los pesos, al terminar de
+// editarlos (SPEC-CALC-002 FR-09 si falla).
 function actualizar(nuevo) {
   estado = guardarCambios(almacen, estado, nuevo);
   pintar();
+}
+
+// FR-11: termina la edición de un peso y lo guarda. Solo puede cambiar el aviso
+// de SPEC-CALC-002 FR-09 (las series usan lo escrito), así que no se repinta
+// el resto: el blur llega con el toque siguiente, y reconstruir el control
+// tocado se comería su clic.
+function terminar(peso) {
+  estado = guardarCambios(almacen, estado, terminarEdicion(estado, peso));
+  texto('aviso-guardado', modeloVista(estado).avisoGuardado);
 }
 
 function enlazarCampos() {
@@ -153,6 +175,9 @@ function enlazarCampos() {
   $('peso-barra').addEventListener('input', (e) => {
     actualizar(escribirPesoBarra(estado, e.target.value));
   });
+  // FR-11: salir del campo termina su edición, aunque no se haya tecleado nada.
+  $('trabajo').addEventListener('blur', () => terminar('trabajo'));
+  $('peso-barra').addEventListener('blur', () => terminar('barra'));
   $('collarines').addEventListener('change', (e) => actualizar({ ...estado, collarines: e.target.checked }));
   $('nuevo-porcentaje').addEventListener('input', (e) => {
     actualizar({ ...estado, textoPorcentaje: e.target.value });
@@ -163,9 +188,20 @@ function enlazarCampos() {
   });
 }
 
+// FR-11, ADR-0005 §3: pasar a segundo plano termina la edición del peso que
+// tiene el foco; manda visibilitychange y pagehide es el respaldo.
+function terminarAlSalir() {
+  const peso = pesoConFoco();
+  if (peso) terminar(peso);
+}
+
 montarOpciones();
 enlazarCampos();
 pintar();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') terminarAlSalir();
+});
+window.addEventListener('pagehide', terminarAlSalir);
 
 // ADR-0001 §3.2: se pide almacenamiento persistente, sin depender del resultado.
 navigator.storage?.persist?.().catch(() => {});
