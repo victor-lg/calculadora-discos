@@ -4,7 +4,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1d2b3a">
+  <meta name="theme-color" content="#0d0e10">
   <meta name="apple-mobile-web-app-title" content="Discos">
   <title>Calculadora de discos</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -14,40 +14,87 @@
 </head>
 <body>
   <main>
-    <h1>Series de calentamiento</h1>
-    <p id="aviso-guardado" class="aviso-guardado" role="status"></p>
+    <h1 class="oculto">Series de calentamiento</h1>
 
-    <section aria-labelledby="titulo-carga">
-      <h2 id="titulo-carga" class="oculto">Carga</h2>
+    <!-- SPEC-CALC-003 FR-02: el peso de trabajo. -->
+    <div class="peso">
+      <label for="trabajo">Peso de trabajo</label>
+      <div class="peso-campo">
+        <span class="auto" id="trabajo-auto"><input id="trabajo" type="text" inputmode="decimal" autocomplete="off" size="1" aria-describedby="error-trabajo indicacion-trabajo"></span><span class="unidad">kg</span>
+      </div>
+    </div>
 
-      <fieldset id="modos">
-        <legend>Modo de carga</legend>
-      </fieldset>
+    <!-- SPEC-CALC-003 FR-03: el panel Carga, plegado al arrancar. -->
+    <section class="plegable" aria-labelledby="titulo-carga">
+      <h2 class="cabecera-panel">
+        <button id="boton-carga" class="pliegue" type="button" aria-expanded="false" aria-controls="panel-carga">
+          <span class="eyebrow" id="titulo-carga">Carga</span>
+          <span class="resumen" id="resumen-carga"></span>
+          <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </h2>
+      <div id="panel-carga" class="cuerpo-panel" hidden>
+        <fieldset id="modos" class="segmentos">
+          <legend class="oculto">Modo de carga</legend>
+          <label class="segmento"><input type="radio" name="modo" value="barra"><svg viewBox="0 0 40 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 10h36"/><rect x="7" y="3" width="4.5" height="14" rx="1.6"/><rect x="28.5" y="3" width="4.5" height="14" rx="1.6"/><path d="M13.5 7v6M26.5 7v6"/></svg><span>Barra</span></label>
+          <label class="segmento"><input type="radio" name="modo" value="dos-lados"><svg viewBox="0 0 40 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3.5v13M3 10h11"/><rect x="7" y="4" width="4" height="12" rx="1.5"/><path d="M37 3.5v13M37 10H26"/><rect x="29" y="4" width="4" height="12" rx="1.5"/></svg><span>Dos lados</span></label>
+          <label class="segmento"><input type="radio" name="modo" value="un-punto"><svg viewBox="0 0 40 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M11 3.5v13M11 10h19"/><rect x="16" y="4" width="4" height="12" rx="1.5"/></svg><span>Un punto</span></label>
+        </fieldset>
 
-      <fieldset id="barras">
-        <legend>Barra</legend>
-        <div id="lista-barras"></div>
-        <p id="peso-barra-fijo" class="dato"></p>
-        <div id="campo-peso-barra" class="campo">
-          <label for="peso-barra">Peso de la barra (kg)</label>
-          <input id="peso-barra" type="text" inputmode="decimal" autocomplete="off" aria-describedby="error-barra">
+        <div id="barras">
+          <!-- FR-14: media barra en plano, todas a la misma escala (manga útil de 375, 280, 200 y 200 mm). -->
+          <fieldset id="lista-barras" class="fichas">
+            <legend class="oculto">Barra</legend>
+            <label class="ficha"><input type="radio" name="barra" value="20"><svg viewBox="0 0 64 20" aria-hidden="true" focusable="false"><rect x="0" y="8.5" width="20" height="3" fill="#c4c9d0"/><rect x="20" y="4" width="2.5" height="12" rx=".6" fill="#e3e7ec"/><rect x="22.5" y="7" width="40" height="6" rx="1" fill="#e3e7ec"/></svg><span class="nombre">Olímpica</span> <span class="peso-ficha"></span></label>
+            <label class="ficha"><input type="radio" name="barra" value="15"><svg viewBox="0 0 64 20" aria-hidden="true" focusable="false"><rect x="0" y="8.7" width="20" height="2.6" fill="#c4c9d0"/><rect x="20" y="4" width="2.5" height="12" rx=".6" fill="#e3e7ec"/><rect x="22.5" y="7" width="29.9" height="6" rx="1" fill="#e3e7ec"/></svg><span class="nombre">Olímpica</span> <span class="peso-ficha"></span></label>
+            <label class="ficha"><input type="radio" name="barra" value="recta"><svg viewBox="0 0 64 20" aria-hidden="true" focusable="false"><rect x="0" y="8.7" width="20" height="2.6" fill="#c4c9d0"/><rect x="20" y="5" width="2" height="10" rx=".6" fill="#e3e7ec"/><rect x="22" y="7.5" width="21.3" height="5" rx="1" fill="#e3e7ec"/></svg><span class="nombre">Recta</span> <span class="peso-ficha"></span></label>
+            <label class="ficha"><input type="radio" name="barra" value="z"><svg viewBox="0 0 64 20" aria-hidden="true" focusable="false"><path d="M0 10h5l3-3.5 4 7 3-3.5h5" fill="none" stroke="#c4c9d0" stroke-width="2.6" stroke-linejoin="round"/><rect x="20" y="5" width="2" height="10" rx=".6" fill="#e3e7ec"/><rect x="22" y="7.5" width="21.3" height="5" rx="1" fill="#e3e7ec"/></svg><span class="nombre">Z</span> <span class="peso-ficha"></span></label>
+          </fieldset>
+
+          <label class="interruptor" for="collarines">
+            <span><span id="titulo-collarines" class="titulo-opcion">Collarines de competición</span><span id="nota-collarines" class="nota">2,5 kg cada uno; suman 5 kg en las series con discos</span></span>
+            <input id="collarines" type="checkbox" role="switch" aria-labelledby="titulo-collarines" aria-describedby="nota-collarines">
+          </label>
+
+          <div id="campo-peso-barra" class="peso-barra">
+            <label for="peso-barra">Peso de la barra</label>
+            <input id="peso-barra" type="text" inputmode="decimal" autocomplete="off" aria-describedby="error-barra"><span class="unidad">kg</span>
+          </div>
           <p id="error-barra" class="error" role="alert"></p>
         </div>
-        <label class="opcion"><input id="collarines" type="checkbox"><span>Collarines de competición</span></label>
-      </fieldset>
 
-      <div class="campo">
-        <label for="trabajo">Peso de trabajo (kg)</label>
-        <input id="trabajo" type="text" inputmode="decimal" autocomplete="off" aria-describedby="error-trabajo indicacion-trabajo">
-        <p id="error-trabajo" class="error" role="alert"></p>
-        <p id="indicacion-trabajo" class="indicacion"></p>
+        <p id="nota-maquina" class="nota-maquina">Los discos se cargan en el cuerno de la máquina.</p>
       </div>
-
-      <fieldset id="discos">
-        <legend>Mis discos</legend>
-        <div id="lista-discos"></div>
-      </fieldset>
     </section>
+
+    <!-- SPEC-CALC-003 FR-04: el panel Mis discos, plegado al arrancar. -->
+    <section class="plegable" aria-labelledby="titulo-discos">
+      <h2 class="cabecera-panel">
+        <button id="boton-discos" class="pliegue" type="button" aria-expanded="false" aria-controls="panel-discos">
+          <span class="eyebrow" id="titulo-discos">Mis discos</span>
+          <span class="puntos" id="puntos-discos" aria-hidden="true"></span>
+          <span class="cuenta" id="cuenta-discos"></span>
+          <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </h2>
+      <div id="panel-discos" class="cuerpo-panel" hidden>
+        <fieldset id="discos">
+          <legend class="oculto">Tipos de disco habilitados</legend>
+          <div id="lista-discos" class="lista-discos"></div>
+        </fieldset>
+      </div>
+    </section>
+
+    <!-- SPEC-CALC-003 FR-05: los avisos generales, en este orden. -->
+    <div id="avisos" class="avisos" aria-live="polite">
+      <p id="error-trabajo" class="aviso"></p>
+      <p id="indicacion-trabajo" class="aviso"></p>
+      <p id="aviso-peso-barra" class="aviso"></p>
+      <p id="indicacion-porcentajes" class="aviso"></p>
+      <p id="indicacion-discos" class="aviso"></p>
+      <p id="aviso-barra" class="aviso"></p>
+      <p id="aviso-guardado" class="aviso"></p>
+    </div>
 
     <section aria-labelledby="titulo-porcentajes">
       <h2 id="titulo-porcentajes">Porcentajes</h2>
@@ -58,13 +105,10 @@
         <button type="submit">Añadir</button>
       </form>
       <p id="error-porcentaje" class="error" role="alert"></p>
-      <p id="indicacion-porcentajes" class="indicacion"></p>
     </section>
 
     <section aria-labelledby="titulo-series">
       <h2 id="titulo-series">Series</h2>
-      <p id="aviso-barra" class="aviso" role="status"></p>
-      <p id="indicacion-discos" class="indicacion"></p>
       <ol id="series" class="series" aria-live="polite"></ol>
     </section>
   </main>

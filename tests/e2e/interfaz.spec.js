@@ -1,5 +1,6 @@
 // Recorridos de la interfaz que necesitan un navegador real.
 import { test, expect } from '@playwright/test';
+import { trabajo, pesoBarra, barra, desplegarPaneles, recargar, copiar, pegar } from './pantalla.js';
 
 const CLAVE = 'calculadora-discos:v1:porcentajes';
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
@@ -7,8 +8,6 @@ const CLAVE_RECTA = 'calculadora-discos:v1:peso-recta';
 const CLAVE_Z = 'calculadora-discos:v1:peso-z';
 const CLAVE_COLLARINES = 'calculadora-discos:v1:collarines';
 
-const trabajo = (page) => page.getByLabel('Peso de trabajo (kg)');
-const pesoBarra = (page) => page.getByLabel('Peso de la barra (kg)');
 const nuevoPorcentaje = (page) => page.getByLabel('Nuevo porcentaje');
 const series = (page) => page.locator('#series > li');
 const porcentajes = (page) => page.locator('#porcentajes > li > span');
@@ -29,20 +28,19 @@ test.beforeEach(async ({ page }) => {
   // Cada test parte de un almacenamiento vacío (contexto propio de Playwright):
   // así ningún test hereda tipos de disco deshabilitados de otro.
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  await desplegarPaneles(page);
 });
-
-const barra = (page, nombre) => page.getByLabel(nombre, { exact: true });
 
 test('SPEC-CALC-001/AC-04 las olímpicas de 20 y 15 kg no permiten cambiar su peso', async ({ page }) => {
   const radios = page.locator('input[name="barra"]');
   await expect(radios).toHaveCount(4);
-  await expect(page.locator('#lista-barras label.opcion')).toHaveText([
-    'Olímpica 20 kg', 'Olímpica 15 kg', 'Recta', 'Z',
+  // SPEC-CALC-003 FR-03: el peso fijo se ve en su ficha.
+  await expect(page.locator('#lista-barras .ficha')).toHaveText([
+    'Olímpica 20 kg', 'Olímpica 15 kg', 'Recta 10 kg', 'Z 10 kg',
   ]);
-  for (const [nombre, fijo] of [['Olímpica 20 kg', '20 kg'], ['Olímpica 15 kg', '15 kg']]) {
+  for (const nombre of ['Olímpica 20 kg', 'Olímpica 15 kg']) {
     await barra(page, nombre).check();
     await expect(pesoBarra(page)).toBeHidden();
-    await expect(page.locator('#peso-barra-fijo')).toHaveText(`Peso de la barra: ${fijo}`);
   }
   for (const nombre of ['Recta', 'Z']) {
     await barra(page, nombre).check();
@@ -87,7 +85,7 @@ test('SPEC-CALC-001/AC-10 las series se actualizan al momento con cada cambio', 
   await page.getByLabel('Un punto').check();
   await expect(series(page).locator('.total')).toHaveText(['41,25 kg', '52,5 kg', '93,75 kg']);
 
-  await page.getByLabel('Dos lados sin barra').check();
+  await page.getByLabel('Dos lados').check();
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '52,5 kg', '92,5 kg']);
 });
 
@@ -114,8 +112,8 @@ test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo
   await barra(page, 'Z').check();
   await pesoBarra(page).fill('8,5');
   await page.getByLabel('Collarines de competición').check();
-  await page.getByLabel('Dos lados sin barra').check();
-  await page.reload();
+  await page.getByLabel('Dos lados').check();
+  await recargar(page);
 
   await expect(porcentajes(page)).toHaveText(['50 %', '75 %']);
   await expect(trabajo(page)).toHaveValue('102,5');
@@ -129,7 +127,7 @@ test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo
   await expect(page.locator('#aviso-guardado')).toBeHidden();
 
   await quitarTodos(page);
-  await page.reload();
+  await recargar(page);
   await expect(porcentajes(page)).toHaveCount(0);
   await expect(page.locator('#indicacion-porcentajes')).toBeVisible();
 });
@@ -142,24 +140,24 @@ test('SPEC-CALC-001/AC-33 datos guardados que faltan, rotos o no válidos: cada 
 
   for (const crudo of [null, '{roto', '[150]', '[40.5]', '["40"]']) {
     await guardar(crudo === null ? {} : { [CLAVE]: crudo });
-    await page.reload();
+    await recargar(page);
     await expect(porcentajes(page), String(crudo)).toHaveText(['40 %', '70 %', '90 %']);
     await expect(trabajo(page)).toHaveValue('100');
     await expect(page.locator('#error-trabajo')).toBeHidden();
   }
 
   await guardar({ [CLAVE]: '[90,40,40]' });
-  await page.reload();
+  await recargar(page);
   await expect(porcentajes(page)).toHaveText(['40 %', '90 %']);
 
   for (const crudo of ['"abc"', '"600"', '{roto']) {
     await guardar({ [CLAVE_TRABAJO]: crudo });
-    await page.reload();
+    await recargar(page);
     await expect(trabajo(page), crudo).toHaveValue('100');
   }
 
   await guardar({ [CLAVE_RECTA]: '60', [CLAVE_Z]: '8.5', [CLAVE_COLLARINES]: '{roto' });
-  await page.reload();
+  await recargar(page);
   await expect(page.getByLabel('Collarines de competición')).not.toBeChecked();
   await barra(page, 'Recta').check();
   await expect(pesoBarra(page)).toHaveValue('10');
@@ -167,7 +165,7 @@ test('SPEC-CALC-001/AC-33 datos guardados que faltan, rotos o no válidos: cada 
   await expect(pesoBarra(page)).toHaveValue('8,5');
 
   await guardar({ [CLAVE]: '{roto', [CLAVE_TRABAJO]: '"102,5"', [CLAVE_COLLARINES]: 'true' });
-  await page.reload();
+  await recargar(page);
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(trabajo(page)).toHaveValue('102,5');
   await expect(page.getByLabel('Collarines de competición')).toBeChecked();
@@ -188,7 +186,7 @@ async function segundoPlano(page) {
 // segundo plano, y vuelve en un arranque de cero.
 async function cerrarYAbrir(page) {
   await segundoPlano(page);
-  await page.reload();
+  await recargar(page);
 }
 
 const guardado = (page, clave) => page.evaluate((c) => localStorage.getItem(c), clave);
@@ -211,7 +209,9 @@ test('SPEC-CALC-001/AC-34 solo se guarda un peso válido, al terminar de editarl
 
   await trabajo(page).fill('100,12');
   await trabajo(page).blur();
-  await trabajo(page).fill('100,123');
+  // SPEC-CALC-003 FR-02: con 7 caracteres, solo se puede pegar.
+  await copiar(page, '100,123');
+  await pegar(page, trabajo(page));
   await trabajo(page).blur();
   await expect(trabajo(page)).toHaveValue('100,123');
   await expect(page.locator('#error-trabajo')).toHaveText('El peso de trabajo admite como máximo dos decimales.');
@@ -289,9 +289,13 @@ test('SPEC-CALC-001/AC-43 pasar a segundo plano termina la edición sin cambiar 
   // "100,12" y, sin salir, "100,123": se conserva el confirmado, "100".
   await trabajo(page).fill('100');
   await trabajo(page).blur();
+  // SPEC-CALC-003 FR-02: el séptimo carácter no se puede teclear; se pega
+  // "100,123" sin salir del campo.
+  await copiar(page, '100,123');
   await trabajo(page).focus();
   await trabajo(page).fill('100,12');
-  await trabajo(page).pressSequentially('3');
+  await pegar(page, trabajo(page));
+  await expect(trabajo(page)).toBeFocused();
   await cerrarYAbrir(page);
   await expect(trabajo(page)).toHaveValue('100');
 
@@ -465,14 +469,14 @@ test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último pes
   await expect(page.locator('#error-barra')).toBeHidden();
 
   await pesoBarra(page).fill('0,5');
-  await page.getByLabel('Dos lados sin barra').check();
+  await page.getByLabel('Dos lados').check();
   await page.getByLabel('Barra', { exact: true }).check();
   await expect(pesoBarra(page)).toHaveValue('7,5');
   await expect(page.locator('#error-barra')).toBeHidden();
   await expect(series(page)).toHaveCount(3);
 
   // Al arrancar de cero, cada barra muestra su último peso válido guardado.
-  await page.reload();
+  await recargar(page);
   await barra(page, 'Recta').check();
   await expect(pesoBarra(page)).toHaveValue('7,5');
   await barra(page, 'Z').check();
