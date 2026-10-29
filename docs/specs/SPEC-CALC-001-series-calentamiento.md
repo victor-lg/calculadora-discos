@@ -170,7 +170,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
     - la persona cambia de barra o de modo;
     - la app pasa a segundo plano, por ejemplo al cambiar de app, al bloquear el teléfono o al abrir el selector de apps para cerrarla.
   - Cada peso tiene un valor confirmado. Al arrancar de cero, es el valor con el que arranca: el guardado o, si falta, no se puede leer o no es válido, el de la primera vez. Después, es el último valor válido que tenía el campo al terminar de editarlo. Al terminar de editar:
-    - si el valor del campo es válido y distinto del confirmado, pasa a ser el confirmado y se guarda. El peso de trabajo se compara por su texto ("100" y "100,0" son distintos) y los pesos de barra, por su valor;
+    - si el valor del campo es válido, pasa a ser el confirmado, y se guarda si es distinto del último que se guardó bien. Así, tras un fallo al guardar (SPEC-CALC-002 FR-09), el siguiente final de edición lo vuelve a intentar. El peso de trabajo se compara por su texto ("100" y "100,0" son distintos) y los pesos de barra, por su valor;
     - si el campo está vacío o no es válido, el confirmado no cambia y no se guarda nada. Lo que muestra el campo tampoco cambia (FR-14), salvo al cambiar de barra o de modo (FR-02).
   - Mientras se escribe, los valores intermedios no se guardan aunque sean válidos: al borrar "105" con la tecla de retroceso, no se guardan ni "10" ni "1". Las series sí se recalculan con cada tecla (FR-10).
   - Si la app pasa a segundo plano a mitad de una edición, se guarda el valor que tenga el campo en ese momento, si es válido, aunque sea un paso intermedio.

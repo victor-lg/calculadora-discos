@@ -1,11 +1,11 @@
 ---
 id: SPEC-CALC-002
 titulo: Inventario de discos disponibles
-estado: aprobada
-version: 0.2
+estado: en-revision
+version: 0.3
 riesgo: R1
 sustituye: null
-adr: [ADR-0001, ADR-0002, ADR-0004]
+adr: [ADR-0001, ADR-0002, ADR-0004, ADR-0005]
 transversales: []
 ---
 
@@ -21,6 +21,11 @@ La versión 0.2 (VIC-9) no cambia las reglas del inventario: adapta los textos y
 SPEC-CALC-001 v0.6 (FR-08, FR-09), fija el texto de FR-06, deja la presentación en
 SPEC-CALC-003 y extiende el aviso de FR-09 a todos los datos guardados (decisión de Víctor,
 2026-10-26). Enlaza ADR-0004.
+La versión 0.3 (VIC-13) adapta el aviso de FR-09 a SPEC-CALC-001 v0.7, que guarda
+los pesos al terminar de editarlos: en los pesos, el aviso compara el valor
+confirmado con el último guardado bien y no cambia mientras se escribe (FR-09,
+AC-14, AC-15). Decisión de Víctor del 2026-10-26, confirmada el 2026-10-29: este
+ajuste va en el mismo PR que SPEC-CALC-001 v0.7. Enlaza ADR-0005.
 -->
 
 # SPEC-CALC-002 — Inventario de discos disponibles
@@ -65,8 +70,8 @@ Víctor, único usuario, en su iPhone. Los discos habilitados son un dato introd
   - Los tipos habilitados y cada dato de SPEC-CALC-001 FR-11 se recuperan por separado: si los datos de uno faltan o no son válidos, los demás se recuperan igualmente.
   - Cuando la app vuelve de segundo plano sin haberse cerrado, conserva los tipos habilitados. Si iOS la cerró mientras estaba en segundo plano, la vuelta es un arranque de cero (ADR-0001).
 - **FR-09:** si la app no puede guardar un cambio de alguno de los datos guardados (los tipos habilitados y los datos de SPEC-CALC-001 FR-11: la lista de porcentajes, el peso de trabajo, los pesos de la recta y de la Z y la opción de collarines), sigue funcionando con los valores que tiene en memoria y muestra un aviso discreto: "No se ha podido guardar: se mantendrá hasta cerrar la app". Las series se calculan con esos valores como si se hubiera guardado.
-  - El aviso se muestra mientras el valor actual de alguno de los datos guardados no coincida con el último que se guardó bien, y desaparece cuando todos coinciden. En los pesos, que solo se guardan si son válidos (SPEC-CALC-001 FR-11), el valor actual es el último válido que se escribió. El peso de trabajo se compara por su texto ("100" y "100,0" no coinciden) y los pesos de barra, por su valor. La app lo sabe sin volver a leer el almacenamiento: al arrancar de cero, el último guardado de cada dato es el valor con el que arranca. Por ejemplo, si se deshace el cambio que no se pudo guardar, el aviso desaparece aunque el almacenamiento siga sin poder guardar.
-  - El aviso solo aparece al guardar. Un fallo al leer los datos al arrancar de cero se trata según FR-08 y SPEC-CALC-001 FR-11, sin aviso.
+  - El aviso se muestra mientras el valor actual de alguno de los datos guardados no coincida con el último que se guardó bien, y desaparece cuando todos coinciden. En los pesos, que solo se guardan al terminar de editarlos y si son válidos (SPEC-CALC-001 FR-11), el valor actual es el confirmado, no lo que hay escrito en el campo: mientras se escribe, el aviso no aparece ni desaparece. El peso de trabajo se compara por su texto ("100" y "100,0" no coinciden) y los pesos de barra, por su valor. La app lo sabe sin volver a leer el almacenamiento: al arrancar de cero, el último guardado de cada dato es el valor con el que arranca. Por ejemplo, si se deshace el cambio que no se pudo guardar, el aviso desaparece aunque el almacenamiento siga sin poder guardar.
+  - El aviso solo aparece al guardar; en los pesos, al terminar de editarlos (SPEC-CALC-001 FR-11). Un fallo al leer los datos al arrancar de cero se trata según FR-08 y SPEC-CALC-001 FR-11, sin aviso.
 
 ## 5. Criterios de aceptación
 
@@ -119,16 +124,17 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
 - **AC-14 → FR-09:** con la barra de 20 kg, 100 kg, el 90 %, sin el aviso de fallo al guardar y con el almacenamiento del dispositivo sin poder guardar, cada caso desde ese punto de partida:
   - al deshabilitar el de 25 kg, el de 25 kg queda deshabilitado, la serie muestra 20 + 15 por lado y la app muestra el aviso "No se ha podido guardar: se mantendrá hasta cerrar la app";
   - al añadir el porcentaje 50, aparece la serie del 50 % y la app muestra el mismo aviso;
-  - al cambiar el peso de trabajo a 105 kg, las series se recalculan y la app muestra el mismo aviso;
+  - al cambiar el peso de trabajo a 105 kg y salir del campo, las series se recalculan y la app muestra el mismo aviso;
   - al quitar el porcentaje 90, desaparece su serie y la app muestra el mismo aviso;
   - al deshabilitar el de 25 kg (aparece el aviso), si después el almacenamiento vuelve a poder guardar y la persona añade el porcentaje 50, la lista se guarda pero el aviso sigue, porque los tipos habilitados no se han guardado; al habilitar otra vez el de 25 kg, los tipos se guardan y el aviso desaparece;
   - al deshabilitar el de 25 kg (aparece el aviso) y volver a habilitarlo con el almacenamiento todavía sin poder guardar, el aviso desaparece, porque los dos datos vuelven a coincidir con lo último que se guardó bien;
   - al añadir el porcentaje 50 (aparece el aviso), si después el almacenamiento vuelve a poder guardar y la persona deshabilita el de 25 kg, los tipos se guardan pero el aviso sigue, porque la lista no coincide con la última guardada.
 - **AC-15 → FR-09:** con la barra de 20 kg, el peso de trabajo guardado "100", sin el aviso de fallo al guardar y con el almacenamiento sin poder guardar:
-  - al cambiar el peso de trabajo a "105", aparece el aviso; al volver a escribir "100", desaparece;
-  - al cambiar el peso de trabajo a "105" (aparece el aviso) y después borrar el campo, el aviso sigue, porque el último peso válido, "105", no coincide con el guardado;
+  - al cambiar el peso de trabajo a "105", el aviso no aparece mientras se escribe; al salir del campo, aparece; al volver a escribir "100" y salir del campo, desaparece;
+  - al cambiar el peso de trabajo a "105" y salir del campo (aparece el aviso), y después borrar el campo y salir de él, el aviso sigue, porque el peso confirmado, "105", no coincide con el guardado;
+  - al cambiar el peso de trabajo a "105" y salir del campo (aparece el aviso), si después el almacenamiento vuelve a poder guardar y la persona entra en el campo y sale sin cambiar nada, se guarda "105" y el aviso desaparece;
   - al activar los collarines, aparece el aviso; al desactivarlos, desaparece;
-  - al cambiar a la Z y escribir 8,5 kg en su peso, aparece el aviso.
+  - al cambiar a la Z, escribir 8,5 kg en su peso y salir del campo, aparece el aviso.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
@@ -140,7 +146,7 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
   - ningún tipo habilitado guardado: se recupera así (FR-08, AC-11);
   - datos guardados de los tipos que faltan, ilegibles o no válidos (con un peso ajeno a los 7, con un peso repetido o que no son una lista): los 7 habilitados, sin afectar a la lista de porcentajes (FR-08, AC-11, AC-12);
   - habilitar o deshabilitar con el peso vacío o no válido: no hay series que recalcular, pero el cambio se aplica y se guarda (FR-02, FR-08, AC-11);
-  - fallo al guardar cualquier dato guardado: la app sigue con los valores en memoria y muestra un aviso discreto mientras alguno no coincida con lo último que se guardó bien (FR-09, AC-14, AC-15);
+  - fallo al guardar cualquier dato guardado: la app sigue con los valores en memoria y muestra un aviso discreto mientras alguno no coincida con lo último que se guardó bien; en los pesos cuenta el valor confirmado, y el aviso no cambia mientras se escribe (FR-09, AC-14, AC-15);
   - pocos tipos habilitados y un objetivo grande (por ejemplo, solo el de 1,25 kg y 500 kg en el modo Un punto, 400 discos): se muestran todos los discos, sin límite, agrupados por tipo (SPEC-CALC-001 FR-08), con el aviso de capacidad de SPEC-CALC-001 FR-16.
 - **Decisiones pendientes:** ninguna crítica.
 
@@ -148,7 +154,7 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
 
 ## 11. Dependencias y restricciones
 
-- Depende de SPEC-CALC-001 v0.6, que delega en esta spec qué discos se usan (FR-06, FR-07 y FR-09) e incluye los tipos habilitados en SPEC-CALC-001 AC-13.
+- Depende de SPEC-CALC-001 v0.7, que delega en esta spec qué discos se usan (FR-06, FR-07 y FR-09) e incluye los tipos habilitados en SPEC-CALC-001 AC-13.
 - La presentación de los tipos ("Mis discos") la fija SPEC-CALC-003.
-- ADR-0002, que modifica ADR-0001 §3.2, y ADR-0004, que lo amplía, fijan qué se guarda en el dispositivo y dónde. Esta versión no se fusiona antes que ADR-0004. Las reglas de validez, los valores por defecto y el fallo al guardar viven en esta spec (FR-08, FR-09) y en SPEC-CALC-001 FR-11.
+- ADR-0002, que modifica ADR-0001 §3.2, y ADR-0004, que lo amplía, fijan qué se guarda en el dispositivo y dónde; ADR-0005 modifica ADR-0004 para que los pesos se escriban al terminar de editarlos. Esta versión no se fusiona antes que ADR-0005. Las reglas de validez, los valores por defecto y el fallo al guardar viven en esta spec (FR-08, FR-09) y en SPEC-CALC-001 FR-11.
 - SPEC-CALC-002 AC-13 no se da por cumplido sin la prueba manual en el iPhone de ADR-0002 §5.
