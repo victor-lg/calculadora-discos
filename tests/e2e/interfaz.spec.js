@@ -506,7 +506,7 @@ test('SPEC-CALC-001/AC-35 SPEC-CALC-001/AC-39 discos agrupados y aviso de capaci
   await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
 });
 
-test('SPEC-CALC-001/FR-11 con el foco en un peso, el primer toque en otro control funciona aunque salir del campo repinte', async ({ page }) => {
+test('SPEC-CALC-001/FR-11 con el foco en un peso, salir del campo no se come el primer toque en otro control', async ({ page }) => {
   await trabajo(page).fill('105');
   await page.getByRole('button', { name: 'Quitar 90 %' }).click();
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %']);
