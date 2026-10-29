@@ -43,6 +43,8 @@ Carga y en sus fichas (FR-03, AC-03): el del campo mientras es válido y, si no,
 confirmado de SPEC-CALC-001 v0.7 FR-11, en lugar del último válido tecleado.
 Decisiones de Víctor del 2026-10-29, en las rondas 1 y 2 de G4 del PR #22, que
 ajusta esta spec en el mismo PR que SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3.
+Tras la ronda 3, FR-08 aclara que el aviso de "Deshacer" desaparece al teclear en
+un peso, como ya decía AC-12.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -95,7 +97,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - plegado, muestra un resumen en una línea: "Barra · <nombre> <peso> kg", con los nombres "Olímpica", "Recta" y "Z", con " · collarines" al final si están activados (SPEC-CALC-001 FR-15), en el modo Barra, o "Dos lados · máquina" y "Un punto · máquina" en los demás modos. En la recta y la Z, el peso es el del campo si es válido, el mismo con el que se calculan las series (SPEC-CALC-001 FR-10); si el campo está vacío o no es válido, es el confirmado (SPEC-CALC-001 FR-02 y FR-11). Por ejemplo, "Barra · Olímpica 20 kg · collarines";
   - desplegado, muestra los tres modos como un control segmentado de tres botones con icono y texto: "Barra", "Dos lados" y "Un punto". El modo elegido se distingue visualmente y se anuncia como seleccionado;
   - solo en el modo Barra, muestra:
-    - una ficha por barra (Olímpica 20 kg, Olímpica 15 kg, Recta y Z), con su miniatura, su nombre y su peso (en la recta y la Z, el mismo que el resumen); la elegida se distingue y se anuncia como seleccionada;
+    - una ficha por barra (Olímpica 20 kg, Olímpica 15 kg, Recta y Z), con su miniatura, su nombre y su peso (en la recta y la Z: la elegida, el mismo peso que el resumen; la otra, su peso confirmado, SPEC-CALC-001 FR-11); la elegida se distingue y se anuncia como seleccionada;
     - el interruptor "Collarines de competición", con el texto "2,5 kg cada uno; suman 5 kg en las series con discos";
     - con la recta o la Z elegidas, el campo "Peso de la barra" (kg), con esa etiqueta accesible y el teclado decimal, y, debajo, su mensaje de error (SPEC-CALC-001 FR-02);
   - en los modos Dos lados y Un punto, muestra "Los discos se cargan en el cuerno de la máquina." en lugar de las fichas, el interruptor y el campo.
@@ -134,7 +136,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - la referencia visual (escena, medidas de discos, barras, máquina y collarín) es la de §11.
 - **FR-08:** borrar una serie:
   - la persona desliza la tarjeta hacia la izquierda; deslizar en vertical sigue desplazando la página. Mientras arrastra, debajo aparece un fondo con "Borrar" en rojo claro sobre un granate tenue; pasado el 35 % del ancho de la tarjeta, el fondo pasa a rojo vivo, el texto a blanco y el icono crece;
-  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta la siguiente acción de la persona que cambie algo (añadir o borrar una serie, cambiar un peso, el modo, la barra, los collarines o los discos habilitados) o hasta que pulse "Deshacer". Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
+  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta la siguiente acción de la persona que cambie algo (añadir o borrar una serie, teclear en un peso, cambiar el modo, la barra, los collarines o los discos habilitados) o hasta que pulse "Deshacer". Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
   - si la suelta sin pasar el 35 %, la tarjeta vuelve a su sitio y la lista no cambia;
   - cada tarjeta tiene un botón "Quitar la serie del P %", que hace lo mismo que el gesto, aviso incluido. Está oculto a la vista salvo cuando recibe el foco o cuando la persona mantiene pulsada la tarjeta 500 ms sin moverla; así se puede borrar con un toque, sin arrastrar (WCAG 2.5.7). Si el dedo se mueve antes de los 500 ms, es el gesto de deslizar; si se mueve después, no pasa nada más. Al soltar tras la pulsación larga, no se activa nada de la tarjeta (ni la marca de diferencia), y durante la pulsación no aparecen la selección de texto ni el menú del sistema. Mostrado por la pulsación larga, se oculta al tocar fuera de él;
   - tras borrar con este botón, el foco pasa a "Deshacer". Si el foco sigue en el aviso cuando desaparece o cuando se pulsa "Deshacer", pasa al botón "+ Añadir porcentaje" o, si el campo de añadir está abierto, a ese campo. Si la persona ha llevado el foco a otro sitio, no se mueve;
@@ -177,7 +179,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
   - se ven los tres modos, con "Barra" seleccionado, las cuatro fichas de barra, con "Olímpica 20 kg" seleccionada, y el interruptor de collarines desactivado, con su texto;
   - al activar los collarines, el resumen dice "Barra · Olímpica 20 kg · collarines";
   - al elegir la Z, aparece el campo "Peso de la barra" con "10"; al escribir "0,5", aparece debajo "Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo." y el resumen sigue diciendo "Barra · Z 10 kg · collarines";
-  - con la Z en 10 kg, al escribir "8,5" sin salir del campo, el resumen dice "Barra · Z 8,5 kg · collarines" y la ficha de la Z muestra 8,5 kg; si después borra el campo sin haber salido de él, los dos vuelven a 10 kg;
+  - con la Z en 10 kg, al escribir "8,5" sin salir del campo, el resumen dice "Barra · Z 8,5 kg · collarines", la ficha de la Z muestra 8,5 kg y la de la recta sigue mostrando 10 kg; si después borra el campo sin haber salido de él, los dos vuelven a 10 kg;
   - al elegir "Dos lados", desaparecen las fichas, el interruptor y el campo, aparece "Los discos se cargan en el cuerno de la máquina." y el resumen dice "Dos lados · máquina"; con "Un punto", "Un punto · máquina";
   - con la Z y "0,5", se ven a la vez el mensaje bajo el campo y "Revisa el peso de la barra en Carga." entre los avisos;
   - cada panel se anuncia como plegado o desplegado.
