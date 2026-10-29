@@ -161,14 +161,23 @@ function actualizar(nuevo) {
   pintar();
 }
 
+// FR-11: termina la edición de un peso y lo guarda. Solo puede cambiar el aviso
+// de SPEC-CALC-002 FR-09 (las series usan lo escrito), así que no se repinta
+// el resto: el blur llega con el toque siguiente, y reconstruir el control
+// tocado se comería su clic.
+function terminar(peso) {
+  estado = guardarCambios(almacen, estado, terminarEdicion(estado, peso));
+  texto('aviso-guardado', modeloVista(estado).avisoGuardado);
+}
+
 function enlazarCampos() {
   $('trabajo').addEventListener('input', (e) => actualizar(escribirTrabajo(estado, e.target.value)));
   $('peso-barra').addEventListener('input', (e) => {
     actualizar(escribirPesoBarra(estado, e.target.value));
   });
   // FR-11: salir del campo termina su edición, aunque no se haya tecleado nada.
-  $('trabajo').addEventListener('blur', () => actualizar(terminarEdicion(estado, 'trabajo')));
-  $('peso-barra').addEventListener('blur', () => actualizar(terminarEdicion(estado, 'barra')));
+  $('trabajo').addEventListener('blur', () => terminar('trabajo'));
+  $('peso-barra').addEventListener('blur', () => terminar('barra'));
   $('collarines').addEventListener('change', (e) => actualizar({ ...estado, collarines: e.target.checked }));
   $('nuevo-porcentaje').addEventListener('input', (e) => {
     actualizar({ ...estado, textoPorcentaje: e.target.value });
@@ -183,7 +192,7 @@ function enlazarCampos() {
 // tiene el foco; manda visibilitychange y pagehide es el respaldo.
 function terminarAlSalir() {
   const peso = pesoConFoco();
-  if (peso) actualizar(terminarEdicion(estado, peso));
+  if (peso) terminar(peso);
 }
 
 montarOpciones();

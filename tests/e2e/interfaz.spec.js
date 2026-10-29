@@ -277,16 +277,23 @@ test('SPEC-CALC-001/AC-43 pasar a segundo plano termina la edición sin cambiar 
   await expect(trabajo(page)).toHaveValue('108');
 
   // A mitad de borrado, se guarda el valor válido de ese momento.
-  await trabajo(page).fill('1');
+  await trabajo(page).fill('105');
+  await trabajo(page).blur();
+  await trabajo(page).focus();
+  await trabajo(page).press('End');
+  for (let i = 0; i < 2; i++) await trabajo(page).press('Backspace');
+  await expect(trabajo(page)).toHaveValue('1');
   await cerrarYAbrir(page);
   await expect(trabajo(page)).toHaveValue('1');
 
-  await trabajo(page).fill('100,12');
+  // "100,12" y, sin salir, "100,123": se conserva el confirmado, "100".
+  await trabajo(page).fill('100');
   await trabajo(page).blur();
   await trabajo(page).focus();
-  await trabajo(page).fill('100,123');
+  await trabajo(page).fill('100,12');
+  await trabajo(page).pressSequentially('3');
   await cerrarYAbrir(page);
-  await expect(trabajo(page)).toHaveValue('100,12');
+  await expect(trabajo(page)).toHaveValue('100');
 
   await barra(page, 'Recta').check();
   await pesoBarra(page).fill('8');
@@ -340,6 +347,8 @@ test('SPEC-CALC-001/AC-44 cambiar de barra o de modo termina la edición aunque 
   // Tocar la ficha ya elegida no descarta el texto.
   await pesoBarra(page).fill('0,5');
   await barra(page, 'Recta').click();
+  // Un clic en el radio ya marcado no lanza change: se lanza a mano.
+  await elegirSinFoco(page, 'barra', 'recta');
   await expect(pesoBarra(page)).toHaveValue('0,5');
   await expect(page.locator('#error-barra')).toBeVisible();
 });
@@ -495,4 +504,21 @@ test('SPEC-CALC-001/AC-35 SPEC-CALC-001/AC-39 discos agrupados y aviso de capaci
   await page.getByLabel('Un punto').check();
   await expect(series(page).locator('.discos')).toHaveText('Total en discos: 25 ×20');
   await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
+});
+
+test('SPEC-CALC-001/FR-11 con el foco en un peso, el primer toque en otro control funciona aunque salir del campo repinte', async ({ page }) => {
+  await trabajo(page).fill('105');
+  await page.getByRole('button', { name: 'Quitar 90 %' }).click();
+  await expect(porcentajes(page)).toHaveText(['40 %', '70 %']);
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"105"');
+
+  await barra(page, 'Recta').check();
+  await pesoBarra(page).fill('8');
+  await page.getByRole('button', { name: 'Quitar 70 %' }).click();
+  await expect(porcentajes(page)).toHaveText(['40 %']);
+  expect(await guardado(page, CLAVE_RECTA)).toBe('8');
+
+  await trabajo(page).fill('105');
+  await page.locator('.diferencia summary').first().click();
+  await expect(page.locator('.diferencia p').first()).toBeVisible();
 });
