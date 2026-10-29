@@ -326,7 +326,9 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
 
 /* FR-05. */
 .avisos { display: flex; flex-direction: column; gap: 8px; }
-.avisos:not(:has(.aviso:not([hidden]))) { display: none; }
+/* Sin avisos, la región sigue en el árbol de accesibilidad (con display:none,
+   VoiceOver puede no anunciar el primer aviso) y solo se anula su hueco. */
+.avisos:not(:has(.aviso:not([hidden]))) { margin-bottom: -14px; }
 .aviso {
   margin: 0;
   font-size: 15px;

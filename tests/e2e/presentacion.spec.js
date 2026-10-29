@@ -78,6 +78,13 @@ test('SPEC-CALC-003/AC-03 el panel Carga: resumen, modos, fichas, collarines y p
   await expect(page.getByRole('radio', { name: 'Barra', exact: true })).toBeChecked();
   await expect(pesosFichas(page)).toHaveText(['Olímpica 20 kg', 'Olímpica 15 kg', 'Recta 10 kg', 'Z 10 kg']);
   await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
+  // Cada ficha con su miniatura; la elegida y el modo elegido, con el acento.
+  await expect(pesosFichas(page).locator('svg')).toHaveCount(4);
+  const acento = /rgb\(255, 138, 42\)/;
+  await expect(pesosFichas(page).first()).toHaveCSS('box-shadow', acento);
+  await expect(pesosFichas(page).nth(1)).toHaveCSS('box-shadow', 'none');
+  await expect(page.locator('#modos .segmento').first()).toHaveCSS('box-shadow', acento);
+  await expect(page.locator('#modos .segmento').nth(1)).toHaveCSS('box-shadow', 'none');
   const collarines = page.getByRole('switch', { name: 'Collarines de competición' });
   await expect(collarines).not.toBeChecked();
   await expect(collarines).toHaveAccessibleDescription('2,5 kg cada uno; suman 5 kg en las series con discos');
@@ -135,6 +142,9 @@ test('SPEC-CALC-003/AC-04 el panel Mis discos: puntos, "N de 7", su anuncio y lo
     await expect(disco(page, nombre)).not.toBeChecked();
     const peso = page.locator('.disco', { has: disco(page, nombre) }).locator('.peso-disco');
     await expect(peso).toHaveCSS('text-decoration-line', 'line-through');
+    // Y su dibujo, en gris.
+    const dibujo = page.locator('.disco', { has: disco(page, nombre) }).locator('.dibujo-disco');
+    await expect(dibujo).toHaveCSS('filter', 'grayscale(1)');
   }
   await expect(disco(page, '20 kg')).toBeChecked();
   await expect(page.locator('.disco', { has: disco(page, '20 kg') }).locator('.peso-disco'))
@@ -151,6 +161,10 @@ test('SPEC-CALC-003/AC-04 el panel Mis discos: puntos, "N de 7", su anuncio y lo
 
 test('SPEC-CALC-003/AC-05 los avisos generales: región anunciada y su orden', async ({ page }) => {
   await expect(page.locator('#avisos')).toHaveAttribute('aria-live', 'polite');
+  // Sin avisos, la región no se quita del árbol de accesibilidad: así se
+  // anuncia el primero que aparezca.
+  await expect(avisos(page)).toHaveCount(0);
+  await expect(page.locator('#avisos')).not.toHaveCSS('display', 'none');
   await desplegarPaneles(page);
 
   for (const nombre of NOMBRES) await disco(page, nombre).click();
