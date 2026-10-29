@@ -274,6 +274,26 @@ test('SPEC-CALC-003 NFR-01 los controles de arriba miden al menos 44 × 44 px', 
   }
 });
 
+test('SPEC-CALC-003 NFR-01 el toque en cualquier punto de un modo, una ficha o un disco llega a su control', async ({ page }) => {
+  await desplegarPaneles(page);
+  // Un tipo deshabilitado tiene el dibujo con opacidad y filtro.
+  await disco(page, '25 kg').click();
+  const tapados = await page.evaluate(() => {
+    const tapados = [];
+    for (const input of document.querySelectorAll('.segmento input, .ficha input, .disco input')) {
+      const r = input.getBoundingClientRect();
+      for (const fy of [0.15, 0.35, 0.5, 0.85]) {
+        const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height * fy);
+        if (e !== input) tapados.push(`${input.value} a ${fy}: ${e.tagName}`);
+      }
+    }
+    return tapados;
+  });
+  expect(tapados).toEqual([]);
+  await disco(page, '25 kg').click();
+  await expect(disco(page, '25 kg')).toBeChecked();
+});
+
 test('SPEC-CALC-003 NFR-02 contraste de los textos, bordes de campo, interruptor y foco de arriba', async ({ page }) => {
   await desplegarPaneles(page);
   await barra(page, 'Z').check();
