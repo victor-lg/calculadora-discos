@@ -1,7 +1,7 @@
 ---
 id: ADR-0005
 titulo: Los pesos se guardan al terminar de editar
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-10-29
 sustituye: null
 sustituido_por: null
@@ -17,6 +17,9 @@ valor confirmado; cambiar de barra o de modo también termina la edición; y el
 cambio de ADR-0004 va en este ADR nuevo, que se fusiona antes que SPEC-CALC-001
 v0.7 y SPEC-CALC-002 v0.3. Cambia solo el último párrafo de ADR-0004 §3 y su
 segundo coste aceptado (§4); el resto de ADR-0004 sigue vigente y no se edita.
+Revisado en G4 en el PR #21 (dos revisores, dos rondas, sin nada que deba
+corregirse; los importantes de las dos rondas, aplicados). Aceptado con el merge
+del PR #21.
 -->
 
 # ADR-0005 — Los pesos se guardan al terminar de editar
