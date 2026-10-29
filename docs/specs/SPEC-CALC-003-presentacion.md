@@ -5,7 +5,7 @@ estado: en-revision
 version: 0.2
 riesgo: R1
 sustituye: null
-adr: [ADR-0001, ADR-0003]
+adr: [ADR-0001, ADR-0003, ADR-0005]
 transversales: []
 ---
 
@@ -39,9 +39,10 @@ Tras la ronda 3 de G4 (2026-10-26), Víctor decidió que el aviso de "Deshacer" 
 tiene plazo y dura hasta la siguiente acción (FR-08, WCAG 2.2.1). El resto de
 los cambios de esa ronda son aclaraciones, sin otra ronda de revisión.
 La versión 0.2 (VIC-13) solo cambia el peso de la recta y la Z en el resumen de
-Carga plegado (FR-03): es el confirmado de SPEC-CALC-001 v0.7 FR-11 y no el último
-válido tecleado. Decisión de Víctor del 2026-10-29, en la ronda 1 de G4 del PR #22,
-que ajusta esta spec en el mismo PR que SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3.
+Carga y en sus fichas (FR-03, AC-03): el del campo mientras es válido y, si no, el
+confirmado de SPEC-CALC-001 v0.7 FR-11, en lugar del último válido tecleado.
+Decisiones de Víctor del 2026-10-29, en las rondas 1 y 2 de G4 del PR #22, que
+ajusta esta spec en el mismo PR que SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -91,10 +92,10 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - su línea inferior toma el color de acento cuando tiene el foco;
   - si el número no cabe en el ancho disponible (por ejemplo, con el zoom de página de NFR-03), su tamaño se reduce hasta caber.
 - **FR-03:** el panel Carga:
-  - plegado, muestra un resumen en una línea: "Barra · <nombre> <peso> kg", con los nombres "Olímpica", "Recta" y "Z", con " · collarines" al final si están activados (SPEC-CALC-001 FR-15), en el modo Barra, o "Dos lados · máquina" y "Un punto · máquina" en los demás modos. En la recta y la Z, el peso es el confirmado (SPEC-CALC-001 FR-02 y FR-11), también mientras el campo tiene un texto vacío o no válido. Por ejemplo, "Barra · Olímpica 20 kg · collarines";
+  - plegado, muestra un resumen en una línea: "Barra · <nombre> <peso> kg", con los nombres "Olímpica", "Recta" y "Z", con " · collarines" al final si están activados (SPEC-CALC-001 FR-15), en el modo Barra, o "Dos lados · máquina" y "Un punto · máquina" en los demás modos. En la recta y la Z, el peso es el del campo si es válido, el mismo con el que se calculan las series (SPEC-CALC-001 FR-10); si el campo está vacío o no es válido, es el confirmado (SPEC-CALC-001 FR-02 y FR-11). Por ejemplo, "Barra · Olímpica 20 kg · collarines";
   - desplegado, muestra los tres modos como un control segmentado de tres botones con icono y texto: "Barra", "Dos lados" y "Un punto". El modo elegido se distingue visualmente y se anuncia como seleccionado;
   - solo en el modo Barra, muestra:
-    - una ficha por barra (Olímpica 20 kg, Olímpica 15 kg, Recta y Z), con su miniatura, su nombre y su peso; la elegida se distingue y se anuncia como seleccionada;
+    - una ficha por barra (Olímpica 20 kg, Olímpica 15 kg, Recta y Z), con su miniatura, su nombre y su peso (en la recta y la Z, el mismo que el resumen); la elegida se distingue y se anuncia como seleccionada;
     - el interruptor "Collarines de competición", con el texto "2,5 kg cada uno; suman 5 kg en las series con discos";
     - con la recta o la Z elegidas, el campo "Peso de la barra" (kg), con esa etiqueta accesible y el teclado decimal, y, debajo, su mensaje de error (SPEC-CALC-001 FR-02);
   - en los modos Dos lados y Un punto, muestra "Los discos se cargan en el cuerno de la máquina." en lugar de las fichas, el interruptor y el campo.
@@ -176,6 +177,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
   - se ven los tres modos, con "Barra" seleccionado, las cuatro fichas de barra, con "Olímpica 20 kg" seleccionada, y el interruptor de collarines desactivado, con su texto;
   - al activar los collarines, el resumen dice "Barra · Olímpica 20 kg · collarines";
   - al elegir la Z, aparece el campo "Peso de la barra" con "10"; al escribir "0,5", aparece debajo "Escribe un peso de barra entre 1 y 50 kg, con dos decimales como máximo." y el resumen sigue diciendo "Barra · Z 10 kg · collarines";
+  - con la Z en 10 kg, al escribir "8,5" sin salir del campo, el resumen dice "Barra · Z 8,5 kg · collarines" y la ficha de la Z muestra 8,5 kg; si después borra el campo sin haber salido de él, los dos vuelven a 10 kg;
   - al elegir "Dos lados", desaparecen las fichas, el interruptor y el campo, aparece "Los discos se cargan en el cuerno de la máquina." y el resumen dice "Dos lados · máquina"; con "Un punto", "Un punto · máquina";
   - con la Z y "0,5", se ven a la vez el mensaje bajo el campo y "Revisa el peso de la barra en Carga." entre los avisos;
   - cada panel se anuncia como plegado o desplegado.

@@ -152,6 +152,7 @@ Salvo que se diga otra cosa, los pesos de los AC son pesos de trabajo y los tipo
   - datos guardados de los tipos que faltan, ilegibles o no válidos (con un peso ajeno a los 7, con un peso repetido o que no son una lista): los 7 habilitados, sin afectar a la lista de porcentajes (FR-08, AC-11, AC-12);
   - habilitar o deshabilitar con el peso vacío o no válido: no hay series que recalcular, pero el cambio se aplica y se guarda (FR-02, FR-08, AC-11);
   - fallo al guardar cualquier dato guardado: la app sigue con los valores en memoria y muestra un aviso discreto mientras alguno no coincida con lo último que se guardó bien; en los pesos cuenta el valor confirmado, y el aviso no cambia mientras se escribe (FR-09, AC-14, AC-15);
+  - tras un fallo al guardar un peso que ya no se está editando (por ejemplo, el de la Z con la recta elegida), el aviso sigue hasta que vuelve a terminar la edición de ese peso (FR-09, AC-15);
   - pocos tipos habilitados y un objetivo grande (por ejemplo, solo el de 1,25 kg y 500 kg en el modo Un punto, 400 discos): se muestran todos los discos, sin límite, agrupados por tipo (SPEC-CALC-001 FR-08), con el aviso de capacidad de SPEC-CALC-001 FR-16.
 - **Decisiones pendientes:** ninguna crítica.
 
