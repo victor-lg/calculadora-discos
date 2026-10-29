@@ -27,9 +27,11 @@ ADR-0004 §3 termina así: "El peso de trabajo se escribe con cada tecla que dej
 
 Esto deja un hueco que no se vio al decidirlo. Al borrar "105" con la tecla de retroceso, "10" y "1" son valores válidos y se guardan por el camino. El campo vacío no se guarda. Al volver a abrir la app sale "1", no "105". Con los pesos de barra pasa lo mismo: al borrar "7,5", se guarda "7".
 
-SPEC-CALC-001 v0.7 (VIC-13, FR-11) cambia la regla: los pesos se guardan al terminar de editarlos y nunca con cada tecla. Si en ese momento el campo está vacío o no es válido, se conserva el último valor confirmado. Qué cuenta como terminar de editar lo fija esa spec. Esa regla contradice el último párrafo de ADR-0004 §3, que manda sobre el código hasta que otro ADR lo modifique.
+SPEC-CALC-001 v0.7 (VIC-13, FR-11) cambia la regla: los pesos se guardan al terminar de editarlos y nunca con cada tecla. Si en ese momento el campo está vacío o no es válido, se conserva el último valor confirmado. El valor confirmado de un peso es el valor válido que tenía el campo en el último final de edición, incluido el paso a segundo plano; al arrancar de cero, el valor con el que arranca. Qué cuenta como terminar de editar lo fija esa spec; los momentos que nombra este ADR son los mínimos, y si la spec añade otros, manda la spec. Esa regla contradice el último párrafo de ADR-0004 §3, que manda sobre el código hasta que otro ADR lo modifique.
 
 El segundo motivo de ADR-0004 sigue valiendo: un cierre de iOS en segundo plano no debe perder lo último escrito. Guardar al pasar a segundo plano lo cubre si la app recibe el aviso de que pasa a segundo plano antes de que iOS la cierre o de que la persona la cierre desde el selector de apps. **Es una hipótesis, no un hecho comprobado:** la verifica la prueba manual de §5.
+
+El hueco se reduce, pero no desaparece del todo: si la app pasa a segundo plano a mitad de borrado, se guarda el valor válido de ese momento (§4). Es consecuencia de la regla que fijó Víctor (guardar también al pasar a segundo plano), que protege lo escrito si iOS cierra la app en segundo plano.
 
 ## 2. Alternativas consideradas
 
@@ -64,7 +66,7 @@ Se guarda cuando la persona deja de teclear durante un tiempo, por ejemplo 1 s.
 
 Además:
 
-- **Paso a segundo plano.** La señal que manda es el evento `visibilitychange` cuando la página pasa a `hidden`. `pagehide` también termina la edición, como respaldo. Si un mismo final de edición se detecta más de una vez (por ejemplo, salir del campo y pasar a segundo plano a la vez), las veces siguientes no escriben nada, porque el peso ya coincide con el último guardado bien.
+- **Paso a segundo plano.** La señal que manda es el evento `visibilitychange` cuando la página pasa a `hidden`. `pagehide` también termina la edición, como respaldo. Se nombran aquí porque la hipótesis de §1 depende de ellos. Si un mismo final de edición se detecta más de una vez (por ejemplo, salir del campo y pasar a segundo plano a la vez), las veces siguientes no escriben nada, porque el peso ya coincide con el último guardado bien.
 - **Cambio de barra o de modo.** Termina la edición aunque el campo conserve el foco: en iOS, tocar otro control no siempre lo quita.
 - **Restos del modelo anterior en ADR-0004.** El argumento contra su opción B ("guardar el peso de trabajo, que cambia con cada tecla válida, reescribiría los demás ajustes") y la referencia de §4 a medir la escritura con cada tecla quedan como contexto histórico. La conclusión de su opción B sigue en pie por el otro motivo que da: SPEC-CALC-001 FR-11 pide recuperar cada dato por separado.
 
@@ -83,12 +85,16 @@ El resto de ADR-0004 y de ADR-0002 §3 no cambia: qué se guarda, una entrada po
   - este ADR se fusiona antes que el PR de SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3, que lo citan. Hasta entonces, cita requisitos de esas versiones que aún no están en `main`;
   - ese PR de spec tiene que:
     - reescribir SPEC-CALC-001 AC-34, cuyos casos ("100,12" y después "100,123"; 7,5 y después 0,5) suponen la escritura con cada tecla;
-    - redefinir en SPEC-CALC-002 FR-09 la diferencia que enciende el aviso: el valor confirmado frente al último guardado bien, y no lo tecleado frente a lo guardado. Si no, el aviso se encendería a mitad de edición. Si la spec no lo cubre, este ADR no debe aceptarse;
-  - el PR de código (VIC-13) lo aplica. Tendrá que cambiar los tests que esperan una escritura con cada tecla válida, y justificarlo en su guía.
+    - redefinir en SPEC-CALC-002 FR-09 la diferencia que enciende el aviso: el valor confirmado frente al último guardado bien, y no lo tecleado frente a lo guardado. Si no, el aviso se encendería a mitad de edición;
+    - reescribir SPEC-CALC-002 AC-14 (tercer caso) y AC-15, que suponen que el aviso aparece al teclear.
+
+    El PR de spec no se fusiona sin esos cambios;
+  - entre la fusión de este ADR y la del PR de spec, este ADR contradice SPEC-CALC-001 FR-11 de `main`. Por eso no se abre ningún PR de código de VIC-13 hasta que la spec esté en `main`;
+  - el PR de código (VIC-13) lo aplica. Tendrá que cambiar los tests que esperan una escritura con cada tecla válida, y justificarlo en su guía. No se fusiona sin registrar el resultado de los pasos 1 a 3 de la prueba manual de §5.
 
 ## 5. Validación
 
-- Los tests de SPEC-CALC-001 AC-34, AC-42 y AC-43 y de SPEC-CALC-002 AC-15, en sus versiones del PR de spec, pasan en la CI.
+- Los tests de SPEC-CALC-001 AC-34, AC-42 y AC-43 y de SPEC-CALC-002 AC-14 y AC-15, en sus versiones del PR de spec (aún no están en `main`), pasan en la CI. SPEC-CALC-002 AC-15 incluye el reintento tras un fallo al guardar.
 - **Prueba manual en el iPhone,** que se registra en el PR de código con la versión de iOS, en la app instalada en la pantalla de inicio (ADR-0001). Safari sin instalar queda fuera, porque la app se usa instalada:
   1. con el peso de trabajo "105" guardado, borrarlo con la tecla de retroceso hasta vaciarlo, cerrar la app desde el selector de apps y volver a abrirla: el peso de trabajo es "105";
   2. escribir "110" sin salir del campo, cerrar la app desde el selector de apps y volver a abrirla: el peso de trabajo es "110". Esto comprueba que se recibe el aviso de paso a segundo plano;
@@ -101,4 +107,5 @@ El resto de ADR-0004 y de ADR-0002 §3 no cambia: qué se guarda, una entrada po
 
 ## 6. Seguimiento
 
-- Revisar este ADR si la prueba manual muestra que en iOS no se recibe el aviso de paso a segundo plano, o si aparecen pesos guardados que la persona no confirmó.
+- Si la prueba manual muestra que en iOS no se recibe el aviso de paso a segundo plano, el PR de código no se fusiona y se propone un ADR que sustituya a este. La opción que habría que valorar primero es guardar también el valor válido tras una pausa en la escritura, aceptando que vuelvan a guardarse pasos intermedios.
+- Revisar este ADR si aparece un peso guardado distinto del que había en el campo en el último final de edición.
