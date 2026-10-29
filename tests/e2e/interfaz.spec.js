@@ -173,24 +173,203 @@ test('SPEC-CALC-001/AC-33 datos guardados que faltan, rotos o no válidos: cada 
   await expect(page.getByLabel('Collarines de competición')).toBeChecked();
 });
 
-test('SPEC-CALC-001/AC-34 solo se guarda un peso válido', async ({ page }) => {
-  await trabajo(page).fill('105');
-  await trabajo(page).fill('');
+// FR-11: la app pasa a segundo plano y vuelve, con el foco donde estuviera.
+async function segundoPlano(page) {
+  await page.evaluate(() => {
+    for (const estado of ['hidden', 'visible']) {
+      Object.defineProperty(document, 'visibilityState', { value: estado, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+    delete document.visibilityState;
+  });
+}
+
+// "Cierra la app y la vuelve a abrir" (SPEC-CALC-001 §5): pasa antes a
+// segundo plano, y vuelve en un arranque de cero.
+async function cerrarYAbrir(page) {
+  await segundoPlano(page);
   await page.reload();
+}
+
+const guardado = (page, clave) => page.evaluate((c) => localStorage.getItem(c), clave);
+
+// Elige una barra o un modo sin quitar el foco del campo, como pasa a veces en
+// iOS al tocar otro control (ADR-0005 §3).
+const elegirSinFoco = (page, nombre, valor) => page.evaluate(([n, v]) => {
+  const radio = document.querySelector(`input[name="${n}"][value="${v}"]`);
+  radio.checked = true;
+  radio.dispatchEvent(new Event('change'));
+}, [nombre, valor]);
+
+test('SPEC-CALC-001/AC-34 solo se guarda un peso válido, al terminar de editarlo', async ({ page }) => {
+  await trabajo(page).fill('105');
+  await trabajo(page).blur();
+  await trabajo(page).fill('');
+  await trabajo(page).blur();
+  await cerrarYAbrir(page);
   await expect(trabajo(page)).toHaveValue('105');
 
   await trabajo(page).fill('100,12');
-  await trabajo(page).pressSequentially('3');
-  await expect(page.locator('#error-trabajo')).toBeVisible();
-  await page.reload();
+  await trabajo(page).blur();
+  await trabajo(page).fill('100,123');
+  await trabajo(page).blur();
+  await expect(trabajo(page)).toHaveValue('100,123');
+  await expect(page.locator('#error-trabajo')).toHaveText('El peso de trabajo admite como máximo dos decimales.');
+  await cerrarYAbrir(page);
   await expect(trabajo(page)).toHaveValue('100,12');
 
   await barra(page, 'Recta').check();
   await pesoBarra(page).fill('7,5');
+  await pesoBarra(page).blur();
   await pesoBarra(page).fill('0,5');
-  await page.reload();
+  await pesoBarra(page).blur();
+  await cerrarYAbrir(page);
   await barra(page, 'Recta').check();
   await expect(pesoBarra(page)).toHaveValue('7,5');
+});
+
+test('SPEC-CALC-001/AC-42 borrar tecla a tecla no guarda los pasos intermedios', async ({ page }) => {
+  await trabajo(page).fill('105');
+  await trabajo(page).blur();
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"105"');
+  await trabajo(page).focus();
+  await trabajo(page).press('End');
+  for (let i = 0; i < 3; i++) {
+    await trabajo(page).press('Backspace');
+    expect(await guardado(page, CLAVE_TRABAJO)).toBe('"105"');
+  }
+  await expect(trabajo(page)).toHaveValue('');
+  await cerrarYAbrir(page);
+  await expect(trabajo(page)).toHaveValue('105');
+
+  await barra(page, 'Recta').check();
+  await pesoBarra(page).fill('7,5');
+  await pesoBarra(page).blur();
+  await pesoBarra(page).focus();
+  await pesoBarra(page).press('End');
+  for (let i = 0; i < 3; i++) await pesoBarra(page).press('Backspace');
+  await expect(pesoBarra(page)).toHaveValue('');
+  expect(await guardado(page, CLAVE_RECTA)).toBe('7.5');
+  await cerrarYAbrir(page);
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+});
+
+test('SPEC-CALC-001/AC-43 pasar a segundo plano termina la edición sin cambiar el campo', async ({ page }) => {
+  await trabajo(page).fill('105');
+  expect(await guardado(page, CLAVE_TRABAJO)).toBeNull();
+  await segundoPlano(page);
+  await expect(trabajo(page)).toBeFocused();
+  await expect(trabajo(page)).toHaveValue('105');
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"105"');
+
+  // Vuelve con el foco en el campo, sigue escribiendo y sale.
+  await trabajo(page).fill('108');
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"105"');
+  await trabajo(page).blur();
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"108"');
+
+  await trabajo(page).fill('');
+  await segundoPlano(page);
+  await expect(trabajo(page)).toHaveValue('');
+  await expect(page.locator('#indicacion-trabajo')).toHaveText('Escribe el peso de trabajo.');
+  await cerrarYAbrir(page);
+  await expect(trabajo(page)).toHaveValue('108');
+
+  // A mitad de borrado, se guarda el valor válido de ese momento.
+  await trabajo(page).fill('1');
+  await cerrarYAbrir(page);
+  await expect(trabajo(page)).toHaveValue('1');
+
+  await trabajo(page).fill('100,12');
+  await trabajo(page).blur();
+  await trabajo(page).focus();
+  await trabajo(page).fill('100,123');
+  await cerrarYAbrir(page);
+  await expect(trabajo(page)).toHaveValue('100,12');
+
+  await barra(page, 'Recta').check();
+  await pesoBarra(page).fill('8');
+  await segundoPlano(page);
+  expect(await guardado(page, CLAVE_RECTA)).toBe('8');
+  await pesoBarra(page).fill('0,5');
+  await segundoPlano(page);
+  await expect(pesoBarra(page)).toHaveValue('0,5');
+  await expect(page.locator('#error-barra')).toBeVisible();
+  expect(await guardado(page, CLAVE_RECTA)).toBe('8');
+});
+
+test('SPEC-CALC-001/AC-43 pagehide también termina la edición', async ({ page }) => {
+  await trabajo(page).fill('105');
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"105"');
+});
+
+test('SPEC-CALC-001/AC-44 cambiar de barra o de modo termina la edición aunque el campo conserve el foco', async ({ page }) => {
+  await barra(page, 'Recta').check();
+  await pesoBarra(page).fill('7,5');
+  await pesoBarra(page).blur();
+
+  await pesoBarra(page).fill('8');
+  await elegirSinFoco(page, 'barra', 'z');
+  expect(await guardado(page, CLAVE_RECTA)).toBe('8');
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('8');
+
+  await pesoBarra(page).fill('9');
+  await elegirSinFoco(page, 'modo', 'dos-lados');
+  expect(await guardado(page, CLAVE_RECTA)).toBe('9');
+  await page.getByLabel('Barra', { exact: true }).check();
+  await expect(pesoBarra(page)).toHaveValue('9');
+
+  // Vaciar sin salir y elegir la Z: al volver, el confirmado.
+  await pesoBarra(page).fill('9,');
+  await pesoBarra(page).fill('');
+  await elegirSinFoco(page, 'barra', 'z');
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('9');
+  await expect(page.locator('#error-barra')).toBeHidden();
+
+  await pesoBarra(page).fill('7,');
+  await elegirSinFoco(page, 'barra', 'z');
+  expect(await guardado(page, CLAVE_RECTA)).toBe('7');
+  await cerrarYAbrir(page);
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7');
+
+  // Tocar la ficha ya elegida no descarta el texto.
+  await pesoBarra(page).fill('0,5');
+  await barra(page, 'Recta').click();
+  await expect(pesoBarra(page)).toHaveValue('0,5');
+  await expect(page.locator('#error-barra')).toBeVisible();
+});
+
+test('SPEC-CALC-001/AC-44 con el foco en el peso de trabajo, el modo y la barra terminan su edición; los collarines no', async ({ page }) => {
+  await trabajo(page).fill('110');
+  await elegirSinFoco(page, 'modo', 'dos-lados');
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"110"');
+
+  await trabajo(page).fill('111');
+  await elegirSinFoco(page, 'barra', '15');
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"111"');
+
+  await trabajo(page).fill('');
+  await elegirSinFoco(page, 'modo', 'barra');
+  await expect(trabajo(page)).toHaveValue('');
+  await expect(page.locator('#indicacion-trabajo')).toHaveText('Escribe el peso de trabajo.');
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"111"');
+
+  // Los demás controles no terminan la edición si el campo conserva el foco.
+  await trabajo(page).fill('112');
+  await page.evaluate(() => {
+    const c = document.getElementById('collarines');
+    c.checked = true;
+    c.dispatchEvent(new Event('change'));
+  });
+  await expect(trabajo(page)).toBeFocused();
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"111"');
+  await trabajo(page).blur();
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"112"');
 });
 
 test('SPEC-CALC-001/AC-22 volver de otra app conserva todo el estado sin recargar', async ({ page, context }) => {

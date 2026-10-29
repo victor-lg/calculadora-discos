@@ -423,12 +423,13 @@ test('SPEC-CALC-001/AC-39 el aviso de capacidad aparece solo cuando los discos n
   assert.equal(caben.avisoCapacidad, null);
 });
 
-test('SPEC-CALC-001/AC-40 cada barra muestra su último peso válido y descarta lo no válido', () => {
+test('SPEC-CALC-001/AC-40 cada barra muestra su peso confirmado y descarta lo no válido', () => {
+  // Se cambia de barra con el foco en su campo: eso termina la edición (FR-11).
   let e = estado({ trabajo: '100', porcentajes: [70] });
   e = escribirPesoBarra(elegirBarra(e, 'recta'), '7,50');
-  e = escribirPesoBarra(elegirBarra(e, 'z'), '8.5');
+  e = escribirPesoBarra(elegirBarra(e, 'z', 'barra'), '8.5');
 
-  e = elegirBarra(e, 'recta');
+  e = elegirBarra(e, 'recta', 'barra');
   assert.equal(modeloVista(e).pesoBarraTexto, '7,5');
   e = elegirBarra(e, 'z');
   assert.equal(modeloVista(e).pesoBarraTexto, '8,5');

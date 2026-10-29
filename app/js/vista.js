@@ -73,22 +73,25 @@ const TRABAJO_INICIAL = '100';
 // `discos` son los tipos habilitados, en centésimas y de mayor a menor
 // (SPEC-CALC-002 FR-08). `guardados` es el último valor que se guardó bien de
 // cada dato: al arrancar de cero, el valor con el que arranca (SPEC-CALC-002 FR-09).
-// `barraValida` es el último peso válido de la recta y de la Z (FR-02), y
-// `trabajoValido`, el último texto válido del peso de trabajo (FR-11).
+// `barraConfirmada` es el peso confirmado de la recta y de la Z (FR-02), y
+// `trabajoConfirmado`, el texto confirmado del peso de trabajo (FR-11).
+// `finales` cuenta los finales de edición de cada peso: guardarCambios solo
+// escribe un peso cuando termina su edición (almacenamiento.js).
 export function estadoInicial(porcentajes, discos = DISCOS_CENT, {
   trabajo = TRABAJO_INICIAL,
   recta = PESO_BARRA_INICIAL_CENT,
   z = PESO_BARRA_INICIAL_CENT,
   collarines = false,
 } = {}) {
-  const barraValida = { recta, z };
+  const barraConfirmada = { recta, z };
   const estado = {
     modo: 'barra',
     barra: '20',
-    pesoBarra: textosBarra(barraValida),
-    barraValida,
+    pesoBarra: textosBarra(barraConfirmada),
+    barraConfirmada,
     trabajo,
-    trabajoValido: trabajo,
+    trabajoConfirmado: trabajo,
+    finales: { trabajo: 0, recta: 0, z: 0 },
     porcentajes: ordenarSinRepetidos(porcentajes),
     discos: [...discos],
     collarines,
@@ -101,38 +104,58 @@ export function estadoInicial(porcentajes, discos = DISCOS_CENT, {
   };
 }
 
-// FR-02: el campo de la recta y el de la Z muestran su último peso válido con
+// FR-02: el campo de la recta y el de la Z muestran su peso confirmado con
 // el formato de FR-14.
-function textosBarra(barraValida) {
-  return { recta: formatearKg(barraValida.recta), z: formatearKg(barraValida.z) };
+function textosBarra(barraConfirmada) {
+  return { recta: formatearKg(barraConfirmada.recta), z: formatearKg(barraConfirmada.z) };
 }
 
-// FR-02: al cambiar de modo o de barra, un peso de barra no válido se descarta
-// y el campo vuelve a mostrar el último válido.
-export function elegirModo(estado, modo) {
-  return { ...estado, modo, pesoBarra: textosBarra(estado.barraValida) };
-}
-
-export function elegirBarra(estado, barra) {
-  return { ...estado, barra, pesoBarra: textosBarra(estado.barraValida) };
-}
-
-// FR-02: lo tecleado se conserva tal cual; si es válido, pasa a ser el último
-// peso válido de esa barra.
-export function escribirPesoBarra(estado, texto) {
-  const cent = analizarPesoBarra(texto);
+// FR-11: termina la edición de un peso, `campo` 'trabajo' o 'barra' (el de la
+// recta o la Z elegida). Si lo escrito es válido, pasa a ser el confirmado; si
+// no, el confirmado no cambia. Lo que muestra el campo no cambia nunca.
+export function terminarEdicion(estado, campo) {
+  if (campo === 'trabajo') {
+    const valido = analizarPeso(estado.trabajo).estado === 'ok';
+    return {
+      ...estado,
+      trabajoConfirmado: valido ? estado.trabajo : estado.trabajoConfirmado,
+      finales: { ...estado.finales, trabajo: estado.finales.trabajo + 1 },
+    };
+  }
+  const barra = estado.barra;
+  // Sin la recta o la Z elegida en el modo Barra, el campo no se ve.
+  if (campo !== 'barra' || estado.modo !== 'barra' || !(barra in estado.barraConfirmada)) return estado;
+  const cent = analizarPesoBarra(estado.pesoBarra[barra]);
   return {
     ...estado,
-    pesoBarra: { ...estado.pesoBarra, [estado.barra]: texto },
-    barraValida: cent === null ? estado.barraValida : { ...estado.barraValida, [estado.barra]: cent },
+    barraConfirmada: cent === null ? estado.barraConfirmada : { ...estado.barraConfirmada, [barra]: cent },
+    finales: { ...estado.finales, [barra]: estado.finales[barra] + 1 },
   };
 }
 
-// FR-03, FR-11: lo tecleado se conserva tal cual; si es válido, pasa a ser el
-// último peso de trabajo válido, que es el que se guarda.
+// FR-02, FR-11: cambiar de modo o de barra termina la edición del peso que
+// tiene el foco (`foco`: 'trabajo', 'barra' o null). Después, el campo de cada
+// barra vuelve a mostrar su peso confirmado: lo vacío o no válido se descarta.
+// Elegir la barra que ya está elegida no es cambiar de barra.
+export function elegirModo(estado, modo, foco = null) {
+  const e = foco ? terminarEdicion(estado, foco) : estado;
+  return { ...e, modo, pesoBarra: textosBarra(e.barraConfirmada) };
+}
+
+export function elegirBarra(estado, barra, foco = null) {
+  if (barra === estado.barra) return estado;
+  const e = foco ? terminarEdicion(estado, foco) : estado;
+  return { ...e, barra, pesoBarra: textosBarra(e.barraConfirmada) };
+}
+
+// FR-02, FR-03: lo tecleado se conserva tal cual. Las series se calculan con
+// ello (FR-10), pero solo se confirma al terminar la edición (FR-11).
+export function escribirPesoBarra(estado, texto) {
+  return { ...estado, pesoBarra: { ...estado.pesoBarra, [estado.barra]: texto } };
+}
+
 export function escribirTrabajo(estado, texto) {
-  const valido = analizarPeso(texto).estado === 'ok';
-  return { ...estado, trabajo: texto, trabajoValido: valido ? texto : estado.trabajoValido };
+  return { ...estado, trabajo: texto };
 }
 
 // FR-04: si es válido y no está, lo añade en su sitio; si no, deja la lista
@@ -169,14 +192,15 @@ const iguales = (a, b) => a.length === b.length && a.every((x, i) => x === b[i])
 
 // SPEC-CALC-002 FR-09: el aviso se muestra mientras algún dato no coincida con
 // lo último guardado bien. El peso de trabajo se compara por su texto y los
-// pesos de barra, por su valor; de los pesos cuenta el último válido.
+// pesos de barra, por su valor; de los pesos cuenta el confirmado, así que el
+// aviso no cambia mientras se escribe.
 function coincideConGuardado(estado) {
   const g = estado.guardados;
   return iguales(estado.porcentajes, g.porcentajes)
     && iguales(estado.discos, g.discos)
-    && estado.trabajoValido === g.trabajo
-    && estado.barraValida.recta === g.recta
-    && estado.barraValida.z === g.z
+    && estado.trabajoConfirmado === g.trabajo
+    && estado.barraConfirmada.recta === g.recta
+    && estado.barraConfirmada.z === g.z
     && estado.collarines === g.collarines;
 }
 

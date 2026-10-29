@@ -191,35 +191,95 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
   await expect(avisoGuardado(page)).toBeHidden();
 });
 
-test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: aviso mientras no coinciden con lo guardado', async ({ page }) => {
+// SPEC-CALC-001 FR-11: la app pasa a segundo plano y vuelve.
+async function segundoPlano(page) {
+  await page.evaluate(() => {
+    for (const estado of ['hidden', 'visible']) {
+      Object.defineProperty(document, 'visibilityState', { value: estado, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+    delete document.visibilityState;
+  });
+}
+
+test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: el aviso compara lo confirmado', async ({ page }) => {
   // Peso de trabajo guardado "100".
   await trabajo(page).fill('101');
+  await trabajo(page).blur();
   await trabajo(page).fill('100');
+  await trabajo(page).blur();
   expect(await page.evaluate((c) => localStorage.getItem(c), CLAVE_TRABAJO)).toBe('"100"');
   await page.reload();
   await expect(avisoGuardado(page)).toBeHidden();
   await page.evaluate(() => {
-    Storage.prototype.setItem = () => { throw new DOMException('Lleno', 'QuotaExceededError'); };
+    const original = Storage.prototype.setItem;
+    window.romperAlmacen = (roto) => {
+      Storage.prototype.setItem = roto
+        ? () => { throw new DOMException('Lleno', 'QuotaExceededError'); }
+        : original;
+    };
+    window.romperAlmacen(true);
   });
 
-  await trabajo(page).fill('105');
-  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
-  await trabajo(page).fill('100');
-  await expect(avisoGuardado(page)).toBeHidden();
-
-  await trabajo(page).fill('105');
+  // Mientras se escribe, el aviso no aparece; al salir del campo, sí.
   await trabajo(page).fill('');
+  await trabajo(page).pressSequentially('105');
+  await expect(avisoGuardado(page)).toBeHidden();
+  await trabajo(page).blur();
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  // "100" sin salir: el aviso sigue; al salir, desaparece.
   await trabajo(page).fill('100');
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  await trabajo(page).blur();
   await expect(avisoGuardado(page)).toBeHidden();
 
+  // "105" y salir, después vaciar y salir: el aviso sigue.
+  await trabajo(page).fill('105');
+  await trabajo(page).blur();
+  await trabajo(page).fill('');
+  await trabajo(page).blur();
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  // Ya se puede guardar: salir con el campo vacío reintenta "105".
+  await page.evaluate(() => window.romperAlmacen(false));
+  await trabajo(page).focus();
+  await trabajo(page).blur();
+  await expect(avisoGuardado(page)).toBeHidden();
+  expect(await page.evaluate((c) => localStorage.getItem(c), CLAVE_TRABAJO)).toBe('"105"');
+
+  // A segundo plano con el foco: aviso; ya se puede guardar y, con el foco, a Dos lados.
+  await page.evaluate(() => window.romperAlmacen(true));
+  await trabajo(page).fill('106');
+  await segundoPlano(page);
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  await page.evaluate(() => window.romperAlmacen(false));
+  await page.evaluate(() => {
+    const radio = document.querySelector('input[name="modo"][value="dos-lados"]');
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change'));
+  });
+  await expect(avisoGuardado(page)).toBeHidden();
+  expect(await page.evaluate((c) => localStorage.getItem(c), CLAVE_TRABAJO)).toBe('"106"');
+  await page.getByLabel('Barra', { exact: true }).check();
+
+  await page.evaluate(() => window.romperAlmacen(true));
   await page.getByLabel('Collarines de competición').check();
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
   await page.getByLabel('Collarines de competición').uncheck();
   await expect(avisoGuardado(page)).toBeHidden();
 
+  // La Z con 8,5 kg y salir: aviso. Elegir la recta no la reintenta; volver, entrar y salir, sí.
   await page.getByLabel('Z', { exact: true }).check();
   await page.getByLabel('Peso de la barra (kg)').fill('8,5');
+  await expect(avisoGuardado(page)).toBeHidden();
+  await page.getByLabel('Peso de la barra (kg)').blur();
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
   expect(await page.evaluate(() => localStorage.getItem('calculadora-discos:v1:peso-z'))).toBeNull();
+  await page.evaluate(() => window.romperAlmacen(false));
+  await page.getByLabel('Recta', { exact: true }).check();
+  await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
+  await page.getByLabel('Z', { exact: true }).check();
+  await page.getByLabel('Peso de la barra (kg)').focus();
+  await page.getByLabel('Peso de la barra (kg)').blur();
+  await expect(avisoGuardado(page)).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('calculadora-discos:v1:peso-z'))).toBe('8.5');
 });
