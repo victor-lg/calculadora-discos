@@ -1,5 +1,6 @@
 // Textos de la presentación (SPEC-CALC-003) a través del modelo de vista: el
-// resumen y las fichas del panel Carga, el resumen de Mis discos y los avisos.
+// resumen y las fichas del panel Carga, el resumen de Mis discos, los avisos y
+// las tarjetas de las series.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -8,6 +9,7 @@ import {
   elegirModo,
   elegirBarra,
   escribirPesoBarra,
+  escribirTrabajo,
   terminarEdicion,
   alternarDisco,
   MODOS,
@@ -103,4 +105,40 @@ test('SPEC-CALC-001/AC-45 al terminar la edición, el resumen pasa al confirmado
   e = terminarEdicion(conTexto('8'), 'barra');
   assert.equal(e.barraConfirmada.recta, 800);
   assert.equal(modeloVista(e).resumenCarga, 'Barra · Recta 8 kg');
+});
+
+const serie = (e, porcentaje) => modeloVista(e).series.find((s) => s.valor === porcentaje);
+
+test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg: marca, total, "Por lado", discos y explicación', () => {
+  const s = serie(escribirTrabajo(inicial(), '105'), 70);
+  assert.equal(s.porcentaje, '70 %');
+  assert.equal(s.diferencia, '−1 kg');
+  assert.equal(s.anuncioDiferencia, '1 kg menos que el objetivo. Ver detalle');
+  assert.equal(s.total, '72,5 kg');
+  assert.equal(s.etiquetaDiscos, 'Por lado');
+  assert.deepEqual(s.grupos, [
+    { cent: 2500, peso: '25', veces: null, anuncio: '1 disco de 25 kg' },
+    { cent: 125, peso: '1,25', veces: null, anuncio: '1 disco de 1,25 kg' },
+  ]);
+  assert.equal(
+    s.detalleDiferencia,
+    'El 70 % de 105 kg son 73,5 kg. Con tus discos, lo más cercano sin pasarte es 72,5 kg: 1 kg menos.',
+  );
+  assert.equal(s.collarin, null);
+  assert.equal(s.linea, null);
+});
+
+test('SPEC-CALC-003/AC-07 sin discos, "×n" con su anuncio y el collarín', () => {
+  const sola = serie(escribirTrabajo(inicial(), '40'), 40);
+  assert.deepEqual([sola.linea, sola.total, sola.explicacion], [
+    'Solo la barra', '20 kg', 'El 40 % son 16 kg, menos que la barra (20 kg).',
+  ]);
+  assert.deepEqual([sola.diferencia, sola.etiquetaDiscos, sola.grupos], [null, null, null]);
+
+  const cien = serie(escribirTrabajo(estadoInicial([100]), '120'), 100);
+  assert.deepEqual(cien.grupos, [{ cent: 2500, peso: '25', veces: '×2', anuncio: '2 discos de 25 kg' }]);
+  assert.deepEqual(cien.discos, ['25 ×2']);
+
+  assert.equal(serie({ ...inicial(), collarines: true }, 70).collarin, '+ collarín de 2,5 kg');
+  assert.equal(serie(inicial(), 70).collarin, null);
 });

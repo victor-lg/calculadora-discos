@@ -1,5 +1,6 @@
-// Recorridos de SPEC-CALC-003 de la parte de arriba de la pantalla: peso de
-// trabajo, paneles Carga y Mis discos y avisos generales; y SPEC-CALC-001 AC-45.
+// Recorridos de SPEC-CALC-003: peso de trabajo, paneles Carga y Mis discos,
+// avisos generales y tarjetas de las series en la vista de solo texto (FR-14);
+// y SPEC-CALC-001 AC-45.
 import { test, expect } from '@playwright/test';
 import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar,
@@ -16,6 +17,7 @@ const avisos = (page) => page.locator('#avisos > .aviso:not([hidden])');
 const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 const guardado = (page, clave) => page.evaluate((c) => localStorage.getItem(c), clave);
 const pesosFichas = (page) => page.locator('#lista-barras .ficha');
+const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 
 // Pliega el panel Carga sin quitar el foco del campo que lo tenga, como pasa a
 // veces en iOS al tocar otro control (ADR-0005 §3).
@@ -364,4 +366,156 @@ test('SPEC-CALC-003 NFR-02 contraste de los textos, bordes de campo, interruptor
     return fallos;
   });
   expect(fallos).toEqual([]);
+});
+
+test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferencia', async ({ page }) => {
+  await trabajo(page).fill('105');
+  const t = tarjeta(page, 70);
+  await expect(t.locator('.porcentaje')).toHaveText('70 %');
+  await expect(t.locator('.total')).toHaveText('72,5 kg');
+  await expect(t.locator('.etiqueta')).toHaveText('Por lado');
+  await expect(t.locator('.disco-serie')).toHaveText(['25', '1,25']);
+  // Cada disco con su punto de color, que es el de su tipo.
+  const puntos = t.locator('.discos .punto');
+  await expect(puntos).toHaveCount(2);
+  const colores = await puntos.evaluateAll((ps) => ps.map((p) => getComputedStyle(p).backgroundColor));
+  expect(colores).toEqual(['rgb(200, 16, 46)', 'rgb(195, 200, 207)']);
+
+  const marca = t.getByRole('button', { name: '1 kg menos que el objetivo. Ver detalle' });
+  await expect(marca).toHaveText('−1 kg');
+  // Plegada, en gris (--linea).
+  const fondo = () => marca.locator('.pastilla').evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await fondo()).toBe('rgb(43, 47, 53)');
+  await expect(marca).toHaveAttribute('aria-expanded', 'false');
+  const detalle = t.locator('.detalle');
+  await expect(detalle).toBeHidden();
+  const plegada = (await t.boundingBox()).height;
+
+  await marca.click();
+  await expect(marca).toHaveAttribute('aria-expanded', 'true');
+  await expect(detalle).toHaveText(
+    'El 70 % de 105 kg son 73,5 kg. Con tus discos, lo más cercano sin pasarte es 72,5 kg: 1 kg menos.',
+  );
+  // Dentro de la tarjeta, que crece para contenerla.
+  const caja = await t.boundingBox();
+  const cajaDetalle = await detalle.boundingBox();
+  expect(caja.height).toBeGreaterThan(plegada);
+  expect(cajaDetalle.y).toBeGreaterThanOrEqual(caja.y);
+  expect(cajaDetalle.y + cajaDetalle.height).toBeLessThanOrEqual(caja.y + caja.height);
+  // La marca toma el color de acento.
+  expect(await fondo()).toBe('rgb(255, 138, 42)');
+
+  await marca.click();
+  await expect(marca).toHaveAttribute('aria-expanded', 'false');
+  await expect(detalle).toBeHidden();
+});
+
+// Decisión de presentación sin AC (FR-06 no dice qué pasa al repintar): la
+// explicación no se cierra por cambios ajenos a la marca.
+test('la explicación desplegada sigue abierta al repintar las tarjetas', async ({ page }) => {
+  await trabajo(page).fill('105');
+  await tarjeta(page, 70).locator('.diferencia').click();
+  await page.getByRole('button', { name: 'Quitar 40 %' }).click();
+  await expect(tarjeta(page, 70).locator('.diferencia')).toHaveAttribute('aria-expanded', 'true');
+  await expect(tarjeta(page, 70).locator('.detalle')).toBeVisible();
+  // Una tarjeta que se queda sin diferencia vuelve plegada.
+  await trabajo(page).fill('100');
+  await trabajo(page).fill('105');
+  await expect(tarjeta(page, 70).locator('.diferencia')).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('SPEC-CALC-003/AC-07 "Solo la barra", "×n" con su anuncio y el collarín', async ({ page }) => {
+  await trabajo(page).fill('40');
+  const t40 = tarjeta(page, 40);
+  await expect(t40.locator('.linea')).toHaveText('Solo la barra');
+  await expect(t40.locator('.total')).toHaveText('20 kg');
+  await expect(t40.locator('.explicacion')).toHaveText('El 40 % son 16 kg, menos que la barra (20 kg).');
+  await expect(t40.locator('.explicacion')).toBeVisible();
+  await expect(t40.locator('.diferencia')).toHaveCount(0);
+  await expect(t40).not.toContainText('Por lado');
+
+  await page.getByLabel('Nuevo porcentaje').fill('100');
+  await page.getByRole('button', { name: 'Añadir' }).click();
+  await trabajo(page).fill('120');
+  const t100 = tarjeta(page, 100);
+  await expect(t100.locator('.disco-serie')).toHaveText('25×2');
+  // Se ve "25" con "×2" y se anuncia "2 discos de 25 kg".
+  await expect(t100.locator('.discos > li .oculto')).toHaveText('2 discos de 25 kg');
+  await expect(t100.locator('.disco-serie')).toHaveAttribute('aria-hidden', 'true');
+  const anunciado = await t100.locator('.discos').ariaSnapshot();
+  expect(anunciado).toContain('2 discos de 25 kg');
+  expect(anunciado).not.toContain('×2');
+
+  await trabajo(page).fill('100');
+  await desplegarPaneles(page);
+  await page.getByRole('switch', { name: /Collarines/ }).check();
+  await expect(tarjeta(page, 70).locator('.collarin')).toHaveText('+ collarín de 2,5 kg');
+});
+
+test('SPEC-CALC-003 NFR-01 las marcas de diferencia miden al menos 44 × 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await trabajo(page).fill('105');
+  const marcas = page.locator('.diferencia');
+  const n = await marcas.count();
+  expect(n).toBeGreaterThan(0);
+  for (let i = 0; i < n; i++) {
+    const caja = await marcas.nth(i).boundingBox();
+    expect(caja.width).toBeGreaterThanOrEqual(44);
+    expect(caja.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
+// Mide el contraste de cada texto visible de las tarjetas frente a su fondo,
+// con el mismo cálculo que el test de contraste de arriba. AC-21 (PR 4 de
+// VIC-11) medirá la pantalla entera.
+const contrasteTarjetas = (page) => page.evaluate(() => {
+  const rgb = (c) => c.match(/[\d.]+/g).map(Number);
+  const lum = ([r, g, b]) => {
+    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const contraste = (a, b) => {
+    const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((m, n) => n - m);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const fondo = (el) => {
+    for (let e = el; e; e = e.parentElement) {
+      const c = getComputedStyle(e).backgroundColor;
+      if (rgb(c)[3] !== 0) return c;
+    }
+    return getComputedStyle(document.body).backgroundColor;
+  };
+  const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
+    && !el.closest('.oculto');
+  const fallos = [];
+  let medidos = 0;
+  for (const el of document.querySelectorAll('#series *')) {
+    const propio = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    if (!propio || !visible(el)) continue;
+    const s = getComputedStyle(el);
+    const grande = parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.66 && Number(s.fontWeight) >= 700);
+    const r = contraste(s.color, fondo(el));
+    medidos++;
+    if (r < (grande ? 3 : 4.5)) fallos.push(`${el.textContent.trim()}: ${r.toFixed(2)}`);
+  }
+  return { fallos, medidos };
+});
+
+test('SPEC-CALC-003 NFR-02 contraste de las tarjetas: marca plegada y desplegada, explicación, collarín y "Solo la barra"', async ({ page }) => {
+  await desplegarPaneles(page);
+  await page.getByRole('switch', { name: /Collarines/ }).check();
+  await trabajo(page).fill('105');
+  // El 70 % con la marca desplegada y el 90 % con la suya plegada.
+  await tarjeta(page, 70).locator('.diferencia').click();
+  await expect(tarjeta(page, 70).locator('.detalle')).toBeVisible();
+  await expect(tarjeta(page, 90).locator('.diferencia')).toHaveAttribute('aria-expanded', 'false');
+  await expect(series(page).locator('.collarin')).not.toHaveCount(0);
+  let r = await contrasteTarjetas(page);
+  expect(r.fallos).toEqual([]);
+  expect(r.medidos).toBeGreaterThan(10);
+
+  await trabajo(page).fill('40');
+  await expect(tarjeta(page, 40).locator('.linea')).toHaveText('Solo la barra');
+  r = await contrasteTarjetas(page);
+  expect(r.fallos).toEqual([]);
 });

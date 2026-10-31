@@ -65,6 +65,9 @@ export const TEXTOS = {
   cuentaDiscos: (n, total) => `${n} de ${total}`,
   anuncioDiscos: (n, total) => `Mis discos: ${n} de ${total} habilitados`,
   revisarBarra: 'Revisa el peso de la barra en Carga.',
+  // SPEC-CALC-003 FR-06: D diferencia, n repeticiones y W peso del disco.
+  anuncioDiferencia: (d) => `${d} kg menos que el objetivo. Ver detalle`,
+  anuncioDisco: (n, w) => (n === 1 ? `1 disco de ${w} kg` : `${n} discos de ${w} kg`),
 };
 
 // FR-04: ordenados de menor a mayor y sin repetidos.
@@ -216,6 +219,7 @@ function barraElegida(estado) {
 }
 
 // FR-08: cada tipo una vez, de mayor a menor, con "×n" si se repite.
+// SPEC-CALC-003 FR-06: con su tipo (el color del punto) y su anuncio.
 function gruposDiscos(discos) {
   const grupos = [];
   for (const d of discos) {
@@ -223,7 +227,12 @@ function gruposDiscos(discos) {
     if (ultimo && ultimo.cent === d) ultimo.n++;
     else grupos.push({ cent: d, n: 1 });
   }
-  return grupos.map(({ cent, n }) => (n > 1 ? `${formatearKg(cent)} ×${n}` : formatearKg(cent)));
+  return grupos.map(({ cent, n }) => ({
+    cent,
+    peso: formatearKg(cent),
+    veces: n > 1 ? `×${n}` : null,
+    anuncio: TEXTOS.anuncioDisco(n, formatearKg(cent)),
+  }));
 }
 
 // FR-09: la línea, el peso total y la explicación de una serie sin discos.
@@ -257,14 +266,17 @@ function modeloSerie(estado, barra, barraCent, trabajoCent, porcentaje) {
     collarines: estado.collarines,
   });
   const serie = {
+    valor: porcentaje,
     porcentaje: `${porcentaje} %`,
     total: null,
     diferencia: null,
+    anuncioDiferencia: null,
     detalleDiferencia: null,
     linea: null,
     explicacion: null,
     etiquetaDiscos: null,
     discos: null,
+    grupos: null,
     collarin: null,
     avisoCapacidad: null,
   };
@@ -272,10 +284,12 @@ function modeloSerie(estado, barra, barraCent, trabajoCent, porcentaje) {
   if (s.minimo) return { ...serie, ...serieSinDiscos(estado, barraCent, s.objetivo, porcentaje) };
   serie.total = `${formatearKg(s.cargado)} kg`;
   serie.etiquetaDiscos = estado.modo === 'un-punto' ? TEXTOS.totalEnDiscos : TEXTOS.porLado;
-  serie.discos = gruposDiscos(s.discos);
+  serie.grupos = gruposDiscos(s.discos);
+  serie.discos = serie.grupos.map((g) => (g.veces ? `${g.peso} ${g.veces}` : g.peso));
   if (s.collarines) serie.collarin = TEXTOS.collarin;
   if (s.diferencia !== 0) {
     serie.diferencia = `${formatearKg(s.diferencia)} kg`;
+    serie.anuncioDiferencia = TEXTOS.anuncioDiferencia(formatearKg(-s.diferencia));
     serie.detalleDiferencia = TEXTOS.detalleDiferencia(
       porcentaje,
       formatearKg(trabajoCent),
