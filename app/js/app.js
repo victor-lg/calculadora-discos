@@ -235,6 +235,29 @@ const CIERRE_MS = 450;
 
 const sinMovimiento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// FR-08 y FR-13: la tarjeta que se borra con el gesto cierra su hueco
+// (altura, margen y opacidad, estilos.css .se-cierra) y después se llama a
+// `despues`: las de debajo suben sin saltar. Si la transición no termina (por
+// ejemplo, porque otro cambio repinta las tarjetas), se sigue igual. Una
+// tarjeta que ya se está cerrando no vuelve a empezar.
+function cerrarHueco(item, despues) {
+  if (item.classList.contains('se-cierra')) return;
+  let hecho = false;
+  const terminar = () => {
+    if (hecho) return;
+    hecho = true;
+    despues();
+  };
+  item.style.height = `${item.offsetHeight}px`;
+  item.getBoundingClientRect();
+  item.classList.add('se-cierra');
+  item.style.height = '0px';
+  item.addEventListener('transitionend', (e) => {
+    if (e.target === item && e.propertyName === 'height') terminar();
+  });
+  setTimeout(terminar, CIERRE_MS);
+}
+
 // FR-08: el botón "Quitar" que mostró una pulsación larga, hasta que se toca
 // fuera de él.
 let quitarMostrado = null;
@@ -313,34 +336,15 @@ function enlazarGesto(item, tarjeta, quitar, valor) {
       item.classList.add('arrastra', 'listo');
       if (sinMovimiento()) borrar(valor);
       else {
-        // La tarjeta sale de lado, su hueco se cierra y después se borra: las
-        // de debajo suben sin saltar. Si una transición no termina (por
-        // ejemplo, porque otro cambio repinta las tarjetas), se sigue igual.
-        let hecho = false;
-        const terminar = () => {
-          if (hecho) return;
-          hecho = true;
-          borrar(valor);
-        };
-        let cerrando = false;
-        const cerrarHueco = () => {
-          if (cerrando) return;
-          cerrando = true;
-          item.style.height = `${item.offsetHeight}px`;
-          item.getBoundingClientRect();
-          item.classList.add('se-cierra');
-          item.style.height = '0px';
-          item.addEventListener('transitionend', (e) => {
-            if (e.target === item && e.propertyName === 'height') terminar();
-          });
-          setTimeout(terminar, CIERRE_MS);
-        };
+        // La tarjeta sale de lado y después cierra su hueco y se borra. Si la
+        // salida no termina, se sigue igual.
+        const cerrar = () => cerrarHueco(item, () => borrar(valor));
         tarjeta.classList.add('sale');
         colocar(-ancho);
         tarjeta.addEventListener('transitionend', (e) => {
-          if (e.target === tarjeta && e.propertyName === 'transform') cerrarHueco();
+          if (e.target === tarjeta && e.propertyName === 'transform') cerrar();
         });
-        setTimeout(cerrarHueco, SALIDA_MS);
+        setTimeout(cerrar, SALIDA_MS);
       }
     } else if (deslizaba) {
       if (!sinMovimiento()) tarjeta.classList.add('vuelve');
