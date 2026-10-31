@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, anadirPorcentaje,
-  botonQuitar, quitarSerie, deslizar, porcentajesDeSeries,
+  botonQuitar, quitarSerie, deslizar, porcentajesDeSeries, cargarFuentes, FUENTES_CARGADAS,
 } from './pantalla.js';
 
 const series = (page) => page.locator('#series > li');
@@ -54,6 +54,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(instalarContraste);
   await page.goto('./');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  expect(await cargarFuentes(page)).toEqual(FUENTES_CARGADAS);
 });
 
 // Los estados de AC-20, en orden: cada uno parte del anterior. Con 105 kg hay

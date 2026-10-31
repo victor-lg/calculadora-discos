@@ -15,6 +15,16 @@ export async function desplegarPaneles(page) {
   }
 }
 
+// SPEC-CALC-003 §11: carga todas las caras de @font-face y devuelve su estado
+// ("Barlow 400 loaded"). Las medidas de geometría esperan a las fuentes de
+// verdad: con las de reserva, el texto ocupa otro ancho.
+export const FUENTES_CARGADAS = [
+  ...[400, 500, 600].map((p) => `Barlow ${p} loaded`),
+  ...[500, 600, 700, 800].map((p) => `Barlow Semi Condensed ${p} loaded`),
+];
+export const cargarFuentes = (page) => page.evaluate(() => Promise.all([...document.fonts]
+  .map((f) => f.load().catch(() => {}).then(() => `${f.family.replace(/"/g, '')} ${f.weight} ${f.status}`))));
+
 // Recarga la app (un arranque de cero) y vuelve a desplegar los paneles.
 export async function recargar(page) {
   await page.reload();
