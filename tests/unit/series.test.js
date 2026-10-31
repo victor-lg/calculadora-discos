@@ -76,7 +76,7 @@ test('SPEC-CALC-001/AC-04 las olímpicas de 20 y 15 kg tienen peso fijo y el cat
   for (const [barra, fijo] of [['20', '20 kg'], ['15', '15 kg']]) {
     const v = vista({ barra, trabajo: '100', porcentajes: [70] });
     assert.equal(v.barraEditable, false);
-    assert.equal(v.pesoBarraFijo, fijo);
+    assert.equal(v.fichas.find((f) => f.id === barra).peso, fijo);
   }
   for (const barra of ['recta', 'z']) {
     assert.equal(vista({ barra, trabajo: '100', porcentajes: [70] }).barraEditable, true);

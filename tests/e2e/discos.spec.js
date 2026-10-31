@@ -1,6 +1,7 @@
 // Recorridos de SPEC-CALC-002 que necesitan un navegador real: tocar los tipos,
 // arranque de cero, vuelta de segundo plano y fallo al guardar.
 import { test, expect } from '@playwright/test';
+import { trabajo, pesoBarra, barra, desplegarPaneles, recargar } from './pantalla.js';
 
 const CLAVE_DISCOS = 'calculadora-discos:v1:discos';
 const CLAVE_PORCENTAJES = 'calculadora-discos:v1:porcentajes';
@@ -8,7 +9,6 @@ const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
 const AVISO_GUARDAR = 'No se ha podido guardar: se mantendrá hasta cerrar la app';
 const NOMBRES = ['25 kg', '20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg', '1,25 kg'];
 
-const trabajo = (page) => page.getByLabel('Peso de trabajo (kg)');
 const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 const series = (page) => page.locator('#series > li');
 const porcentajes = (page) => page.locator('#porcentajes > li > span');
@@ -27,6 +27,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
   // Cada test parte de un almacenamiento vacío: Playwright le da un contexto propio.
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  await desplegarPaneles(page);
 });
 
 test('SPEC-CALC-002/AC-01 los 7 tipos con su peso y su estado; tocar uno lo alterna', async ({ page }) => {
@@ -85,13 +86,13 @@ test('SPEC-CALC-002/AC-11 los tipos se recuperan al arrancar de cero, también n
   await expect(page.locator('#indicacion-trabajo')).toBeVisible();
   await disco(page, '25 kg').click();
   await disco(page, '1,25 kg').click();
-  await page.reload();
+  await recargar(page);
   await expect(disco(page, '25 kg')).not.toBeChecked();
   await expect(disco(page, '1,25 kg')).not.toBeChecked();
   for (const nombre of NOMBRES.slice(1, 6)) await expect(disco(page, nombre)).toBeChecked();
 
   for (const nombre of NOMBRES.slice(1, 6)) await disco(page, nombre).click();
-  await page.reload();
+  await recargar(page);
   for (const nombre of NOMBRES) await expect(disco(page, nombre)).not.toBeChecked();
   await expect(indicacionDiscos(page)).toBeVisible();
 });
@@ -102,11 +103,11 @@ test('SPEC-CALC-002/AC-11 datos guardados que faltan o no son válidos: los 7; [
       if (valor === null) localStorage.removeItem(clave);
       else localStorage.setItem(clave, valor);
     }, [CLAVE_DISCOS, crudo]);
-    await page.reload();
+    await recargar(page);
     for (const nombre of NOMBRES) await expect(disco(page, nombre), String(crudo)).toBeChecked();
   }
   await page.evaluate((clave) => localStorage.setItem(clave, '[1.25,25]'), CLAVE_DISCOS);
-  await page.reload();
+  await recargar(page);
   await expect(page.locator('#lista-discos input:checked')).toHaveCount(2);
   await expect(disco(page, '25 kg')).toBeChecked();
   await expect(disco(page, '1,25 kg')).toBeChecked();
@@ -115,7 +116,7 @@ test('SPEC-CALC-002/AC-11 datos guardados que faltan o no son válidos: los 7; [
 test('SPEC-CALC-002/AC-12 los tipos y los porcentajes se recuperan por separado', async ({ page }) => {
   await disco(page, '25 kg').click();
   await page.evaluate((clave) => localStorage.setItem(clave, '{roto'), CLAVE_PORCENTAJES);
-  await page.reload();
+  await recargar(page);
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(disco(page, '25 kg')).not.toBeChecked();
 
@@ -123,7 +124,7 @@ test('SPEC-CALC-002/AC-12 los tipos y los porcentajes se recuperan por separado'
     localStorage.setItem(discos, '{roto');
     localStorage.setItem(pcts, '[50,75]');
   }, [CLAVE_DISCOS, CLAVE_PORCENTAJES]);
-  await page.reload();
+  await recargar(page);
   for (const nombre of NOMBRES) await expect(disco(page, nombre)).toBeChecked();
   await expect(porcentajes(page)).toHaveText(['50 %', '75 %']);
 });
@@ -209,7 +210,7 @@ test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: el aviso c
   await trabajo(page).fill('100');
   await trabajo(page).blur();
   expect(await page.evaluate((c) => localStorage.getItem(c), CLAVE_TRABAJO)).toBe('"100"');
-  await page.reload();
+  await recargar(page);
   await expect(avisoGuardado(page)).toBeHidden();
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
@@ -268,18 +269,18 @@ test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: el aviso c
   await expect(avisoGuardado(page)).toBeHidden();
 
   // La Z con 8,5 kg y salir: aviso. Elegir la recta no la reintenta; volver, entrar y salir, sí.
-  await page.getByLabel('Z', { exact: true }).check();
-  await page.getByLabel('Peso de la barra (kg)').fill('8,5');
+  await barra(page, 'Z').check();
+  await pesoBarra(page).fill('8,5');
   await expect(avisoGuardado(page)).toBeHidden();
-  await page.getByLabel('Peso de la barra (kg)').blur();
+  await pesoBarra(page).blur();
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
   expect(await page.evaluate(() => localStorage.getItem('calculadora-discos:v1:peso-z'))).toBeNull();
   await page.evaluate(() => window.romperAlmacen(false));
-  await page.getByLabel('Recta', { exact: true }).check();
+  await barra(page, 'Recta').check();
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
-  await page.getByLabel('Z', { exact: true }).check();
-  await page.getByLabel('Peso de la barra (kg)').focus();
-  await page.getByLabel('Peso de la barra (kg)').blur();
+  await barra(page, 'Z').check();
+  await pesoBarra(page).focus();
+  await pesoBarra(page).blur();
   await expect(avisoGuardado(page)).toBeHidden();
   expect(await page.evaluate(() => localStorage.getItem('calculadora-discos:v1:peso-z'))).toBe('8.5');
 });

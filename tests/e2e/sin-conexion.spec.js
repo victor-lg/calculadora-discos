@@ -3,6 +3,7 @@
 // Cada test arranca su propio servidor, que registra todo lo que llega al
 // origen tal cual: método, URL, cabeceras en crudo (cookies incluidas) y cuerpo.
 import { test, expect } from '@playwright/test';
+import { trabajo, pesoBarra, barra, desplegarPaneles } from './pantalla.js';
 import { readFileSync } from 'node:fs';
 import { arrancar } from './servidor.js';
 
@@ -133,7 +134,7 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
   await expect(page.getByRole('heading', { name: 'Series de calentamiento' })).toBeVisible();
   expect(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
 
-  await page.getByLabel('Peso de trabajo (kg)').fill('100');
+  await trabajo(page).fill('100');
   await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '70 %', '90 %']);
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '70 kg', '90 kg']);
   await expect(series(page).locator('.discos strong')).toHaveText(['10', '25', '25 + 10']);
@@ -149,17 +150,18 @@ async function recorrido(context, base, conDatos, sockets) {
   await page.goto(base);
   await esperarServiceWorker(page);
   if (conDatos) {
-    await page.getByLabel('Recta', { exact: true }).check();
-    await page.getByLabel('Peso de la barra (kg)').fill('7,35');
-    await page.getByLabel('Z', { exact: true }).check();
-    await page.getByLabel('Peso de la barra (kg)').fill('8,65');
+    await desplegarPaneles(page);
+    await barra(page, 'Recta').check();
+    await pesoBarra(page).fill('7,35');
+    await barra(page, 'Z').check();
+    await pesoBarra(page).fill('8,65');
     await page.getByLabel('Collarines de competición').check();
-    await page.getByLabel('Peso de trabajo (kg)').fill('487,35');
+    await trabajo(page).fill('487,35');
     await page.getByLabel('Nuevo porcentaje').fill('47');
     await page.getByRole('button', { name: 'Añadir' }).click();
     await page.getByRole('button', { name: 'Quitar 70 %' }).click();
     await page.getByLabel('Un punto').check();
-    await page.getByLabel('Dos lados sin barra').check();
+    await page.getByLabel('Dos lados').check();
     // SPEC-CALC-002: deshabilitar y habilitar tipos, hasta dejar 15, 10, 5 y 2,5 kg.
     for (const nombre of ['25 kg', '20 kg', '1,25 kg', '10 kg', '10 kg']) {
       await page.getByLabel(nombre, { exact: true }).click();
@@ -171,12 +173,13 @@ async function recorrido(context, base, conDatos, sockets) {
   expect(page.url()).toBe(base);
   // ADR-0004: lo guardado vuelve tras el arranque de cero, sin salir del dispositivo.
   if (conDatos) {
-    await expect(page.getByLabel('Peso de trabajo (kg)')).toHaveValue('487,35');
+    await desplegarPaneles(page);
+    await expect(trabajo(page)).toHaveValue('487,35');
     await expect(page.getByLabel('Collarines de competición')).toBeChecked();
-    await page.getByLabel('Recta', { exact: true }).check();
-    await expect(page.getByLabel('Peso de la barra (kg)')).toHaveValue('7,35');
-    await page.getByLabel('Z', { exact: true }).check();
-    await expect(page.getByLabel('Peso de la barra (kg)')).toHaveValue('8,65');
+    await barra(page, 'Recta').check();
+    await expect(pesoBarra(page)).toHaveValue('7,35');
+    await barra(page, 'Z').check();
+    await expect(pesoBarra(page)).toHaveValue('8,65');
   }
   await page.close();
   await new Promise((r) => setTimeout(r, MARGEN_TRAS_CERRAR_MS));

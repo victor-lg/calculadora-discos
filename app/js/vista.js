@@ -6,15 +6,16 @@ import { formatearKg } from './formato.js';
 
 export const MODOS = Object.freeze([
   Object.freeze({ id: 'barra', nombre: 'Barra' }),
-  Object.freeze({ id: 'dos-lados', nombre: 'Dos lados sin barra' }),
+  Object.freeze({ id: 'dos-lados', nombre: 'Dos lados' }),
   Object.freeze({ id: 'un-punto', nombre: 'Un punto' }),
 ]);
 
 // FR-02: catálogo fijo. `cent` es null cuando el peso lo escribe la persona.
 // FR-16: `mangaDmm` es la manga útil de cada lado, en décimas de milímetro.
+// SPEC-CALC-003 FR-03: el nombre se muestra seguido del peso.
 export const BARRAS = Object.freeze([
-  Object.freeze({ id: '20', nombre: 'Olímpica 20 kg', cent: 2000, mangaDmm: 3750 }),
-  Object.freeze({ id: '15', nombre: 'Olímpica 15 kg', cent: 1500, mangaDmm: 2800 }),
+  Object.freeze({ id: '20', nombre: 'Olímpica', cent: 2000, mangaDmm: 3750 }),
+  Object.freeze({ id: '15', nombre: 'Olímpica', cent: 1500, mangaDmm: 2800 }),
   Object.freeze({ id: 'recta', nombre: 'Recta', cent: null, mangaDmm: 2000 }),
   Object.freeze({ id: 'z', nombre: 'Z', cent: null, mangaDmm: 2000 }),
 ]);
@@ -58,6 +59,12 @@ export const TEXTOS = {
     `El ${p} % son ${o} kg: faltan ${f} kg para poner el disco más pequeño (${y} kg).`,
   // FR-16, sin "Se dibujan los que caben.": esta interfaz no dibuja la carga.
   noCaben: (x) => `No caben en la manga: faltan ${x} cm.`,
+  // SPEC-CALC-003 FR-03, FR-04 y FR-05: textos propios de la presentación.
+  resumenBarra: (nombre, peso, collarines) => `Barra · ${nombre} ${peso} kg${collarines ? ' · collarines' : ''}`,
+  resumenMaquina: { 'dos-lados': 'Dos lados · máquina', 'un-punto': 'Un punto · máquina' },
+  cuentaDiscos: (n, total) => `${n} de ${total}`,
+  anuncioDiscos: (n, total) => `Mis discos: ${n} de ${total} habilitados`,
+  revisarBarra: 'Revisa el peso de la barra en Carga.',
 };
 
 // FR-04: ordenados de menor a mayor y sin repetidos.
@@ -294,12 +301,14 @@ export function modeloVista(estado) {
     mostrarBarras: enBarra,
     barraEditable,
     pesoBarraTexto: barraEditable ? estado.pesoBarra[estado.barra] : '',
-    pesoBarraFijo: enBarra && !barraEditable ? `${formatearKg(barra.cent)} kg` : null,
+    resumenCarga: null,
+    fichas: [],
     collarines: estado.collarines,
     trabajo: estado.trabajo,
     errorTrabajo: null,
     indicacionTrabajo: null,
     errorBarra: null,
+    avisoPesoBarra: null,
     avisoBarra: null,
     porcentajes: estado.porcentajes.map((p) => `${p} %`),
     textoPorcentaje: estado.textoPorcentaje,
@@ -310,6 +319,11 @@ export function modeloVista(estado) {
       nombre: `${formatearKg(cent)} kg`,
       habilitado: estado.discos.includes(cent),
     })),
+    // SPEC-CALC-003 FR-04: el resumen del panel Mis discos.
+    cuentaDiscos: estado.discos.length === DISCOS_CENT.length
+      ? null
+      : TEXTOS.cuentaDiscos(estado.discos.length, DISCOS_CENT.length),
+    anuncioDiscos: TEXTOS.anuncioDiscos(estado.discos.length, DISCOS_CENT.length),
     // SPEC-CALC-002 FR-06: además de las demás indicaciones, avisos o errores.
     indicacionDiscos: estado.discos.length === 0 ? TEXTOS.habilitarDiscos : null,
     avisoGuardado: coincideConGuardado(estado) ? null : TEXTOS.falloGuardar,
@@ -322,8 +336,24 @@ export function modeloVista(estado) {
 
   let barraCent = 0;
   if (enBarra) barraCent = barraEditable ? analizarPesoBarra(vista.pesoBarraTexto) : barra.cent;
-  // FR-02: vacío o no válido, el mismo mensaje.
-  if (barraCent === null) vista.errorBarra = TEXTOS.errorBarra;
+  // FR-02: vacío o no válido, el mismo mensaje. SPEC-CALC-003 FR-05: y un
+  // aviso general, esté el panel Carga plegado o desplegado.
+  if (barraCent === null) {
+    vista.errorBarra = TEXTOS.errorBarra;
+    vista.avisoPesoBarra = TEXTOS.revisarBarra;
+  }
+
+  // SPEC-CALC-003 FR-03: la recta o la Z elegida, con el peso del campo si es
+  // válido y, si no, el confirmado; la otra, con su confirmado.
+  const pesoFicha = (b) => {
+    if (b.cent !== null) return b.cent;
+    const escrito = b.id === estado.barra ? analizarPesoBarra(estado.pesoBarra[b.id]) : null;
+    return escrito ?? estado.barraConfirmada[b.id];
+  };
+  vista.fichas = BARRAS.map((b) => ({ id: b.id, nombre: b.nombre, peso: `${formatearKg(pesoFicha(b))} kg` }));
+  vista.resumenCarga = enBarra
+    ? TEXTOS.resumenBarra(barra.nombre, formatearKg(pesoFicha(barra)), estado.collarines)
+    : TEXTOS.resumenMaquina[estado.modo];
 
   // FR-12: mientras el peso de barra no es válido, tampoco se muestra el aviso.
   if (trabajo.estado !== 'ok' || barraCent === null) return vista;

@@ -1,8 +1,6 @@
 // Interfaz: traslada lo que hace la persona al estado en memoria y pinta el
 // modelo de vista tal cual, siempre con textContent (nunca innerHTML).
 import {
-  MODOS,
-  BARRAS,
   estadoInicial,
   elegirModo,
   elegirBarra,
@@ -36,17 +34,6 @@ function crear(etiqueta, clase, texto) {
   return el;
 }
 
-function opcion(nombreGrupo, valor, texto, alCambiar, tipo = 'radio') {
-  const label = crear('label', 'opcion');
-  const input = document.createElement('input');
-  input.type = tipo;
-  input.name = nombreGrupo;
-  input.value = valor;
-  input.addEventListener('change', () => alCambiar(valor));
-  label.append(input, crear('span', null, texto));
-  return label;
-}
-
 // FR-11: el peso cuyo campo tiene el foco ('trabajo' o 'barra'), o null.
 function pesoConFoco() {
   const id = document.activeElement?.id;
@@ -54,34 +41,76 @@ function pesoConFoco() {
   return id === 'peso-barra' ? 'barra' : null;
 }
 
+// SPEC-CALC-003 FR-03 y FR-04: los modos y las fichas de barra están en el
+// HTML; los tipos de disco y sus puntos se crean una vez al arrancar.
 function montarOpciones() {
   // FR-11: en iOS, tocar otro control no siempre quita el foco del campo
   // (ADR-0005 §3), así que el cambio de modo o de barra termina su edición.
-  for (const m of MODOS) {
-    $('modos').append(opcion('modo', m.id, m.nombre, (modo) => actualizar(elegirModo(estado, modo, pesoConFoco()))));
+  for (const input of document.querySelectorAll('input[name="modo"]')) {
+    input.addEventListener('change', () => actualizar(elegirModo(estado, input.value, pesoConFoco())));
   }
-  for (const b of BARRAS) {
-    $('lista-barras').append(opcion('barra', b.id, b.nombre, (barra) => {
-      actualizar(elegirBarra(estado, barra, pesoConFoco()));
-    }));
+  for (const input of document.querySelectorAll('input[name="barra"]')) {
+    input.addEventListener('change', () => actualizar(elegirBarra(estado, input.value, pesoConFoco())));
   }
   // SPEC-CALC-002 FR-02: cada tipo se habilita o deshabilita al tocarlo.
   for (const d of modeloVista(estado).discos) {
-    $('lista-discos').append(opcion('disco', String(d.cent), d.nombre, () => {
-      actualizar(alternarDisco(estado, d.cent));
-    }, 'checkbox'));
+    const label = crear('label', 'disco');
+    label.dataset.cent = String(d.cent);
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'disco';
+    input.value = String(d.cent);
+    input.addEventListener('change', () => actualizar(alternarDisco(estado, d.cent)));
+    const dibujo = crear('span', 'dibujo-disco');
+    dibujo.setAttribute('aria-hidden', 'true');
+    label.append(input, dibujo, crear('span', 'peso-disco', d.nombre));
+    $('lista-discos').append(label);
+    const punto = crear('i', null);
+    punto.dataset.cent = String(d.cent);
+    $('puntos-discos').append(punto);
   }
+}
+
+// Solo se escribe lo que cambia: en iOS, cambiar el contenido bajo el dedo
+// entre el toque y el clic hace que el clic no llegue, y el fin de edición de
+// un peso repinta justo en ese momento (blur del campo).
+function cambiarTexto(el, valor) {
+  if (el.textContent !== valor) el.textContent = valor;
+}
+
+function cambiarAtributo(el, nombre, valor) {
+  if (el.getAttribute(nombre) !== valor) el.setAttribute(nombre, valor);
+}
+
+function mostrar(el, visible) {
+  if (el.hidden === visible) el.hidden = !visible;
 }
 
 function texto(id, valor) {
   const el = $(id);
-  el.textContent = valor ?? '';
-  el.hidden = !valor;
+  cambiarTexto(el, valor ?? '');
+  mostrar(el, Boolean(valor));
 }
 
 function valorCampo(id, valor) {
   const el = $(id);
   if (el.value !== valor) el.value = valor;
+}
+
+// SPEC-CALC-003 FR-02: el campo crece con el texto (la copia invisible de
+// estilos.css) y, si el número no cabe, se reduce hasta caber.
+function ajustarPeso({ forzar = false } = {}) {
+  const auto = $('trabajo-auto');
+  const input = $('trabajo');
+  if (!forzar && auto.dataset.texto === input.value) return;
+  auto.dataset.texto = input.value;
+  auto.style.removeProperty('font-size');
+  let tamano = parseFloat(getComputedStyle(auto).fontSize);
+  // WebKit suma 1 px de cursor a scrollWidth aunque el texto quepa.
+  while (input.scrollWidth > input.clientWidth + 1 && tamano > 16) {
+    tamano -= 2;
+    auto.style.fontSize = `${tamano}px`;
+  }
 }
 
 function pintarSerie(s) {
@@ -109,27 +138,49 @@ function pintarSerie(s) {
   return li;
 }
 
-function pintar() {
-  const v = modeloVista(estado);
-
+// La parte de arriba se actualiza en su sitio, sin reconstruir ningún control:
+// así se puede repintar al terminar una edición sin perder el toque siguiente.
+function pintarArriba(v) {
   for (const input of document.querySelectorAll('input[name="modo"]')) input.checked = input.value === v.modo;
   for (const input of document.querySelectorAll('input[name="barra"]')) input.checked = input.value === v.barra;
-  for (const input of document.querySelectorAll('input[name="disco"]')) {
-    input.checked = v.discos.find((d) => String(d.cent) === input.value).habilitado;
+  for (const f of v.fichas) {
+    const ficha = document.querySelector(`input[name="barra"][value="${f.id}"]`).closest('.ficha');
+    cambiarTexto(ficha.querySelector('.peso-ficha'), f.peso);
   }
-
-  $('barras').hidden = !v.mostrarBarras;
-  texto('peso-barra-fijo', v.pesoBarraFijo && `Peso de la barra: ${v.pesoBarraFijo}`);
-  $('campo-peso-barra').hidden = !v.barraEditable;
+  cambiarTexto($('resumen-carga'), v.resumenCarga);
+  mostrar($('barras'), v.mostrarBarras);
+  mostrar($('nota-maquina'), !v.mostrarBarras);
   $('collarines').checked = v.collarines;
+  mostrar($('campo-peso-barra'), v.barraEditable);
   valorCampo('peso-barra', v.pesoBarraTexto);
   texto('error-barra', v.errorBarra);
-  $('peso-barra').setAttribute('aria-invalid', String(Boolean(v.errorBarra)));
+  cambiarAtributo($('peso-barra'), 'aria-invalid', String(Boolean(v.errorBarra)));
 
   valorCampo('trabajo', v.trabajo);
+  ajustarPeso();
+  cambiarAtributo($('trabajo'), 'aria-invalid', String(Boolean(v.errorTrabajo)));
+
+  for (const d of v.discos) {
+    const cent = String(d.cent);
+    document.querySelector(`input[name="disco"][value="${cent}"]`).checked = d.habilitado;
+    document.querySelector(`#puntos-discos [data-cent="${cent}"]`).classList.toggle('apagado', !d.habilitado);
+  }
+  cambiarTexto($('cuenta-discos'), v.cuentaDiscos ?? '');
+  cambiarAtributo($('boton-discos'), 'aria-label', v.anuncioDiscos);
+
+  // SPEC-CALC-003 FR-05: los avisos generales, en el orden del HTML.
   texto('error-trabajo', v.errorTrabajo);
   texto('indicacion-trabajo', v.indicacionTrabajo);
-  $('trabajo').setAttribute('aria-invalid', String(Boolean(v.errorTrabajo)));
+  texto('aviso-peso-barra', v.avisoPesoBarra);
+  texto('indicacion-porcentajes', v.indicacionPorcentajes);
+  texto('indicacion-discos', v.indicacionDiscos);
+  texto('aviso-barra', v.avisoBarra);
+  texto('aviso-guardado', v.avisoGuardado);
+}
+
+function pintar() {
+  const v = modeloVista(estado);
+  pintarArriba(v);
 
   $('porcentajes').replaceChildren(...v.porcentajes.map((p, i) => {
     const li = crear('li', null);
@@ -144,12 +195,8 @@ function pintar() {
   }));
   valorCampo('nuevo-porcentaje', v.textoPorcentaje);
   texto('error-porcentaje', v.errorPorcentaje);
-  texto('indicacion-porcentajes', v.indicacionPorcentajes);
   $('nuevo-porcentaje').setAttribute('aria-invalid', String(Boolean(v.errorPorcentaje)));
 
-  texto('aviso-barra', v.avisoBarra);
-  texto('indicacion-discos', v.indicacionDiscos);
-  texto('aviso-guardado', v.avisoGuardado);
   $('series').replaceChildren(...v.series.map(pintarSerie));
 }
 
@@ -161,16 +208,46 @@ function actualizar(nuevo) {
   pintar();
 }
 
-// FR-11: termina la edición de un peso y lo guarda. Solo puede cambiar el aviso
-// de SPEC-CALC-002 FR-09 (las series usan lo escrito), así que no se repinta
-// el resto: el blur llega con el toque siguiente, y reconstruir el control
-// tocado se comería su clic.
+// FR-11: termina la edición de un peso y lo guarda. Las series usan lo escrito,
+// así que solo se repinta la parte de arriba (resumen de Carga, fichas y
+// avisos): el blur llega con el toque siguiente, y reconstruir las listas se
+// comería el clic en el control tocado.
 function terminar(peso) {
   estado = guardarCambios(almacen, estado, terminarEdicion(estado, peso));
-  texto('aviso-guardado', modeloVista(estado).avisoGuardado);
+  pintarArriba(modeloVista(estado));
 }
 
+// SPEC-CALC-003 FR-03 y FR-04: cada panel se pliega y despliega con su botón,
+// que anuncia su estado. Devuelve si queda desplegado.
+function alternarPanel(boton) {
+  const desplegado = boton.getAttribute('aria-expanded') !== 'true';
+  boton.setAttribute('aria-expanded', String(desplegado));
+  $(boton.getAttribute('aria-controls')).hidden = !desplegado;
+  return desplegado;
+}
+
+function enlazarPaneles() {
+  // SPEC-CALC-001 FR-02 y FR-11 (AC-45): plegar el panel Carga termina la
+  // edición del peso que tiene el foco, sin descartar lo escrito. Se mira el
+  // foco antes de plegar: al ocultarse, el campo de la barra lo perdería.
+  $('boton-carga').addEventListener('click', (e) => {
+    const peso = pesoConFoco();
+    if (!alternarPanel(e.currentTarget) && peso) terminar(peso);
+  });
+  $('boton-discos').addEventListener('click', (e) => alternarPanel(e.currentTarget));
+}
+
+// SPEC-CALC-003 FR-02: no deja teclear más de 6 caracteres, pero un texto
+// pegado o arrastrado se conserva entero y se valida.
+const MAX_TRABAJO = 6;
+
 function enlazarCampos() {
+  $('trabajo').addEventListener('beforeinput', (e) => {
+    if (!e.inputType.startsWith('insert') || e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') return;
+    const el = e.target;
+    const quedan = el.value.length - (el.selectionEnd - el.selectionStart);
+    if (quedan + (e.data ?? '').length > MAX_TRABAJO) e.preventDefault();
+  });
   $('trabajo').addEventListener('input', (e) => actualizar(escribirTrabajo(estado, e.target.value)));
   $('peso-barra').addEventListener('input', (e) => {
     actualizar(escribirPesoBarra(estado, e.target.value));
@@ -197,7 +274,9 @@ function terminarAlSalir() {
 
 montarOpciones();
 enlazarCampos();
+enlazarPaneles();
 pintar();
+window.addEventListener('resize', () => ajustarPeso({ forzar: true }));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') terminarAlSalir();
 });
