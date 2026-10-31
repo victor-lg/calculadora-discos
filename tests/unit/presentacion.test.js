@@ -78,6 +78,12 @@ test('SPEC-CALC-003/AC-04 el resumen de Mis discos y su anuncio', () => {
   assert.equal(modeloVista(e).cuentaDiscos, '0 de 7');
 });
 
+test('SPEC-CALC-003/AC-04 cada tipo trae su peso sin "kg" para verlo y con "kg" para anunciarlo', () => {
+  const v = modeloVista(inicial());
+  assert.deepEqual(v.discos.map((d) => d.peso), ['25', '20', '15', '10', '5', '2,5', '1,25']);
+  assert.deepEqual(v.discos.map((d) => d.nombre), ['25 kg', '20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg', '1,25 kg']);
+});
+
 test('SPEC-CALC-003/AC-05 SPEC-CALC-003/AC-25 el aviso general del peso de la barra', () => {
   const e = elegirBarra(inicial(), 'z');
   assert.equal(modeloVista(e).avisoPesoBarra, null);

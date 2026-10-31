@@ -423,7 +423,8 @@ input[aria-invalid="true"], .peso-barra input[aria-invalid="true"] { border-colo
    proporción 1 : 1,3 (una sola a 360 px o menos); sin él (FR-14), solo el
    texto, en una columna. La explicación y el aviso de capacidad van debajo, a
    todo el ancho. */
-.series { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+/* --hueco-series también lo usa .se-cierra para cerrar el hueco al borrar. */
+.series { --hueco-series: 10px; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--hueco-series); }
 /* FR-08: la tarjeta se desliza sobre el fondo de borrar, que solo se ve
    mientras se arrastra. pan-y deja el desplazamiento vertical al navegador. */
 .deslizable { position: relative; border-radius: 14px; overflow: hidden; }
@@ -548,9 +549,9 @@ input[aria-invalid="true"], .peso-barra input[aria-invalid="true"] { border-colo
 .serie.sale { transition: transform 0.2s ease-in; }
 .serie.vuelve { transition: transform 0.2s ease-out; }
 /* Después, su hueco se cierra: altura y margen a 0 (el margen negativo anula
-   el hueco entre tarjetas) y opacidad (referencia visual §6). */
+   el hueco entre tarjetas, --hueco-series) y opacidad (referencia visual §6). */
 .deslizable.se-cierra {
-  margin-bottom: -10px;
+  margin-bottom: calc(-1 * var(--hueco-series));
   opacity: 0;
   transition: height 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), margin-bottom 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 0.18s;

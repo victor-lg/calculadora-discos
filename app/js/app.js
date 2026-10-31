@@ -236,8 +236,8 @@ const CIERRE_MS = 450;
 const sinMovimiento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // FR-08 y FR-13: la tarjeta que se borra con el gesto cierra su hueco
-// (altura, margen y opacidad, estilos.css .se-cierra) y después se llama a
-// `despues`: las de debajo suben sin saltar. Si la transición no termina (por
+// (altura, margen y opacidad, estilos.css .se-cierra; inerte mientras tanto)
+// y después se llama a `despues`: las de debajo suben sin saltar. Si la transición no termina (por
 // ejemplo, porque otro cambio repinta las tarjetas), se sigue igual. Una
 // tarjeta que ya se está cerrando no vuelve a empezar.
 function cerrarHueco(item, despues) {
@@ -248,6 +248,7 @@ function cerrarHueco(item, despues) {
     hecho = true;
     despues();
   };
+  item.inert = true;
   item.style.height = `${item.offsetHeight}px`;
   item.getBoundingClientRect();
   item.classList.add('se-cierra');
@@ -339,6 +340,8 @@ function enlazarGesto(item, tarjeta, quitar, valor) {
         // La tarjeta sale de lado y después cierra su hueco y se borra. Si la
         // salida no termina, se sigue igual.
         const cerrar = () => cerrarHueco(item, () => borrar(valor));
+        // Mientras sale, la tarjeta ya no se puede tocar ni enfocar.
+        item.inert = true;
         tarjeta.classList.add('sale');
         colocar(-ancho);
         tarjeta.addEventListener('transitionend', (e) => {
@@ -607,7 +610,8 @@ enlazarPaneles();
 pintar();
 window.addEventListener('resize', () => ajustarPeso({ forzar: true }));
 // FR-02: la primera medida puede hacerse con la fuente de reserva, más ancha;
-// al llegar Barlow, el número se vuelve a medir.
+// al llegar Barlow, el número se vuelve a medir. WebKit no avisa con
+// loadingdone de las fuentes que pide la CSS, así que también se espera a ready.
 document.fonts?.addEventListener('loadingdone', () => ajustarPeso({ forzar: true }));
 document.fonts?.ready.then(() => ajustarPeso({ forzar: true }));
 document.addEventListener('visibilitychange', () => {

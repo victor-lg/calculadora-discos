@@ -1,6 +1,7 @@
 // Ajustes de SPEC-CALC-003 frente a la referencia visual de §11
 // (docs/diseno/maqueta-interfaz.html y notas-diseno-interfaz.md §3.6 y §6),
-// tras la prueba en el iPhone de AC-24.
+// tras la prueba en el iPhone de AC-24. Lo que solo fija la referencia visual
+// cita AC-24, que es donde se acepta; la prueba manual sigue haciendo falta.
 import { test, expect } from '@playwright/test';
 import { trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, deslizar } from './pantalla.js';
 
@@ -49,14 +50,19 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
   });
 
   // FR-02: el número solo se reduce si no cabe. A 195 px (el zoom al 200 % de
-  // NFR-03), "102,5" no cabe a 52 px con la fuente de reserva, más ancha, y con
-  // Barlow sí. Al llegar Barlow, el número vuelve a su tamaño.
-  test('se vuelve a medir cuando llega Barlow', async ({ page }) => {
+  // NFR-03), "102,5" no cabe a 52 px con la fuente de reserva de WebKit, más
+  // ancha, y con Barlow sí. Al llegar Barlow, el número vuelve a su tamaño. En
+  // Chromium la de reserva ya cabe, así que no hay nada que volver a medir.
+  test('se vuelve a medir cuando llega Barlow', async ({ page, browserName }) => {
+    test.skip(browserName !== 'webkit', 'solo WebKit reduce el número con la fuente de reserva');
     await page.setViewportSize({ width: 195, height: 422 });
     await page.addInitScript(() => localStorage.setItem('calculadora-discos:v1:trabajo', JSON.stringify('102,5')));
     await retrasarFuentes(page, 1500);
-    await page.goto('./');
+    // Sin esperar a load, que en WebKit espera también a las fuentes.
+    await page.goto('./', { waitUntil: 'domcontentloaded' });
     await expect(trabajo(page)).toHaveValue('102,5');
+    // Antes de que llegue Barlow, con la de reserva, el número está reducido.
+    expect(parseFloat((await medirPeso(page)).numero[0])).toBeLessThan(52);
     await cargarFuentes(page);
     await expect.poll(async () => (await medirPeso(page)).numero[0]).toBe('52px');
   });
@@ -98,13 +104,13 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
   });
 });
 
-test.describe('referencia visual de §11', () => {
+test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('./');
   });
 
-  test('SPEC-CALC-003/AC-06 el "kg" del total de cada tarjeta, a 16 px, peso 500 y en gris', async ({ page }) => {
+  test('(FR-06) el "kg" del total de cada tarjeta, a 16 px, peso 500 y en gris', async ({ page }) => {
     const total = tarjeta(page, 70).locator('.total');
     await expect(total).toHaveText('70 kg');
     const kg = total.locator('small');
@@ -115,7 +121,7 @@ test.describe('referencia visual de §11', () => {
     await expect(total).toHaveCSS('font-size', '34px');
   });
 
-  test('SPEC-CALC-003/AC-03 el círculo del interruptor de collarines, centrado en vertical en la pastilla', async ({ page }) => {
+  test('(FR-03) el círculo del interruptor de collarines, centrado en vertical en la pastilla', async ({ page }) => {
     await desplegarPaneles(page);
     const centros = () => page.evaluate(() => {
       const input = document.getElementById('collarines');
@@ -139,7 +145,7 @@ test.describe('referencia visual de §11', () => {
     }
   });
 
-  test('SPEC-CALC-003/AC-03 un peso de barra no válido tiene el borde rojo también con el foco', async ({ page }) => {
+  test('(FR-03) un peso de barra no válido tiene el borde rojo también con el foco', async ({ page }) => {
     await desplegarPaneles(page);
     await barra(page, 'Z').check();
     const campo = pesoBarra(page);
@@ -153,7 +159,7 @@ test.describe('referencia visual de §11', () => {
     await expect(campo).toHaveCSS('border-top-color', ROJO);
   });
 
-  test('SPEC-CALC-003/AC-04 el título de Mis discos como el de la referencia y los pesos sin "kg"', async ({ page }) => {
+  test('(FR-04) el título de Mis discos como el de la referencia y los pesos sin "kg"', async ({ page }) => {
     const titulo = page.locator('#titulo-discos');
     await expect(titulo).toHaveText('Mis discos');
     await expect(titulo).toHaveCSS('text-transform', 'none');
@@ -177,7 +183,7 @@ test.describe('referencia visual de §11', () => {
     await expect(page.getByLabel('1,25 kg', { exact: true })).toBeChecked();
   });
 
-  test('SPEC-CALC-003/AC-05 los avisos generales llevan el icono de aviso de la referencia', async ({ page }) => {
+  test('(FR-05) los avisos generales llevan el icono de aviso de la referencia', async ({ page }) => {
     await trabajo(page).fill('');
     const avisos = page.locator('#avisos > .aviso:not([hidden])');
     await expect(avisos).toHaveText(['Escribe el peso de trabajo.']);
@@ -204,13 +210,26 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
     const inicio90 = (await t90.boundingBox()).y;
     const inicio70 = (await t70.boundingBox()).y;
     // Registra la posición de la tarjeta del 90 % en cada fotograma, y las
-    // transiciones de la tarjeta que se borra.
+    // transiciones de la tarjeta que se borra. Además, en cuanto empieza el
+    // cierre del hueco, lleva sus transiciones a 0, 52, 104… 260 ms y mide la
+    // del 90 % en cada momento: no depende de cuántos fotogramas pinte el
+    // navegador.
     await page.evaluate(() => {
-      window.registro = { posiciones: [], transiciones: [] };
+      window.registro = { posiciones: [], transiciones: [], muestras: null };
       const ver = () => {
         const li = [...document.querySelectorAll('#series > li')];
         const t90 = li.find((el) => el.querySelector('.porcentaje').textContent === '90 %');
         window.registro.posiciones.push(t90.getBoundingClientRect().y);
+        const cierra = li.find((el) => el.classList.contains('se-cierra'));
+        if (cierra && !window.registro.muestras) {
+          const animaciones = cierra.getAnimations();
+          const antes = animaciones.map((a) => a.currentTime);
+          window.registro.muestras = [0, 52, 104, 156, 208, 260].map((ms) => {
+            for (const a of animaciones) a.currentTime = ms;
+            return t90.getBoundingClientRect().y;
+          });
+          animaciones.forEach((a, i) => { a.currentTime = antes[i]; });
+        }
         for (const el of li) {
           for (const a of el.getAnimations({ subtree: true })) {
             const clave = `${a.transitionProperty} ${a.effect.getTiming().duration} ${a.effect.getTiming().easing}`;
@@ -224,7 +243,7 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
     await deslizar(page, t70, 0.5);
     await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '90 %']);
     await expect.poll(async () => (await t90.boundingBox()).y).toBe(inicio70);
-    const { posiciones, transiciones } = await page.evaluate(() => window.registro);
+    const { posiciones, transiciones, muestras } = await page.evaluate(() => window.registro);
 
     expect(transiciones).toEqual(expect.arrayContaining([
       'transform 200 ease-in',
@@ -232,13 +251,19 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
       'margin-bottom 260 cubic-bezier(0.2, 0.8, 0.2, 1)',
     ]));
     expect(transiciones.some((t) => t.startsWith('opacity '))).toBe(true);
-    // La del 90 % sube poco a poco, sin bajar nunca: pasa por posiciones
-    // intermedias en lugar de saltar al sitio del 70 %.
+    // La del 90 % sube poco a poco, sin bajar nunca, y acaba en el sitio del
+    // 70 %. Durante el cierre pasa por posiciones intermedias en lugar de
+    // saltar.
     for (let i = 1; i < posiciones.length; i++) {
       expect(posiciones[i]).toBeLessThanOrEqual(posiciones[i - 1] + 0.5);
     }
-    expect(posiciones.filter((y) => y < inicio90 - 1 && y > inicio70 + 1).length).toBeGreaterThanOrEqual(2);
     expect(Math.min(...posiciones)).toBeCloseTo(inicio70, 0);
+    expect(muestras[0]).toBeCloseTo(inicio90, 0);
+    expect(muestras.at(-1)).toBeCloseTo(inicio70, 0);
+    // Con la curva de §6, a los 208 ms ya ha recorrido casi todo: las
+    // intermedias que cuentan son las de 52, 104 y 156 ms.
+    for (let i = 1; i < muestras.length; i++) expect(muestras[i]).toBeLessThanOrEqual(muestras[i - 1]);
+    expect(muestras.slice(1, 4).every((y) => y < inicio90 - 1 && y > inicio70 + 1), JSON.stringify({ inicio90, inicio70, muestras })).toBe(true);
   });
 
   test('con "Reducir movimiento", sin salida de lado ni cierre del hueco', async ({ page }) => {
