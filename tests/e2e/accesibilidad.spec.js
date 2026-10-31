@@ -360,9 +360,18 @@ const medirDesborde = (page) => page.evaluate(() => {
   for (const el of document.querySelectorAll('main svg')) {
     if (visible(el)) cajas.push({ nombre: `icono de ${el.parentElement.id || el.parentElement.className}`, r: el.getBoundingClientRect(), el });
   }
-  // Un botón tampoco puede tapar un texto, un icono u otro botón.
-  for (const el of document.querySelectorAll('main button')) {
-    if (visible(el)) cajas.push({ nombre: `botón "${el.getAttribute('aria-label') || el.textContent.trim()}"`, r: el.getBoundingClientRect(), el });
+  // Un botón tampoco puede tapar un texto, un icono u otro botón. Cuenta la
+  // parte que se ve: la caja si tiene fondo o borde y, si es transparente
+  // (como la marca de diferencia, con 44 px de zona de toque), la pastilla.
+  const seVe = (e) => {
+    const s = getComputedStyle(e);
+    return s.backgroundColor.match(/[\d.]+/g).length === 3 || Number(s.backgroundColor.match(/[\d.]+/g)[3]) > 0
+      || parseFloat(s.borderTopWidth) > 0;
+  };
+  for (const el of document.querySelectorAll('main button, main button *')) {
+    if (!visible(el) || !seVe(el)) continue;
+    const boton = el.closest('button');
+    cajas.push({ nombre: `botón "${boton.getAttribute('aria-label') || boton.textContent.trim()}"`, r: el.getBoundingClientRect(), el });
   }
   for (const el of document.querySelectorAll('main input:not([type=radio], [type=checkbox])')) {
     if (!visible(el)) continue;
