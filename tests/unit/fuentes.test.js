@@ -10,9 +10,14 @@ const APP = fileURLToPath(new URL('../../app/', import.meta.url));
 const sha256 = (ruta) => createHash('sha256').update(readFileSync(ruta)).digest('hex');
 
 // Copias byte a byte de files/*-latin-*-normal.woff2 de @fontsource/barlow y
-// @fontsource/barlow-semi-condensed 5.3.0 (tarballs de npm con la integridad
-// publicada), y OFL.txt de google/fonts (ofl/barlow, commit 8acd41a), igual al
-// de ofl/barlowsemicondensed.
+// @fontsource/barlow-semi-condensed 5.3.0, y OFL.txt de google/fonts
+// (ofl/barlow, commit 8acd41abf23f6795163d97ffef8406d2449c63da), igual al de
+// ofl/barlowsemicondensed. Integridad publicada en npm de los tarballs:
+//   barlow-5.3.0.tgz                 sha512-tGR0y6QObRtKv71MOth44222+mdNFM/ZWFWDV1VLzNbG4oK9PNRlyJzmkck4vHAi9ibHBXgt4SlY51amFP55CA==
+//   barlow-semi-condensed-5.3.0.tgz  sha512-EdpQ1GlLMofGqDsQhEw+g6DonNKmzt21p8y/oNbTl4BFzEkqYkFyE2fj25YGxmZBL/LZZGAxe74FlvEWcgc31w==
+// Para contrastarlas a mano:
+//   npm pack @fontsource/barlow@5.3.0 @fontsource/barlow-semi-condensed@5.3.0
+//   tar -xzf <tarball> && sha256sum package/files/*-latin-{400..800}-normal.woff2
 const COPIAS = {
   'OFL.txt': '186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f',
   'barlow-latin-400-normal.woff2': 'b0a8ad37ac45f5fb22ced461576db72e44e295107aad7a9c8a7a4bad728fd03b',
