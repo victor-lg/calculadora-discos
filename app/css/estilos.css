@@ -472,11 +472,14 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
 .serie.vuelve { transition: transform 0.2s ease-out; }
 
 /* FR-08: "Quitar la serie del P %", oculto a la vista salvo con el foco o tras
-   la pulsación larga. NFR-01: 44 px de alto. */
+   la pulsación larga. Al verse ocupa su propia fila al final de la tarjeta, que
+   crece: encima del texto taparía el porcentaje y la marca de diferencia
+   (NFR-03). Oculto, queda fuera del flujo para no dejar hueco. NFR-01: 44 px
+   de alto. */
 .quitar {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  grid-column: 1 / -1;
+  justify-self: end;
+  max-width: 100%;
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--borrar-texto);
@@ -487,6 +490,7 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
   font-weight: 600;
 }
 .quitar:not(:focus, .mostrado) {
+  position: absolute;
   width: 1px;
   height: 1px;
   min-height: 0;
@@ -569,4 +573,15 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
 @media (max-width: 360px) {
   #trabajo-auto { font-size: 52px; }
   .serie:has(> .dibujo) { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* NFR-03: con el zoom al 200 % (195 px) el número, "✕" y "Añadir" no caben en
+   una línea. El pseudoelemento ocupa una línea entera y pasa los botones a la
+   siguiente, a la derecha. */
+@media (max-width: 300px) {
+  .campo-anadir { flex-wrap: wrap; }
+  .campo-anadir::after { content: ""; flex-basis: 100%; order: 1; }
+  .campo-anadir button { order: 2; margin-bottom: 2px; }
+  .cancelar { margin-left: auto; }
+  #porcentaje-auto { max-width: calc(100% - 30px); }
 }
