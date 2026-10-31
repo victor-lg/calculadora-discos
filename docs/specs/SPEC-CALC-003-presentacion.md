@@ -1,7 +1,7 @@
 ---
 id: SPEC-CALC-003
 titulo: Presentación de la calculadora
-estado: en-revision
+estado: aprobada
 version: 0.4
 riesgo: R1
 sustituye: null
