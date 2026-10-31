@@ -1,8 +1,8 @@
 ---
 id: SPEC-CALC-003
 titulo: Presentación de la calculadora
-estado: aprobada
-version: 0.2
+estado: en-revision
+version: 0.3
 riesgo: R1
 sustituye: null
 adr: [ADR-0001, ADR-0003, ADR-0005]
@@ -45,6 +45,10 @@ Decisiones de Víctor del 2026-10-29, en las rondas 1 y 2 de G4 del PR #22, que
 ajusta esta spec en el mismo PR que SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3.
 Tras la ronda 3, FR-08 aclara que el aviso de "Deshacer" desaparece al teclear en
 un peso, como ya decía AC-12.
+La versión 0.3 (VIC-11) quita "añadir una serie" de las acciones que cierran el
+aviso de "Deshacer" (FR-08), para que cuadre con AC-13, que añade el 70 con el
+aviso abierto y después pulsa "Deshacer". Es una aclaración de Víctor del
+2026-10-31, sin reglas nuevas, en el mismo PR que SPEC-CALC-001 v0.8.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -136,7 +140,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - la referencia visual (escena, medidas de discos, barras, máquina y collarín) es la de §11.
 - **FR-08:** borrar una serie:
   - la persona desliza la tarjeta hacia la izquierda; deslizar en vertical sigue desplazando la página. Mientras arrastra, debajo aparece un fondo con "Borrar" en rojo claro sobre un granate tenue; pasado el 35 % del ancho de la tarjeta, el fondo pasa a rojo vivo, el texto a blanco y el icono crece;
-  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta la siguiente acción de la persona que cambie algo (añadir o borrar una serie, teclear en un peso, cambiar el modo, la barra, los collarines o los discos habilitados) o hasta que pulse "Deshacer". Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
+  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta la siguiente acción de la persona que cambie algo (borrar una serie, teclear en un peso, cambiar el modo, la barra, los collarines o los discos habilitados) o hasta que pulse "Deshacer". Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
   - si la suelta sin pasar el 35 %, la tarjeta vuelve a su sitio y la lista no cambia;
   - cada tarjeta tiene un botón "Quitar la serie del P %", que hace lo mismo que el gesto, aviso incluido. Está oculto a la vista salvo cuando recibe el foco o cuando la persona mantiene pulsada la tarjeta 500 ms sin moverla; así se puede borrar con un toque, sin arrastrar (WCAG 2.5.7). Si el dedo se mueve antes de los 500 ms, es el gesto de deslizar; si se mueve después, no pasa nada más. Al soltar tras la pulsación larga, no se activa nada de la tarjeta (ni la marca de diferencia), y durante la pulsación no aparecen la selección de texto ni el menú del sistema. Mostrado por la pulsación larga, se oculta al tocar fuera de él;
   - tras borrar con este botón, el foco pasa a "Deshacer". Si el foco sigue en el aviso cuando desaparece o cuando se pulsa "Deshacer", pasa al botón "+ Añadir porcentaje" o, si el campo de añadir está abierto, a ese campo. Si la persona ha llevado el foco a otro sitio, no se mueve;
