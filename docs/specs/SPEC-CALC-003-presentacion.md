@@ -48,7 +48,9 @@ un peso, como ya decía AC-12.
 La versión 0.3 (VIC-11) quita "añadir una serie" de las acciones que cierran el
 aviso de "Deshacer" (FR-08), para que cuadre con AC-13, que añade el 70 con el
 aviso abierto y después pulsa "Deshacer". Es una aclaración de Víctor del
-2026-10-31, sin reglas nuevas, en el mismo PR que SPEC-CALC-001 v0.8.
+2026-10-31, sin reglas nuevas, en el mismo PR que SPEC-CALC-001 v0.8. Tras la
+ronda 1 de G4, FR-08 da la lista de acciones que cierran el aviso como cerrada y
+AC-13 comprueba que el aviso sigue visible después de añadir.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -140,7 +142,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - la referencia visual (escena, medidas de discos, barras, máquina y collarín) es la de §11.
 - **FR-08:** borrar una serie:
   - la persona desliza la tarjeta hacia la izquierda; deslizar en vertical sigue desplazando la página. Mientras arrastra, debajo aparece un fondo con "Borrar" en rojo claro sobre un granate tenue; pasado el 35 % del ancho de la tarjeta, el fondo pasa a rojo vivo, el texto a blanco y el icono crece;
-  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta la siguiente acción de la persona que cambie algo (borrar una serie, teclear en un peso, cambiar el modo, la barra, los collarines o los discos habilitados) o hasta que pulse "Deshacer". Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
+  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta que la persona borre otra serie, teclee en un peso o cambie el modo, la barra, los collarines o los discos habilitados, o hasta que pulse "Deshacer". Ninguna otra acción lo cierra; en particular, añadir un porcentaje no lo cierra. Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
   - si la suelta sin pasar el 35 %, la tarjeta vuelve a su sitio y la lista no cambia;
   - cada tarjeta tiene un botón "Quitar la serie del P %", que hace lo mismo que el gesto, aviso incluido. Está oculto a la vista salvo cuando recibe el foco o cuando la persona mantiene pulsada la tarjeta 500 ms sin moverla; así se puede borrar con un toque, sin arrastrar (WCAG 2.5.7). Si el dedo se mueve antes de los 500 ms, es el gesto de deslizar; si se mueve después, no pasa nada más. Al soltar tras la pulsación larga, no se activa nada de la tarjeta (ni la marca de diferencia), y durante la pulsación no aparecen la selección de texto ni el menú del sistema. Mostrado por la pulsación larga, se oculta al tocar fuera de él;
   - tras borrar con este botón, el foco pasa a "Deshacer". Si el foco sigue en el aviso cuando desaparece o cuando se pulsa "Deshacer", pasa al botón "+ Añadir porcentaje" o, si el campo de añadir está abierto, a ese campo. Si la persona ha llevado el foco a otro sitio, no se mueve;
@@ -200,7 +202,8 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
   - mantener pulsada la tarjeta del 70 % 500 ms sin moverla muestra "Quitar la serie del 70 %"; al tocarlo se borra la serie, con el mismo aviso. Si en vez de eso se toca fuera, el botón se oculta y la lista no cambia.
 - **AC-12 → FR-08:** con el teclado, al llevar el foco al botón "Quitar la serie del 70 %", el botón se ve; al activarlo, se borra la serie, aparece el mismo aviso y el foco pasa a "Deshacer", que la recupera; entonces el foco pasa a "+ Añadir porcentaje". Si tras borrar la persona lleva el foco al peso de trabajo y escribe 105, el aviso desaparece y el foco sigue en el peso de trabajo.
 - **AC-13 → FR-08:** "Deshacer" no duplica ni recupera de más:
-  - al borrar el 70 %, añadir 70 y pulsar "Deshacer", la lista es 40, 70 y 90, con un solo 70;
+  - al borrar el 70 % y añadir 70, el aviso y "Deshacer" siguen visibles; al pulsar "Deshacer", la lista es 40, 70 y 90, con un solo 70;
+  - al borrar el 70 % y añadir 50, el aviso sigue visible y "Deshacer" recupera el 70: la lista es 40, 50, 70 y 90;
   - al borrar el 70 % y después el 40 %, el aviso dice "Serie del 40 % borrada" y "Deshacer" recupera solo el 40;
   - al borrar el 70 % y esperar un minuto sin hacer nada, el aviso sigue visible y "Deshacer" lo recupera;
   - al borrar el 70 % y activar los collarines, el aviso desaparece y la lista sigue siendo 40 y 90.
@@ -240,7 +243,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 - **Casos límite y errores:**
   - varios avisos generales a la vez: se muestran todos, en el orden de FR-05 (AC-05);
   - deslizar sin pasar el umbral: la tarjeta vuelve y no se borra nada (AC-11);
-  - deshacer cuando el porcentaje ya volvió a la lista o tras otro borrado: no se duplica nada; el aviso no tiene plazo y se cierra con la siguiente acción (AC-13);
+  - deshacer cuando el porcentaje ya volvió a la lista o tras otro borrado: no se duplica nada; el aviso no tiene plazo, se cierra solo con las acciones de FR-08 y añadir un porcentaje no lo cierra (AC-13);
   - confirmar con "Añadir" o con Intro, que a la vez quitan el foco al campo: se añade una sola vez (AC-14);
   - perder el foco con un porcentaje vacío, no válido o repetido: se cierra sin mensaje, o se queda abierto con el error (AC-14);
   - más discos de los que caben: se dibujan los que caben y la etiqueta cita solo esos (AC-10);
@@ -266,7 +269,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 
 ## 11. Dependencias y restricciones
 
-- Las reglas y los textos de las series vienen de SPEC-CALC-001 v0.7 y SPEC-CALC-002 v0.3. Esta spec no los cambia.
+- Las reglas y los textos de las series vienen de SPEC-CALC-001 v0.8 y SPEC-CALC-002 v0.3. Esta spec no los cambia.
 - La tecnología del dibujo la fija ADR-0003, que modifica la regla de "cero dependencias en tiempo de ejecución" de ADR-0001 §3.1. Esta spec no se fusiona antes que ADR-0003.
 - Todo lo que usa la presentación (fuentes, librería 3D e iconos) se sirve desde el propio origen de la app, sin red de terceros (SPEC-CALC-001 NFR-01 y NFR-02, ADR-0001 §3.4).
 - **Referencia visual:** `docs/diseno/maqueta-interfaz.html`, `docs/diseno/discos-3d.html` (banco del modelado) y `docs/diseno/notas-diseno-interfaz.md` §3.2, §3.6, §4 y §6 (iconos, colores, tipografía, radios, márgenes, escena, medidas IPF de los discos, barras, máquina, collarín y duraciones). Son la referencia que acepta Víctor en la prueba manual (AC-24), no requisitos con AC propio. Donde la maqueta contradiga SPEC-CALC-001, SPEC-CALC-002 o esta spec (por ejemplo, en el contraste de NFR-02, en cómo elige los discos, en qué guarda, en que reescribe lo tecleado en el campo de porcentaje o en que no tiene pulsación larga), mandan las specs. Sus fuentes y three.js se cargan de terceros; eso no pasa a la app.

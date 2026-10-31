@@ -58,7 +58,7 @@ campo mientras es válido y, si no, el confirmado (SPEC-CALC-003 FR-03).
 La versión 0.8 (VIC-11) aclara en FR-04 que un porcentaje se quita desde su serie
 (SPEC-CALC-003 FR-08) y que, mientras la app no muestra series, no se puede quitar
 ninguno. Es una aclaración de Víctor del 2026-10-31, sin reglas nuevas, en el mismo
-PR que SPEC-CALC-003 v0.3.
+PR que SPEC-CALC-003 v0.3. Tras la ronda 1 de G4, AC-46 lo comprueba.
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -339,6 +339,7 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
   - con el foco en el peso de trabajo, si la persona escribe "110" y pliega el panel Carga, se guarda "110";
   - con la recta guardada en 7,5 kg y elegida, si la persona cambia su peso a 0,5 y pliega el panel Carga, el campo conserva "0,5", la región de avisos muestra "Revisa el peso de la barra en Carga.", el resumen dice "Barra · Recta 7,5 kg" y la recta sigue guardada en 7,5 kg. Si después elige la Z y vuelve a la recta, el "0,5" se ha descartado y el campo muestra "7,5";
   - con la recta guardada en 7,5 kg y elegida, si la persona cambia su peso a 8 y pliega el panel, el resumen dice "Barra · Recta 8 kg" y la recta queda guardada en 8 kg.
+- **AC-46 → FR-04:** con los porcentajes 40, 70 y 90 y el peso de trabajo vacío, la app no muestra series ni ninguna forma de quitar un porcentaje. Al escribir 100, vuelven las series del 40, 70 y 90 %.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
