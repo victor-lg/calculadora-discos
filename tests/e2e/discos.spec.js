@@ -1,7 +1,7 @@
 // Recorridos de SPEC-CALC-002 que necesitan un navegador real: tocar los tipos,
 // arranque de cero, vuelta de segundo plano y fallo al guardar.
 import { test, expect } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles, recargar } from './pantalla.js';
+import { trabajo, pesoBarra, barra, desplegarPaneles, recargar, discosDeSeries } from './pantalla.js';
 
 const CLAVE_DISCOS = 'calculadora-discos:v1:discos';
 const CLAVE_PORCENTAJES = 'calculadora-discos:v1:porcentajes';
@@ -50,8 +50,8 @@ test('SPEC-CALC-002/AC-08 sin tipos no hay series; al habilitar el de 10 kg apar
   await disco(page, '10 kg').click();
   await expect(indicacionDiscos(page)).toBeHidden();
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '60 kg', '80 kg']);
-  await expect(series(page).locator('.discos strong')).toHaveText(['10', '10 ×2', '10 ×3']);
-  await expect(series(page).locator('.diferencia summary')).toHaveText(['−10 kg', '−10 kg']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['10', '10 ×2', '10 ×3']);
+  await expect(series(page).locator('.diferencia')).toHaveText(['−10 kg', '−10 kg']);
 });
 
 test('SPEC-CALC-002/AC-09 sin tipos, la indicación aparece junto a las demás', async ({ page }) => {
@@ -71,12 +71,12 @@ test('SPEC-CALC-002/AC-09 sin tipos, la indicación aparece junto a las demás',
 test('SPEC-CALC-002/AC-10 deshabilitar y habilitar el de 25 kg recalcula al momento', async ({ page }) => {
   await soloPorcentaje(page, 90);
   await trabajo(page).fill('100');
-  const discos = series(page).locator('.discos strong');
-  await expect(discos).toHaveText(['25 + 10']);
+  const discos = () => discosDeSeries(page);
+  await expect.poll(discos).toEqual(['25 + 10']);
   await disco(page, '25 kg').click();
-  await expect(discos).toHaveText(['20 + 15']);
+  await expect.poll(discos).toEqual(['20 + 15']);
   await disco(page, '25 kg').click();
-  await expect(discos).toHaveText(['25 + 10']);
+  await expect.poll(discos).toEqual(['25 + 10']);
 });
 
 test('SPEC-CALC-002/AC-11 los tipos se recuperan al arrancar de cero, también ninguno', async ({ page }) => {
@@ -134,7 +134,7 @@ test('SPEC-CALC-002/AC-13 volver de otra app conserva los tipos sin recargar', a
   await soloPorcentaje(page, 90);
   await trabajo(page).fill('100');
   await disco(page, '25 kg').click();
-  await expect(series(page).locator('.discos strong')).toHaveText(['20 + 15']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['20 + 15']);
   await page.evaluate(() => { window.marcaSinRecarga = true; });
 
   const otra = await context.newPage();
@@ -151,7 +151,7 @@ test('SPEC-CALC-002/AC-13 volver de otra app conserva los tipos sin recargar', a
 
   expect(await page.evaluate(() => window.marcaSinRecarga)).toBe(true);
   await expect(disco(page, '25 kg')).not.toBeChecked();
-  await expect(series(page).locator('.discos strong')).toHaveText(['20 + 15']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['20 + 15']);
 });
 
 test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que todo coincide', async ({ page }) => {
@@ -171,7 +171,7 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
 
   await disco(page, '25 kg').click();
   await expect(disco(page, '25 kg')).not.toBeChecked();
-  await expect(series(page).locator('.discos strong')).toHaveText(['20 + 15']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['20 + 15']);
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
 
   // Deshacer el cambio quita el aviso aunque siga sin poder guardar.

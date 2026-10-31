@@ -3,7 +3,7 @@
 // Cada test arranca su propio servidor, que registra todo lo que llega al
 // origen tal cual: método, URL, cabeceras en crudo (cookies incluidas) y cuerpo.
 import { test, expect } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles } from './pantalla.js';
+import { trabajo, pesoBarra, barra, desplegarPaneles, discosDeSeries } from './pantalla.js';
 import { readFileSync } from 'node:fs';
 import { arrancar } from './servidor.js';
 
@@ -137,7 +137,7 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
   await trabajo(page).fill('100');
   await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '70 %', '90 %']);
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '70 kg', '90 kg']);
-  await expect(series(page).locator('.discos strong')).toHaveText(['10', '25', '25 + 10']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['10', '25', '25 + 10']);
   await expect(series(page).locator('.diferencia')).toHaveCount(0);
   expect(llegadas.slice(antes)).toEqual([]);
 });

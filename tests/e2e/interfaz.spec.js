@@ -1,6 +1,6 @@
 // Recorridos de la interfaz que necesitan un navegador real.
 import { test, expect } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles, recargar, copiar, pegar } from './pantalla.js';
+import { trabajo, pesoBarra, barra, desplegarPaneles, recargar, copiar, pegar, discosDeSeries } from './pantalla.js';
 
 const CLAVE = 'calculadora-discos:v1:porcentajes';
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
@@ -68,19 +68,19 @@ test('SPEC-CALC-001/AC-10 las series se actualizan al momento con cada cambio', 
 
   await barra(page, 'Olímpica 15 kg').check();
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '52,5 kg', '92,5 kg']);
-  await expect(series(page).locator('.discos strong')).toHaveText(['10 + 2,5', '15 + 2,5 + 1,25', '25 + 10 + 2,5 + 1,25']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['10 + 2,5', '15 + 2,5 + 1,25', '25 + 10 + 2,5 + 1,25']);
 
   await page.getByLabel('Collarines de competición').check();
-  await expect(series(page).locator('.discos strong')).toHaveText(['10', '15 + 1,25', '25 + 10 + 1,25']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['10', '15 + 1,25', '25 + 10 + 1,25']);
   await expect(series(page).locator('.collarin')).toHaveCount(3);
 
   await page.getByLabel('Collarines de competición').uncheck();
   await expect(series(page).locator('.collarin')).toHaveCount(0);
   await barra(page, 'Recta').check();
-  await expect(series(page).locator('.discos strong')).toHaveText(['15', '20 + 1,25', '25 + 15 + 1,25']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['15', '20 + 1,25', '25 + 15 + 1,25']);
 
   await pesoBarra(page).fill('12,5');
-  await expect(series(page).locator('.discos strong')).toHaveText(['10 + 2,5 + 1,25', '20', '25 + 15']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['10 + 2,5 + 1,25', '20', '25 + 15']);
 
   await page.getByLabel('Un punto').check();
   await expect(series(page).locator('.total')).toHaveText(['41,25 kg', '52,5 kg', '93,75 kg']);
@@ -94,7 +94,7 @@ test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(trabajo(page)).toHaveValue('100');
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '70 kg', '90 kg']);
-  await expect(series(page).locator('.discos strong')).toHaveText(['10', '25', '25 + 10']);
+  await expect.poll(() => discosDeSeries(page)).toEqual(['10', '25', '25 + 10']);
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
   await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
   await expect(page.getByLabel('Collarines de competición')).not.toBeChecked();
@@ -423,9 +423,9 @@ test('SPEC-CALC-001/AC-32 el campo conserva exactamente lo tecleado', async ({ p
   await trabajo(page).fill('');
   await trabajo(page).pressSequentially('102.5');
   await expect(trabajo(page)).toHaveValue('102.5');
-  await expect(series(page).locator('.diferencia summary')).toHaveText('−1,75 kg');
-  await series(page).locator('.diferencia summary').click();
-  await expect(series(page).locator('.diferencia p')).toHaveText(
+  await expect(series(page).locator('.diferencia')).toHaveText('−1,75 kg');
+  await series(page).locator('.diferencia').click();
+  await expect(series(page).locator('.detalle')).toHaveText(
     'El 70 % de 102,5 kg son 71,75 kg. Con tus discos, lo más cercano sin pasarte es 70 kg: 1,75 kg menos.',
   );
 
@@ -488,10 +488,10 @@ test('SPEC-CALC-001/AC-02 la marca "−1 kg" va junto al porcentaje y abre la ex
   await anadir(page, '70');
   await trabajo(page).fill('105');
   const cabecera = series(page).locator('.cabecera');
-  await expect(cabecera.locator('.porcentaje + .diferencia summary')).toHaveText('−1 kg');
-  await expect(series(page).locator('.diferencia p')).toBeHidden();
-  await cabecera.locator('.diferencia summary').click();
-  await expect(series(page).locator('.diferencia p')).toHaveText(
+  await expect(cabecera.locator('.porcentaje + .diferencia')).toHaveText('−1 kg');
+  await expect(series(page).locator('.detalle')).toBeHidden();
+  await cabecera.locator('.diferencia').click();
+  await expect(series(page).locator('.detalle')).toHaveText(
     'El 70 % de 105 kg son 73,5 kg. Con tus discos, lo más cercano sin pasarte es 72,5 kg: 1 kg menos.',
   );
 });
@@ -500,13 +500,15 @@ test('SPEC-CALC-001/AC-35 SPEC-CALC-001/AC-39 discos agrupados y aviso de capaci
   await quitarTodos(page);
   await anadir(page, '100');
   await trabajo(page).fill('120');
-  await expect(series(page).locator('.discos')).toHaveText('Por lado: 25 ×2');
+  await expect(series(page).locator('.etiqueta')).toHaveText('Por lado');
+  await expect.poll(() => discosDeSeries(page)).toEqual(['25 ×2']);
   await expect(series(page)).not.toContainText('kg por lado');
   await expect(series(page).locator('.capacidad')).toHaveCount(0);
 
   await trabajo(page).fill('500');
   await page.getByLabel('Un punto').check();
-  await expect(series(page).locator('.discos')).toHaveText('Total en discos: 25 ×20');
+  await expect(series(page).locator('.etiqueta')).toHaveText('Total en discos');
+  await expect.poll(() => discosDeSeries(page)).toEqual(['25 ×20']);
   await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
 });
 
@@ -523,6 +525,6 @@ test('SPEC-CALC-001/FR-11 con el foco en un peso, salir del campo no se come el 
   expect(await guardado(page, CLAVE_RECTA)).toBe('8');
 
   await trabajo(page).fill('105');
-  await page.locator('.diferencia summary').first().click();
-  await expect(page.locator('.diferencia p').first()).toBeVisible();
+  await page.locator('.diferencia').first().click();
+  await expect(page.locator('.detalle').first()).toBeVisible();
 });

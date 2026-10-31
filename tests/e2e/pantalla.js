@@ -42,3 +42,12 @@ export async function pegar(page, campo) {
   await campo.selectText();
   await page.keyboard.press('ControlOrMeta+V');
 }
+
+// SPEC-CALC-003 FR-06: los discos que se ven en cada tarjeta que los tiene,
+// unidos con " + " y con "×n" tras el peso ("25 ×2 + 10"). Para usarlo con
+// expect.poll.
+export const discosDeSeries = (page) => page.locator('#series > li').evaluateAll((lis) => lis
+  .filter((li) => li.querySelector('.discos'))
+  .map((li) => [...li.querySelectorAll('.disco-serie')]
+    .map((d) => [...d.querySelectorAll('.cifra, .veces')].map((x) => x.textContent).join(' '))
+    .join(' + ')));

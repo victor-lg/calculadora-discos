@@ -113,27 +113,63 @@ function ajustarPeso({ forzar = false } = {}) {
   }
 }
 
+// SPEC-CALC-003 FR-06: los porcentajes cuya explicación de la diferencia está
+// desplegada. Se conserva al repintar las tarjetas.
+const desplegadas = new Set();
+
+// FR-06: la marca se despliega y se pliega en su sitio, sin repintar la tarjeta.
+function alternarDiferencia(marca, valor) {
+  const desplegada = marca.getAttribute('aria-expanded') !== 'true';
+  if (desplegada) desplegadas.add(valor);
+  else desplegadas.delete(valor);
+  marca.setAttribute('aria-expanded', String(desplegada));
+  $(marca.getAttribute('aria-controls')).hidden = !desplegada;
+}
+
+// SPEC-CALC-003 FR-06 y FR-14: la tarjeta de una serie, solo con texto. Las
+// líneas van en la columna de texto y, debajo, a todo el ancho, la explicación
+// de la diferencia y el aviso de capacidad.
 function pintarSerie(s) {
   const li = crear('li', 'serie');
+  const texto = crear('div', 'texto');
   const cabecera = crear('div', 'cabecera');
-  const izquierda = crear('div', null);
-  izquierda.append(crear('span', 'porcentaje', s.porcentaje));
-  // FR-06: la diferencia junto al porcentaje, con una explicación que se puede abrir.
+  cabecera.append(crear('span', 'porcentaje', s.porcentaje));
+  texto.append(cabecera, crear('span', 'total', s.total));
+  li.append(texto);
   if (s.diferencia) {
-    const detalle = crear('details', 'diferencia');
-    detalle.append(crear('summary', null, s.diferencia), crear('p', null, s.detalleDiferencia));
-    izquierda.append(detalle);
+    const id = `detalle-${s.valor}`;
+    const desplegada = desplegadas.has(s.valor);
+    const marca = crear('button', 'diferencia');
+    marca.type = 'button';
+    marca.setAttribute('aria-label', s.anuncioDiferencia);
+    marca.setAttribute('aria-expanded', String(desplegada));
+    marca.setAttribute('aria-controls', id);
+    marca.append(crear('span', 'pastilla', s.diferencia));
+    marca.addEventListener('click', () => alternarDiferencia(marca, s.valor));
+    cabecera.append(marca);
+    const detalle = crear('p', 'detalle', s.detalleDiferencia);
+    detalle.id = id;
+    detalle.hidden = !desplegada;
+    li.append(detalle);
   }
-  cabecera.append(izquierda, crear('span', 'total', s.total));
-  li.append(cabecera);
   // FR-09: sin discos, la línea y su explicación, siempre visible.
-  if (s.linea) li.append(crear('p', 'linea', s.linea), crear('p', 'explicacion', s.explicacion));
-  if (s.discos) {
-    const discos = crear('p', 'discos');
-    discos.append(crear('span', 'etiqueta', `${s.etiquetaDiscos}: `), crear('strong', null, s.discos.join(' + ')));
-    li.append(discos);
+  if (s.linea) texto.append(crear('p', 'linea', s.linea), crear('p', 'explicacion', s.explicacion));
+  if (s.grupos) {
+    const discos = crear('ul', 'discos');
+    for (const g of s.grupos) {
+      const item = crear('li', null);
+      item.dataset.cent = String(g.cent);
+      // Se ve el punto, el peso y "×n"; se anuncia "n discos de W kg".
+      const visible = crear('span', 'disco-serie');
+      visible.setAttribute('aria-hidden', 'true');
+      visible.append(crear('i', 'punto'), crear('span', 'cifra', g.peso));
+      if (g.veces) visible.append(crear('em', 'veces', g.veces));
+      item.append(visible, crear('span', 'oculto', g.anuncio));
+      discos.append(item);
+    }
+    texto.append(crear('p', 'etiqueta', s.etiquetaDiscos), discos);
   }
-  if (s.collarin) li.append(crear('p', 'collarin', s.collarin));
+  if (s.collarin) texto.append(crear('p', 'collarin', s.collarin));
   if (s.avisoCapacidad) li.append(crear('p', 'capacidad', s.avisoCapacidad));
   return li;
 }
@@ -197,6 +233,10 @@ function pintar() {
   texto('error-porcentaje', v.errorPorcentaje);
   $('nuevo-porcentaje').setAttribute('aria-invalid', String(Boolean(v.errorPorcentaje)));
 
+  // FR-06: una tarjeta que desaparece o se queda sin diferencia vuelve plegada.
+  for (const valor of desplegadas) {
+    if (!v.series.some((s) => s.valor === valor && s.diferencia)) desplegadas.delete(valor);
+  }
   $('series').replaceChildren(...v.series.map(pintarSerie));
 }
 

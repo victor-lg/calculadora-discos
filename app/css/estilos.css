@@ -338,8 +338,8 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
   padding: 9px 12px;
 }
 
-/* Lista de porcentajes y series: presentación anterior hasta los PR de VIC-11
-   que las sustituyen, con los tokens nuevos. */
+/* Lista de porcentajes: presentación anterior hasta el PR de VIC-11 que la
+   sustituye, con los tokens nuevos. */
 .porcentajes {
   list-style: none;
   padding: 0;
@@ -385,22 +385,106 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
   font-weight: 700;
 }
 #error-porcentaje { margin-top: 0.25rem; }
-.series { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+/* SPEC-CALC-003 FR-06: la tarjeta de una serie. Con dibujo, dos columnas en
+   proporción 1 : 1,3 (una sola a 360 px o menos); sin él (FR-14), solo el
+   texto, en una columna. La explicación y el aviso de capacidad van debajo, a
+   todo el ancho. */
+.series { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .serie {
   background: var(--superficie);
   border-radius: 14px;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: center;
 }
-.serie p { margin: 0.25rem 0 0; }
-.cabecera { display: flex; justify-content: space-between; align-items: flex-start; font-weight: 700; font-size: 1.2rem; }
-.discos strong { font-size: 1.3rem; }
-.etiqueta, .explicacion, .collarin { color: var(--texto-2); }
-.linea { font-weight: 600; }
-.diferencia { font-weight: normal; font-size: 1rem; }
-.diferencia summary { min-height: 44px; display: flex; align-items: center; color: var(--texto-2); cursor: pointer; }
-.capacidad { background: var(--superficie-2); border-radius: 0.4rem; padding: 0.25rem 0.5rem; }
+.serie:has(> .dibujo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+.serie p { margin: 0; }
+.serie .texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cabecera { display: flex; align-items: center; gap: 4px; min-height: 44px; }
+.porcentaje { font-family: var(--fuente-num); font-size: 18px; font-weight: 600; color: var(--texto-2); }
+/* NFR-01: el botón mide 44 × 44 px; la pastilla es lo que se ve. */
+.diferencia {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pastilla {
+  background: var(--linea);
+  color: var(--texto);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-family: var(--fuente-num);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.diferencia[aria-expanded="true"] .pastilla { background: var(--acento); color: var(--tinta-acento); }
+.total {
+  font-family: var(--fuente-num);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.etiqueta { margin-top: 4px; font-size: 14px; color: var(--texto-2); }
+.discos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.disco-serie {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-family: var(--fuente-num);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.disco-serie .punto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-disco);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.disco-serie .veces {
+  font-style: normal;
+  font-family: var(--fuente-ui);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--linea);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+.collarin { margin-top: 2px; font-size: 13px; color: var(--texto-2); }
+.linea { margin-top: 4px; font-size: 15px; font-weight: 600; }
+.explicacion { font-size: 13px; color: var(--texto-2); }
+.detalle, .capacidad { grid-column: 1 / -1; font-size: 14px; line-height: 1.35; }
+.detalle {
+  background: var(--superficie-2);
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.capacidad { font-size: 13px; border-top: 1px solid var(--linea); padding-top: 8px; }
 
 @media (max-width: 360px) {
   #trabajo-auto { font-size: 52px; }
+  .serie:has(> .dibujo) { grid-template-columns: minmax(0, 1fr); }
 }
