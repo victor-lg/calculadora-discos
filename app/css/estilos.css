@@ -130,6 +130,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   font-weight: 600;
 }
 
+.titulo-panel { font-size: 15px; font-weight: 600; }
+
 .unidad { font-family: var(--fuente-num); color: var(--texto-2); font-weight: 500; }
 .error { font-size: 14px; color: var(--error); margin: 0; padding: 0 4px; }
 
@@ -158,13 +160,16 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 }
 .auto::after { content: attr(data-texto); visibility: hidden; white-space: pre; overflow: hidden; }
 .auto input { width: 0; min-width: 100%; background: none; outline: none; caret-color: var(--acento); }
+/* El sitio del número lo fija app.js (ajustarPeso): todo el ancho salvo "kg". */
 #trabajo-auto {
+  max-width: none;
   font-family: var(--fuente-num);
   font-weight: 600;
   font-size: 64px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+#trabajo-auto.midiendo { flex: none; }
 
 /* FR-03 y FR-04: paneles plegables. */
 .plegable { background: var(--superficie); border: 1px solid var(--linea); border-radius: 16px; }
@@ -293,8 +298,14 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .interruptor input::before {
   content: "";
   position: absolute;
+  /* * { box-sizing } no llega a los pseudoelementos: sin esto, la pista medía
+     50 × 32 px con el borde, salía del campo y descentraba el círculo. */
+  box-sizing: border-box;
   left: 3px;
-  top: 8px;
+  /* Pista y círculo se centran en vertical por igual, mida lo que mida el
+     campo (en iOS no coincidían con medidas en px). */
+  top: 50%;
+  transform: translateY(-50%);
   width: 46px;
   height: 28px;
   border-radius: 999px;
@@ -304,7 +315,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .interruptor input::after {
   content: "";
   position: absolute;
-  top: 13px;
+  top: 50%;
+  transform: translateY(-50%);
   left: 8px;
   width: 18px;
   height: 18px;
@@ -312,7 +324,7 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   background: var(--texto-2);
 }
 .interruptor input:checked::before { background: var(--acento); border-color: var(--acento); }
-.interruptor input:checked::after { transform: translateX(18px); background: var(--tinta-acento); }
+.interruptor input:checked::after { transform: translate(18px, -50%); background: var(--tinta-acento); }
 
 .peso-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 15px; color: var(--texto-2); }
 .peso-barra input {
@@ -328,7 +340,10 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   text-align: right;
 }
 .peso-barra input:focus { border-color: var(--acento); outline: none; }
-input[aria-invalid="true"] { border-color: var(--rojo); }
+/* Un peso no válido mantiene el borde rojo con el foco; el foco lo marca el
+   grosor del borde. */
+input[aria-invalid="true"], .peso-barra input[aria-invalid="true"] { border-color: var(--rojo); }
+.peso-barra input[aria-invalid="true"]:focus { box-shadow: inset 0 0 0 1px var(--rojo); }
 .nota-maquina { font-size: 14px; color: var(--texto-2); margin: 0; padding: 2px 4px; }
 
 /* FR-04: los colores de los discos (referencia visual §4.2). Son decorativos. */
@@ -391,6 +406,9 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
    VoiceOver puede no anunciar el primer aviso) y solo se anula su hueco. */
 .avisos:not(:has(.aviso:not([hidden]))) { margin-bottom: -14px; }
 .aviso {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
   margin: 0;
   font-size: 15px;
   background: var(--superficie);
@@ -399,11 +417,14 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
   padding: 9px 12px;
 }
 
+.aviso svg { flex: none; width: 16px; height: 16px; margin-top: 3px; color: var(--texto-2); }
+
 /* SPEC-CALC-003 FR-06: la tarjeta de una serie. Con dibujo, dos columnas en
    proporción 1 : 1,3 (una sola a 360 px o menos); sin él (FR-14), solo el
    texto, en una columna. La explicación y el aviso de capacidad van debajo, a
    todo el ancho. */
-.series { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+/* --hueco-series también lo usa .se-cierra para cerrar el hueco al borrar. */
+.series { --hueco-series: 10px; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--hueco-series); }
 /* FR-08: la tarjeta se desliza sobre el fondo de borrar, que solo se ve
    mientras se arrastra. pan-y deja el desplazamiento vertical al navegador. */
 .deslizable { position: relative; border-radius: 14px; overflow: hidden; }
@@ -474,6 +495,7 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+.total small { font-size: 16px; font-weight: 500; color: var(--texto-2); }
 .etiqueta { margin-top: 4px; font-size: 14px; color: var(--texto-2); }
 .discos {
   list-style: none;
@@ -526,6 +548,14 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
    sitio. Con "Reducir movimiento", app.js no pone estas clases (FR-13). */
 .serie.sale { transition: transform 0.2s ease-in; }
 .serie.vuelve { transition: transform 0.2s ease-out; }
+/* Después, su hueco se cierra: altura y margen a 0 (el margen negativo anula
+   el hueco entre tarjetas, --hueco-series) y opacidad (referencia visual §6). */
+.deslizable.se-cierra {
+  margin-bottom: calc(-1 * var(--hueco-series));
+  opacity: 0;
+  transition: height 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), margin-bottom 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.18s;
+}
 
 /* FR-08: "Quitar la serie del P %", oculto a la vista salvo con el foco o tras
    la pulsación larga. Al verse ocupa su propia fila al final de la tarjeta, que

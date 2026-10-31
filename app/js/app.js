@@ -68,7 +68,10 @@ function montarOpciones() {
     input.addEventListener('change', () => actualizar(alternarDisco(estado, d.cent)));
     const dibujo = crear('span', 'dibujo-disco');
     dibujo.setAttribute('aria-hidden', 'true');
-    label.append(input, dibujo, crear('span', 'peso-disco', d.nombre));
+    // Se ve el peso sin "kg" (referencia visual de §11); se anuncia con él.
+    const peso = crear('span', 'peso-disco', d.peso);
+    peso.append(crear('span', 'oculto', ' kg'));
+    label.append(input, dibujo, peso);
     $('lista-discos').append(label);
     const punto = crear('i', null);
     punto.dataset.cent = String(d.cent);
@@ -97,25 +100,54 @@ function texto(id, valor) {
   mostrar(el, Boolean(valor));
 }
 
+// SPEC-CALC-003 FR-05: un aviso general, con su icono delante.
+function aviso(id, valor) {
+  const el = $(id);
+  cambiarTexto(el.querySelector('.texto-aviso'), valor ?? '');
+  mostrar(el, Boolean(valor));
+}
+
+// FR-06: la cifra en grande y " kg" en pequeño y en gris (referencia visual
+// de §11).
+function conUnidad(el, texto) {
+  const cifra = texto.replace(/ kg$/, '');
+  el.append(cifra);
+  if (cifra !== texto) el.append(crear('small', null, ' kg'));
+  return el;
+}
+
 function valorCampo(id, valor) {
   const el = $(id);
   if (el.value !== valor) el.value = valor;
 }
 
 // SPEC-CALC-003 FR-02: el campo crece con el texto (la copia invisible de
-// estilos.css) y, si el número no cabe, se reduce hasta caber.
+// estilos.css) y, si el número no cabe junto a "kg", se reduce hasta caber. Se
+// compara el ancho de la copia con el sitio que queda, no el desbordamiento
+// del campo: en iOS el campo desborda unos píxeles aunque el número quepa, y
+// reducir la letra no lo corrige, así que el número acababa en el mínimo.
 function ajustarPeso({ forzar = false } = {}) {
   const auto = $('trabajo-auto');
   const input = $('trabajo');
   if (!forzar && auto.dataset.texto === input.value) return;
   auto.dataset.texto = input.value;
   auto.style.removeProperty('font-size');
+  const campo = auto.parentElement;
+  const disponible = campo.clientWidth - campo.querySelector('.unidad').getBoundingClientRect().width
+    - parseFloat(getComputedStyle(campo).columnGap);
+  // Mientras se mide, la copia toma su ancho natural, sin encogerse.
+  auto.classList.add('midiendo');
+  const ancho = () => auto.getBoundingClientRect().width;
   let tamano = parseFloat(getComputedStyle(auto).fontSize);
-  // WebKit suma 1 px de cursor a scrollWidth aunque el texto quepa.
-  while (input.scrollWidth > input.clientWidth + 1 && tamano > 16) {
-    tamano -= 2;
+  if (ancho() > disponible) {
+    tamano = Math.max(16, Math.floor((tamano * disponible) / ancho()));
     auto.style.fontSize = `${tamano}px`;
+    while (ancho() > disponible && tamano > 16) {
+      tamano -= 1;
+      auto.style.fontSize = `${tamano}px`;
+    }
   }
+  auto.classList.remove('midiendo');
 }
 
 // SPEC-CALC-003 FR-06: los porcentajes cuya explicación de la diferencia está
@@ -145,7 +177,7 @@ function pintarSerie(s) {
   const columna = crear('div', 'texto');
   const cabecera = crear('div', 'cabecera');
   cabecera.append(crear('span', 'porcentaje', s.porcentaje));
-  columna.append(cabecera, crear('span', 'total', s.total));
+  columna.append(cabecera, conUnidad(crear('span', 'total'), s.total));
   li.append(columna);
   if (s.diferencia) {
     const id = `detalle-${s.valor}`;
@@ -196,10 +228,36 @@ function pintarSerie(s) {
 const UMBRAL_BORRAR = 0.35;
 const PULSACION_LARGA_MS = 500;
 const MOVIMIENTO_PX = 10;
-// Lo que puede tardar como mucho la salida de lado (estilos.css, .sale).
+// Lo que pueden tardar como mucho la salida de lado y el cierre del hueco
+// (estilos.css, .sale y .se-cierra).
 const SALIDA_MS = 400;
+const CIERRE_MS = 450;
 
 const sinMovimiento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// FR-08 y FR-13: la tarjeta que se borra con el gesto cierra su hueco
+// (altura, margen y opacidad, estilos.css .se-cierra; inerte mientras tanto)
+// y después se llama a `despues`: las de debajo suben sin saltar. Si la transición no termina (por
+// ejemplo, porque otro cambio repinta las tarjetas), se sigue igual. Una
+// tarjeta que ya se está cerrando no vuelve a empezar.
+function cerrarHueco(item, despues) {
+  if (item.classList.contains('se-cierra')) return;
+  let hecho = false;
+  const terminar = () => {
+    if (hecho) return;
+    hecho = true;
+    despues();
+  };
+  item.inert = true;
+  item.style.height = `${item.offsetHeight}px`;
+  item.getBoundingClientRect();
+  item.classList.add('se-cierra');
+  item.style.height = '0px';
+  item.addEventListener('transitionend', (e) => {
+    if (e.target === item && e.propertyName === 'height') terminar();
+  });
+  setTimeout(terminar, CIERRE_MS);
+}
 
 // FR-08: el botón "Quitar" que mostró una pulsación larga, hasta que se toca
 // fuera de él.
@@ -279,21 +337,17 @@ function enlazarGesto(item, tarjeta, quitar, valor) {
       item.classList.add('arrastra', 'listo');
       if (sinMovimiento()) borrar(valor);
       else {
-        // La tarjeta sale de lado y después se borra. Si la transición no
-        // termina (por ejemplo, porque otro cambio repinta las tarjetas), se
-        // borra igual.
-        let hecho = false;
-        const terminar = () => {
-          if (hecho) return;
-          hecho = true;
-          borrar(valor);
-        };
+        // La tarjeta sale de lado y después cierra su hueco y se borra. Si la
+        // salida no termina, se sigue igual.
+        const cerrar = () => cerrarHueco(item, () => borrar(valor));
+        // Mientras sale, la tarjeta ya no se puede tocar ni enfocar.
+        item.inert = true;
         tarjeta.classList.add('sale');
         colocar(-ancho);
         tarjeta.addEventListener('transitionend', (e) => {
-          if (e.target === tarjeta && e.propertyName === 'transform') terminar();
+          if (e.target === tarjeta && e.propertyName === 'transform') cerrar();
         });
-        setTimeout(terminar, SALIDA_MS);
+        setTimeout(cerrar, SALIDA_MS);
       }
     } else if (deslizaba) {
       if (!sinMovimiento()) tarjeta.classList.add('vuelve');
@@ -359,13 +413,13 @@ function pintarArriba(v) {
   cambiarAtributo($('boton-discos'), 'aria-label', v.anuncioDiscos);
 
   // SPEC-CALC-003 FR-05: los avisos generales, en el orden del HTML.
-  texto('error-trabajo', v.errorTrabajo);
-  texto('indicacion-trabajo', v.indicacionTrabajo);
-  texto('aviso-peso-barra', v.avisoPesoBarra);
-  texto('indicacion-porcentajes', v.indicacionPorcentajes);
-  texto('indicacion-discos', v.indicacionDiscos);
-  texto('aviso-barra', v.avisoBarra);
-  texto('aviso-guardado', v.avisoGuardado);
+  aviso('error-trabajo', v.errorTrabajo);
+  aviso('indicacion-trabajo', v.indicacionTrabajo);
+  aviso('aviso-peso-barra', v.avisoPesoBarra);
+  aviso('indicacion-porcentajes', v.indicacionPorcentajes);
+  aviso('indicacion-discos', v.indicacionDiscos);
+  aviso('aviso-barra', v.avisoBarra);
+  aviso('aviso-guardado', v.avisoGuardado);
 }
 
 function pintar() {
@@ -555,6 +609,11 @@ enlazarAnadir();
 enlazarPaneles();
 pintar();
 window.addEventListener('resize', () => ajustarPeso({ forzar: true }));
+// FR-02: la primera medida puede hacerse con la fuente de reserva, más ancha;
+// al llegar Barlow, el número se vuelve a medir. WebKit no avisa con
+// loadingdone de las fuentes que pide la CSS, así que también se espera a ready.
+document.fonts?.addEventListener('loadingdone', () => ajustarPeso({ forzar: true }));
+document.fonts?.ready.then(() => ajustarPeso({ forzar: true }));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') terminarAlSalir();
 });
