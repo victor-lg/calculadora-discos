@@ -212,9 +212,29 @@ test('SPEC-CALC-003/AC-13 borrar el 70, añadir 70 y "Deshacer" deja un solo 70'
   await quitarSerie(page, 70);
   await anadirPorcentaje(page, '70');
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
+  await expect(deshacer(page)).toBeVisible();
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(aviso(page)).toBeHidden();
+});
+
+test('SPEC-CALC-003/AC-13 borrar el 70 y añadir 50 deja el aviso, y "Deshacer" recupera el 70', async ({ page }) => {
+  await quitarSerie(page, 70);
+  await anadirPorcentaje(page, '50');
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '90 %']);
+  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
+  await deshacer(page).click();
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
+  await expect(aviso(page)).toBeHidden();
+});
+
+test('SPEC-CALC-001/AC-46 con el peso de trabajo vacío no hay series ni forma de quitar un porcentaje', async ({ page }) => {
+  await trabajo(page).fill('');
+  await expect(series(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Quitar la serie/ })).toHaveCount(0);
+  await trabajo(page).fill('100');
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
 });
 
 test('SPEC-CALC-003/AC-13 al borrar el 70 y después el 40, "Deshacer" recupera solo el 40', async ({ page }) => {

@@ -166,11 +166,28 @@ test('SPEC-CALC-003/AC-11 borrar el 70 % deja 40 y 90 con su aviso; "Deshacer" l
 test('SPEC-CALC-003/AC-13 "Deshacer" no duplica un porcentaje que ya volvió a la lista', () => {
   let e = confirmar(borrarSerie(inicial(), 70), '70');
   assert.deepEqual(lista(e), [40, 70, 90]);
-  // Añadir no cierra el aviso (decisión de Víctor, 2026-10-31).
+  // Añadir no cierra el aviso (SPEC-CALC-003 FR-08).
   assert.equal(modeloVista(e).avisoBorrado, 'Serie del 70 % borrada');
   e = deshacerBorrado(e);
   assert.deepEqual(lista(e), [40, 70, 90]);
   assert.equal(modeloVista(e).avisoBorrado, null);
+});
+
+test('SPEC-CALC-003/AC-13 añadir otro porcentaje no cierra el aviso y "Deshacer" recupera el borrado', () => {
+  let e = confirmar(borrarSerie(inicial(), 70), '50');
+  assert.deepEqual(lista(e), [40, 50, 90]);
+  assert.equal(modeloVista(e).avisoBorrado, 'Serie del 70 % borrada');
+  e = deshacerBorrado(e);
+  assert.deepEqual(lista(e), [40, 50, 70, 90]);
+  assert.equal(modeloVista(e).avisoBorrado, null);
+});
+
+test('SPEC-CALC-001/AC-46 con el peso de trabajo vacío no hay series que quitar y la lista se conserva', () => {
+  let e = escribirTrabajo(inicial(), '');
+  assert.deepEqual(modeloVista(e).series, []);
+  assert.deepEqual(lista(e), [40, 70, 90]);
+  e = escribirTrabajo(e, '100');
+  assert.deepEqual(modeloVista(e).series.map((s) => s.quitar), ['Quitar la serie del 40 %', 'Quitar la serie del 70 %', 'Quitar la serie del 90 %']);
 });
 
 test('SPEC-CALC-003/AC-13 solo se deshace el último borrado', () => {
@@ -188,7 +205,8 @@ test('SPEC-CALC-003/AC-13 activar los collarines cierra el aviso y la lista sigu
   assert.deepEqual(lista(deshacerBorrado(e)), [40, 90]);
 });
 
-// SPEC-CALC-003 FR-08: el aviso dura hasta la siguiente acción que cambie algo.
+// SPEC-CALC-003 FR-08: el aviso se cierra al borrar otra serie, teclear en un peso
+// o cambiar el modo, la barra, los collarines o los discos habilitados.
 test('SPEC-CALC-003/AC-12 teclear en un peso, cambiar el modo, la barra o los discos cierran el aviso', () => {
   const borrada = borrarSerie(inicial(), 70);
   const acciones = [

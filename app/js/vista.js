@@ -200,7 +200,7 @@ export function escribirPorcentaje(estado, texto) {
 // FR-04: si es válido y no está, lo añade en su sitio; si no, deja la lista
 // como estaba y guarda el mensaje. SPEC-CALC-003 FR-09: el campo se cierra si
 // se añade o está vacío, y sigue abierto con el mensaje si no. Añadir no
-// cierra el aviso de "Deshacer" (decisión de Víctor, 2026-10-31: AC-13).
+// cierra el aviso de "Deshacer" (SPEC-CALC-003 FR-08, AC-13).
 export function anadirPorcentaje(estado) {
   const r = analizarPorcentaje(estado.textoPorcentaje);
   // Vacío o solo espacios: la lista no cambia y no hay mensaje.
