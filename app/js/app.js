@@ -7,8 +7,13 @@ import {
   escribirPesoBarra,
   escribirTrabajo,
   terminarEdicion,
+  cambiarCollarines,
+  abrirAnadir,
+  cancelarAnadir,
+  escribirPorcentaje,
   anadirPorcentaje,
-  quitarPorcentaje,
+  borrarSerie,
+  deshacerBorrado,
   alternarDisco,
   modeloVista,
 } from './vista.js';
@@ -117,6 +122,9 @@ function ajustarPeso({ forzar = false } = {}) {
 // desplegada. Se conserva al repintar las tarjetas.
 const desplegadas = new Set();
 
+// Las series de la última vez que se pintaron las tarjetas.
+let seriesPintadas = null;
+
 // FR-06: la marca se despliega y se pliega en su sitio, sin repintar la tarjeta.
 function alternarDiferencia(marca, valor) {
   const desplegada = marca.getAttribute('aria-expanded') !== 'true';
@@ -128,9 +136,12 @@ function alternarDiferencia(marca, valor) {
 
 // SPEC-CALC-003 FR-06 y FR-14: la tarjeta de una serie, solo con texto. Las
 // líneas van en la columna de texto y, debajo, a todo el ancho, la explicación
-// de la diferencia y el aviso de capacidad.
+// de la diferencia y el aviso de capacidad. FR-08: la tarjeta va sobre el fondo
+// de borrar y lleva el botón "Quitar la serie del P %".
 function pintarSerie(s) {
-  const li = crear('li', 'serie');
+  const item = crear('li', 'deslizable');
+  const fondo = $('plantilla-borrar').content.firstElementChild.cloneNode(true);
+  const li = crear('div', 'serie');
   const columna = crear('div', 'texto');
   const cabecera = crear('div', 'cabecera');
   cabecera.append(crear('span', 'porcentaje', s.porcentaje));
@@ -171,7 +182,148 @@ function pintarSerie(s) {
   }
   if (s.collarin) columna.append(crear('p', 'collarin', s.collarin));
   if (s.avisoCapacidad) li.append(crear('p', 'capacidad', s.avisoCapacidad));
-  return li;
+  const quitar = crear('button', 'quitar', s.quitar);
+  quitar.type = 'button';
+  quitar.addEventListener('click', () => borrar(s.valor, { foco: true }));
+  li.append(quitar);
+  item.append(fondo, li);
+  enlazarGesto(item, li, quitar, s.valor);
+  return item;
+}
+
+// SPEC-CALC-003 FR-08: umbral del gesto (fracción del ancho), duración de la
+// pulsación larga y lo que tiene que moverse el dedo para que cuente.
+const UMBRAL_BORRAR = 0.35;
+const PULSACION_LARGA_MS = 500;
+const MOVIMIENTO_PX = 10;
+// Lo que puede tardar como mucho la salida de lado (estilos.css, .sale).
+const SALIDA_MS = 400;
+
+const sinMovimiento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// FR-08: el botón "Quitar" que mostró una pulsación larga, hasta que se toca
+// fuera de él.
+let quitarMostrado = null;
+
+function ocultarQuitar() {
+  quitarMostrado?.classList.remove('mostrado');
+  quitarMostrado = null;
+}
+
+// FR-08: deslizar a la izquierda borra pasado el umbral; mantener pulsada la
+// tarjeta sin moverla muestra "Quitar". Deslizar en vertical sigue desplazando
+// la página (touch-action: pan-y en estilos.css).
+function enlazarGesto(item, tarjeta, quitar, valor) {
+  let inicio = null;
+  let desliza = false;
+  let larga = false;
+  let reloj = null;
+  let ancho = 0;
+  let dx = 0;
+
+  const colocar = (x) => { tarjeta.style.transform = x ? `translateX(${x}px)` : ''; };
+  const fin = () => {
+    clearTimeout(reloj);
+    inicio = null;
+    desliza = false;
+    item.classList.remove('arrastra', 'listo');
+  };
+
+  tarjeta.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || e.button !== 0 || e.target === quitar) return;
+    inicio = { x: e.clientX, y: e.clientY };
+    desliza = false;
+    larga = false;
+    dx = 0;
+    ancho = tarjeta.getBoundingClientRect().width;
+    reloj = setTimeout(() => {
+      larga = true;
+      ocultarQuitar();
+      quitar.classList.add('mostrado');
+      quitarMostrado = quitar;
+    }, PULSACION_LARGA_MS);
+  });
+
+  tarjeta.addEventListener('pointermove', (e) => {
+    // Tras la pulsación larga, mover el dedo no hace nada más.
+    if (!inicio || larga) return;
+    const mx = e.clientX - inicio.x;
+    const my = e.clientY - inicio.y;
+    if (!desliza) {
+      if (Math.abs(my) > MOVIMIENTO_PX && Math.abs(my) >= Math.abs(mx)) {
+        fin();
+        return;
+      }
+      if (Math.abs(mx) <= MOVIMIENTO_PX) return;
+      clearTimeout(reloj);
+      desliza = true;
+      tarjeta.setPointerCapture(e.pointerId);
+      tarjeta.classList.remove('vuelve');
+      item.classList.add('arrastra');
+    }
+    // Durante el gesto la tarjeta sigue al dedo, también con "Reducir
+    // movimiento" (FR-13).
+    dx = Math.min(0, mx);
+    colocar(dx);
+    item.classList.toggle('listo', -dx > ancho * UMBRAL_BORRAR);
+  });
+
+  const soltar = () => {
+    if (!inicio) return;
+    const borra = desliza && -dx > ancho * UMBRAL_BORRAR;
+    const deslizaba = desliza;
+    fin();
+    // Tras el gesto o la pulsación larga no se activa nada de la tarjeta.
+    if (deslizaba || larga) suprimirClic(tarjeta);
+    if (borra) {
+      item.classList.add('arrastra', 'listo');
+      if (sinMovimiento()) borrar(valor);
+      else {
+        // La tarjeta sale de lado y después se borra. Si la transición no
+        // termina (por ejemplo, porque otro cambio repinta las tarjetas), se
+        // borra igual.
+        let hecho = false;
+        const terminar = () => {
+          if (hecho) return;
+          hecho = true;
+          borrar(valor);
+        };
+        tarjeta.classList.add('sale');
+        colocar(-ancho);
+        tarjeta.addEventListener('transitionend', terminar, { once: true });
+        setTimeout(terminar, SALIDA_MS);
+      }
+    } else if (deslizaba) {
+      if (!sinMovimiento()) tarjeta.classList.add('vuelve');
+      colocar(0);
+    }
+  };
+  tarjeta.addEventListener('pointerup', soltar);
+  tarjeta.addEventListener('pointercancel', () => {
+    fin();
+    colocar(0);
+  });
+  // FR-08: durante la pulsación no aparece el menú del sistema.
+  tarjeta.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+// El clic que sigue al gesto o a la pulsación larga no llega a la tarjeta. En
+// táctil, el clic puede llegar en otra tarea; si no llega, se deja de esperar.
+function suprimirClic(tarjeta) {
+  const parar = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+  };
+  tarjeta.addEventListener('click', parar, { capture: true, once: true });
+  setTimeout(() => tarjeta.removeEventListener('click', parar, { capture: true }), SALIDA_MS);
+}
+
+// FR-08: borra la serie y muestra el aviso. Tras borrar con el botón "Quitar",
+// el foco pasa a "Deshacer".
+function borrar(valor, { foco = false } = {}) {
+  ocultarQuitar();
+  actualizar(borrarSerie(estado, valor));
+  if (foco) $('deshacer').focus();
 }
 
 // La parte de arriba se actualiza en su sitio, sin reconstruir ningún control:
@@ -218,26 +370,33 @@ function pintar() {
   const v = modeloVista(estado);
   pintarArriba(v);
 
-  $('porcentajes').replaceChildren(...v.porcentajes.map((p, i) => {
-    const li = crear('li', null);
-    const quitar = crear('button', 'quitar', '×');
-    quitar.type = 'button';
-    quitar.setAttribute('aria-label', `Quitar ${p}`);
-    quitar.addEventListener('click', () => {
-      actualizar(quitarPorcentaje(estado, i));
-    });
-    li.append(crear('span', null, p), quitar);
-    return li;
-  }));
+  // SPEC-CALC-003 FR-09: el botón o el campo de añadir.
+  mostrar($('abrir-anadir'), !v.anadiendo);
+  mostrar($('form-porcentaje'), v.anadiendo);
   valorCampo('nuevo-porcentaje', v.textoPorcentaje);
+  $('porcentaje-auto').dataset.texto = v.textoPorcentaje || $('nuevo-porcentaje').placeholder;
   texto('error-porcentaje', v.errorPorcentaje);
-  $('nuevo-porcentaje').setAttribute('aria-invalid', String(Boolean(v.errorPorcentaje)));
+  cambiarAtributo($('nuevo-porcentaje'), 'aria-invalid', String(Boolean(v.errorPorcentaje)));
+
+  // FR-08: si el foco está en el aviso cuando desaparece, pasa al botón de
+  // añadir o, si está abierto, a su campo. Si está en otro sitio, no se mueve.
+  const focoEnAviso = $('aviso-borrado').contains(document.activeElement);
+  cambiarTexto($('texto-borrado'), v.avisoBorrado ?? '');
+  mostrar($('aviso-borrado'), Boolean(v.avisoBorrado));
+  if (focoEnAviso && !v.avisoBorrado) $(v.anadiendo ? 'nuevo-porcentaje' : 'abrir-anadir').focus();
 
   // FR-06: una tarjeta que desaparece o se queda sin diferencia vuelve plegada.
   for (const valor of desplegadas) {
     if (!v.series.some((s) => s.valor === valor && s.diferencia)) desplegadas.delete(valor);
   }
-  $('series').replaceChildren(...v.series.map(pintarSerie));
+  // Las tarjetas solo se reconstruyen si cambian: así no se pierde el control
+  // que tiene el foco o el dedo cuando cambia otra cosa (por ejemplo, el campo
+  // de añadir se cierra al llevar el foco a "Quitar").
+  const firma = JSON.stringify(v.series);
+  if (firma !== seriesPintadas) {
+    seriesPintadas = firma;
+    $('series').replaceChildren(...v.series.map(pintarSerie));
+  }
 }
 
 // FR-10: cualquier cambio recalcula al momento. FR-11 y SPEC-CALC-002 FR-08:
@@ -281,13 +440,19 @@ function enlazarPaneles() {
 // pegado o arrastrado se conserva entero y se valida.
 const MAX_TRABAJO = 6;
 
-function enlazarCampos() {
-  $('trabajo').addEventListener('beforeinput', (e) => {
+// Solo cuenta lo que inserta texto: Intro (insertLineBreak, sin datos) tiene
+// que seguir confirmando aunque lo pegado pase del límite.
+function limitar(campo, maximo) {
+  campo.addEventListener('beforeinput', (e) => {
     if (!e.inputType.startsWith('insert') || e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') return;
-    const el = e.target;
-    const quedan = el.value.length - (el.selectionEnd - el.selectionStart);
-    if (quedan + (e.data ?? '').length > MAX_TRABAJO) e.preventDefault();
+    if (!e.data) return;
+    const quedan = campo.value.length - (campo.selectionEnd - campo.selectionStart);
+    if (quedan + e.data.length > maximo) e.preventDefault();
   });
+}
+
+function enlazarCampos() {
+  limitar($('trabajo'), MAX_TRABAJO);
   $('trabajo').addEventListener('input', (e) => actualizar(escribirTrabajo(estado, e.target.value)));
   $('peso-barra').addEventListener('input', (e) => {
     actualizar(escribirPesoBarra(estado, e.target.value));
@@ -295,13 +460,78 @@ function enlazarCampos() {
   // FR-11: salir del campo termina su edición, aunque no se haya tecleado nada.
   $('trabajo').addEventListener('blur', () => terminar('trabajo'));
   $('peso-barra').addEventListener('blur', () => terminar('barra'));
-  $('collarines').addEventListener('change', (e) => actualizar({ ...estado, collarines: e.target.checked }));
-  $('nuevo-porcentaje').addEventListener('input', (e) => {
-    actualizar({ ...estado, textoPorcentaje: e.target.value });
+  $('collarines').addEventListener('change', (e) => actualizar(cambiarCollarines(estado, e.target.checked)));
+  $('deshacer').addEventListener('click', () => actualizar(deshacerBorrado(estado)));
+  // FR-08: el botón "Quitar" que mostró la pulsación larga se oculta al tocar
+  // fuera de él.
+  document.addEventListener('pointerdown', (e) => {
+    if (quitarMostrado && e.target !== quitarMostrado) ocultarQuitar();
+  }, { capture: true });
+}
+
+// SPEC-CALC-003 FR-09: no deja teclear más de 3 caracteres, pero lo pegado o
+// arrastrado se conserva entero y se valida.
+const MAX_PORCENTAJE = 3;
+
+// FR-09: Intro y "Añadir" confirman, también al perder el foco. Una misma
+// confirmación añade una sola vez: con el campo cerrado no hay nada que confirmar.
+function confirmarAnadir() {
+  if (!estado.anadiendo) return;
+  actualizar(anadirPorcentaje(estado));
+}
+
+// FR-09: al cerrarse con Intro, "Añadir", Escape o "✕", el foco vuelve al
+// botón de añadir.
+function enfocarSiCerrado() {
+  if (!estado.anadiendo) $('abrir-anadir').focus();
+}
+
+function enlazarAnadir() {
+  const campo = $('nuevo-porcentaje');
+  const form = $('form-porcentaje');
+  $('abrir-anadir').addEventListener('click', () => {
+    actualizar(abrirAnadir(estado));
+    campo.focus();
   });
-  $('form-porcentaje').addEventListener('submit', (e) => {
+  limitar(campo, MAX_PORCENTAJE);
+  campo.addEventListener('input', () => actualizar(escribirPorcentaje(estado, campo.value)));
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
-    actualizar(anadirPorcentaje(estado));
+    confirmarAnadir();
+    enfocarSiCerrado();
+  });
+  const cancelar = () => {
+    actualizar(cancelarAnadir(estado));
+    enfocarSiCerrado();
+  };
+  $('cancelar-anadir').addEventListener('click', cancelar);
+  campo.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') cancelar();
+  });
+  // Tocar "✕", "Añadir" o el resto de la caja no quita el foco al campo: así
+  // cancelar prevalece y confirmar no pasa dos veces. Fuera de los botones, el
+  // toque lleva al campo. Si aun así el toque en un botón le quita el foco, se
+  // espera a su clic.
+  let botonPulsado = false;
+  document.addEventListener('pointerdown', (e) => {
+    botonPulsado = Boolean(e.target.closest?.('#form-porcentaje button'));
+  }, { capture: true });
+  form.addEventListener('mousedown', (e) => {
+    if (e.target === campo) return;
+    e.preventDefault();
+    if (!e.target.closest('button')) campo.focus();
+  });
+  // Perder el foco porque la persona toca otra cosa confirma; pasar a segundo
+  // plano o bloquear el teléfono, no. Moverse entre el campo y sus botones
+  // tampoco.
+  form.addEventListener('focusout', (e) => {
+    if (form.contains(e.relatedTarget) || botonPulsado) return;
+    if (document.visibilityState === 'hidden' || !document.hasFocus()) return;
+    confirmarAnadir();
+  });
+  // En iOS, tocar fuera de un campo no siempre le quita el foco (ADR-0005 §3).
+  document.addEventListener('pointerdown', (e) => {
+    if (estado.anadiendo && !form.contains(e.target)) confirmarAnadir();
   });
 }
 
@@ -314,6 +544,7 @@ function terminarAlSalir() {
 
 montarOpciones();
 enlazarCampos();
+enlazarAnadir();
 enlazarPaneles();
 pintar();
 window.addEventListener('resize', () => ajustarPeso({ forzar: true }));

@@ -1,6 +1,9 @@
 // Recorridos de la interfaz que necesitan un navegador real.
 import { test, expect } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles, recargar, copiar, pegar, discosDeSeries } from './pantalla.js';
+import {
+  trabajo, pesoBarra, barra, desplegarPaneles, recargar, copiar, pegar, discosDeSeries,
+  porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas, deslizar,
+} from './pantalla.js';
 
 const CLAVE = 'calculadora-discos:v1:porcentajes';
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
@@ -8,20 +11,13 @@ const CLAVE_RECTA = 'calculadora-discos:v1:peso-recta';
 const CLAVE_Z = 'calculadora-discos:v1:peso-z';
 const CLAVE_COLLARINES = 'calculadora-discos:v1:collarines';
 
-const nuevoPorcentaje = (page) => page.getByLabel('Nuevo porcentaje');
 const series = (page) => page.locator('#series > li');
-const porcentajes = (page) => page.locator('#porcentajes > li > span');
-
-async function anadir(page, texto) {
-  await nuevoPorcentaje(page).fill(texto);
-  await page.getByRole('button', { name: 'Añadir' }).click();
-}
-
-async function quitarTodos(page) {
-  while (await page.getByRole('button', { name: /^Quitar / }).count()) {
-    await page.getByRole('button', { name: /^Quitar / }).first().click();
-  }
-}
+// SPEC-CALC-003: la lista de porcentajes son las tarjetas (FR-01), se añade
+// con su campo (FR-09) y se quita con su botón o su gesto (FR-08).
+const porcentajes = porcentajesDeSeries;
+const anadir = anadirPorcentaje;
+const quitarTodos = quitarTodas;
+const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
@@ -63,7 +59,7 @@ test('SPEC-CALC-001/AC-10 las series se actualizan al momento con cada cambio', 
   await anadir(page, '50');
   await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '50 %', '70 %', '90 %']);
 
-  await page.getByRole('button', { name: 'Quitar 70 %' }).click();
+  await quitarSerie(page, 70);
   await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '50 %', '90 %']);
 
   await barra(page, 'Olímpica 15 kg').check();
@@ -512,15 +508,16 @@ test('SPEC-CALC-001/AC-35 SPEC-CALC-001/AC-39 discos agrupados y aviso de capaci
   await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
 });
 
+// SPEC-CALC-003 FR-08: el primer toque es el gesto de borrar una tarjeta.
 test('SPEC-CALC-001/FR-11 con el foco en un peso, salir del campo no se come el primer toque en otro control', async ({ page }) => {
   await trabajo(page).fill('105');
-  await page.getByRole('button', { name: 'Quitar 90 %' }).click();
+  await deslizar(page, tarjeta(page, 90), 0.5);
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %']);
   expect(await guardado(page, CLAVE_TRABAJO)).toBe('"105"');
 
   await barra(page, 'Recta').check();
   await pesoBarra(page).fill('8');
-  await page.getByRole('button', { name: 'Quitar 70 %' }).click();
+  await deslizar(page, tarjeta(page, 70), 0.5);
   await expect(porcentajes(page)).toHaveText(['40 %']);
   expect(await guardado(page, CLAVE_RECTA)).toBe('8');
 

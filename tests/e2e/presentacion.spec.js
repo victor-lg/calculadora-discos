@@ -4,6 +4,7 @@
 import { test, expect } from '@playwright/test';
 import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar,
+  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, quitarTodas, deslizar,
 } from './pantalla.js';
 
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
@@ -27,12 +28,6 @@ const plegarCargaSinFoco = (page) => page.evaluate(() => document.getElementById
 const romperAlmacen = (page) => page.evaluate(() => {
   Storage.prototype.setItem = () => { throw new DOMException('Lleno', 'QuotaExceededError'); };
 });
-
-async function quitarTodos(page) {
-  while (await page.getByRole('button', { name: /^Quitar / }).count()) {
-    await page.getByRole('button', { name: /^Quitar / }).first().click();
-  }
-}
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
@@ -169,8 +164,10 @@ test('SPEC-CALC-003/AC-05 los avisos generales: región anunciada y su orden', a
   await expect(page.locator('#avisos')).not.toHaveCSS('display', 'none');
   await desplegarPaneles(page);
 
+  // Las series se quitan desde su tarjeta (FR-08), así que antes de
+  // deshabilitar los tipos.
+  await quitarTodas(page);
   for (const nombre of NOMBRES) await disco(page, nombre).click();
-  await quitarTodos(page);
   await trabajo(page).fill('');
   await expect(avisos(page)).toHaveText([
     'Escribe el peso de trabajo.',
@@ -179,13 +176,15 @@ test('SPEC-CALC-003/AC-05 los avisos generales: región anunciada y su orden', a
   ]);
 
   // Z con 0,5, lista vacía, sin tipos y el aviso de fallo al guardar: el 50
-  // se guarda y, al quitarlo, la lista vacía ya no se puede guardar.
+  // se guarda y, al quitarlo, la lista vacía ya no se puede guardar. Para
+  // quitarlo hace falta su tarjeta: con los tipos habilitados.
   await trabajo(page).fill('100');
   await trabajo(page).blur();
-  await page.getByLabel('Nuevo porcentaje').fill('50');
-  await page.getByRole('button', { name: 'Añadir' }).click();
+  for (const nombre of NOMBRES) await disco(page, nombre).click();
+  await anadirPorcentaje(page, '50');
   await romperAlmacen(page);
-  await page.getByRole('button', { name: 'Quitar 50 %' }).click();
+  await quitarSerie(page, 50);
+  for (const nombre of NOMBRES) await disco(page, nombre).click();
   await barra(page, 'Z').check();
   await pesoBarra(page).fill('0,5');
   await expect(avisos(page)).toHaveText([
@@ -415,7 +414,7 @@ test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferenci
 test('la explicación desplegada sigue abierta al repintar las tarjetas', async ({ page }) => {
   await trabajo(page).fill('105');
   await tarjeta(page, 70).locator('.diferencia').click();
-  await page.getByRole('button', { name: 'Quitar 40 %' }).click();
+  await quitarSerie(page, 40);
   await expect(tarjeta(page, 70).locator('.diferencia')).toHaveAttribute('aria-expanded', 'true');
   await expect(tarjeta(page, 70).locator('.detalle')).toBeVisible();
   // Una tarjeta que se queda sin diferencia vuelve plegada.
@@ -434,8 +433,7 @@ test('SPEC-CALC-003/AC-07 "Solo la barra", "×n" con su anuncio y el collarín',
   await expect(t40.locator('.diferencia')).toHaveCount(0);
   await expect(t40).not.toContainText('Por lado');
 
-  await page.getByLabel('Nuevo porcentaje').fill('100');
-  await page.getByRole('button', { name: 'Añadir' }).click();
+  await anadirPorcentaje(page, '100');
   await trabajo(page).fill('120');
   const t100 = tarjeta(page, 100);
   await expect(t100.locator('.disco-serie')).toHaveText('25×2');

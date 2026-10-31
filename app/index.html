@@ -96,21 +96,36 @@
       <p id="aviso-guardado" class="aviso"></p>
     </div>
 
-    <section aria-labelledby="titulo-porcentajes">
-      <h2 id="titulo-porcentajes">Porcentajes</h2>
-      <ul id="porcentajes" class="porcentajes"></ul>
-      <form id="form-porcentaje" class="anadir" novalidate>
-        <label for="nuevo-porcentaje" class="oculto">Nuevo porcentaje</label>
-        <input id="nuevo-porcentaje" type="text" inputmode="numeric" autocomplete="off" placeholder="%" aria-describedby="error-porcentaje">
-        <button type="submit">Añadir</button>
-      </form>
-      <p id="error-porcentaje" class="error" role="alert"></p>
-    </section>
-
+    <!-- SPEC-CALC-003 FR-06 y FR-08: una tarjeta por serie, que se puede borrar.
+         Cada tarjeta lleva debajo una copia de este fondo. -->
+    <template id="plantilla-borrar">
+      <div class="fondo-borrar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" focusable="false"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Borrar</div>
+    </template>
     <section aria-labelledby="titulo-series">
-      <h2 id="titulo-series">Series</h2>
+      <h2 id="titulo-series" class="oculto">Series</h2>
       <ol id="series" class="series" aria-live="polite"></ol>
     </section>
+
+    <!-- SPEC-CALC-003 FR-09: el botón se convierte en el campo de añadir. -->
+    <div class="anadir">
+      <button id="abrir-anadir" class="abrir-anadir" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Añadir porcentaje</button>
+      <form id="form-porcentaje" class="campo-anadir" novalidate hidden>
+        <label for="nuevo-porcentaje" class="oculto">Nuevo porcentaje</label>
+        <span class="auto" id="porcentaje-auto"><input id="nuevo-porcentaje" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" size="1" placeholder="Porcentaje" aria-describedby="error-porcentaje"></span><span class="unidad">%</span>
+        <button id="cancelar-anadir" class="cancelar" type="button" aria-label="Cancelar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="confirmar" type="submit">Añadir</button>
+      </form>
+      <p id="error-porcentaje" class="error" role="alert"></p>
+    </div>
+
+    <!-- SPEC-CALC-003 FR-08: el aviso de "Deshacer", sin plazo. La región
+         sigue en el árbol de accesibilidad para que se anuncie al aparecer. -->
+    <div id="region-borrado" class="region-borrado" role="status">
+      <div id="aviso-borrado" class="aviso-borrado" hidden>
+        <span id="texto-borrado"></span>
+        <button id="deshacer" type="button">Deshacer</button>
+      </div>
+    </div>
   </main>
 </body>
 </html>

@@ -3,7 +3,9 @@
 // Cada test arranca su propio servidor, que registra todo lo que llega al
 // origen tal cual: método, URL, cabeceras en crudo (cookies incluidas) y cuerpo.
 import { test, expect } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles, discosDeSeries } from './pantalla.js';
+import {
+  trabajo, pesoBarra, barra, desplegarPaneles, discosDeSeries, anadirPorcentaje, quitarSerie,
+} from './pantalla.js';
 import { readFileSync } from 'node:fs';
 import { arrancar } from './servidor.js';
 
@@ -157,9 +159,8 @@ async function recorrido(context, base, conDatos, sockets) {
     await pesoBarra(page).fill('8,65');
     await page.getByLabel('Collarines de competición').check();
     await trabajo(page).fill('487,35');
-    await page.getByLabel('Nuevo porcentaje').fill('47');
-    await page.getByRole('button', { name: 'Añadir' }).click();
-    await page.getByRole('button', { name: 'Quitar 70 %' }).click();
+    await anadirPorcentaje(page, '47');
+    await quitarSerie(page, 70);
     await page.getByLabel('Un punto').check();
     await page.getByLabel('Dos lados').check();
     // SPEC-CALC-002: deshabilitar y habilitar tipos, hasta dejar 15, 10, 5 y 2,5 kg.
