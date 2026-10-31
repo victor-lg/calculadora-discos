@@ -1,7 +1,10 @@
 // Recorridos de SPEC-CALC-002 que necesitan un navegador real: tocar los tipos,
 // arranque de cero, vuelta de segundo plano y fallo al guardar.
 import { test, expect } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles, recargar, discosDeSeries } from './pantalla.js';
+import {
+  trabajo, pesoBarra, barra, desplegarPaneles, recargar, discosDeSeries,
+  porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas,
+} from './pantalla.js';
 
 const CLAVE_DISCOS = 'calculadora-discos:v1:discos';
 const CLAVE_PORCENTAJES = 'calculadora-discos:v1:porcentajes';
@@ -11,16 +14,14 @@ const NOMBRES = ['25 kg', '20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg', '1,25 kg'
 
 const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 const series = (page) => page.locator('#series > li');
-const porcentajes = (page) => page.locator('#porcentajes > li > span');
+// SPEC-CALC-003 FR-01: la lista de porcentajes son las tarjetas.
+const porcentajes = porcentajesDeSeries;
 const indicacionDiscos = (page) => page.locator('#indicacion-discos');
 const avisoGuardado = (page) => page.locator('#aviso-guardado');
 
 async function soloPorcentaje(page, valor) {
-  while (await page.getByRole('button', { name: /^Quitar / }).count()) {
-    await page.getByRole('button', { name: /^Quitar / }).first().click();
-  }
-  await page.getByLabel('Nuevo porcentaje').fill(String(valor));
-  await page.getByRole('button', { name: 'Añadir' }).click();
+  await quitarTodas(page);
+  await anadirPorcentaje(page, String(valor));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -179,8 +180,7 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
   await expect(avisoGuardado(page)).toBeHidden();
 
   // Falla la lista; vuelve a poder guardar y se guardan los discos: el aviso sigue.
-  await page.getByLabel('Nuevo porcentaje').fill('50');
-  await page.getByRole('button', { name: 'Añadir' }).click();
+  await anadirPorcentaje(page, '50');
   await expect(series(page).locator('.porcentaje')).toHaveText(['50 %', '90 %']);
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
   await page.evaluate(() => window.romperAlmacen(false));
@@ -188,7 +188,7 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
   expect(await page.evaluate((c) => localStorage.getItem(c), CLAVE_DISCOS)).toBe('[20,15,10,5,2.5,1.25]');
   await expect(avisoGuardado(page)).toHaveText(AVISO_GUARDAR);
   // Al guardarse también la lista, desaparece.
-  await page.getByRole('button', { name: 'Quitar 50 %' }).click();
+  await quitarSerie(page, 50);
   await expect(avisoGuardado(page)).toBeHidden();
 });
 

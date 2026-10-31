@@ -51,3 +51,39 @@ export const discosDeSeries = (page) => page.locator('#series > li').evaluateAll
   .map((li) => [...li.querySelectorAll('.disco-serie')]
     .map((d) => [...d.querySelectorAll('.cifra, .veces')].map((x) => x.textContent).join(' '))
     .join(' + ')));
+
+// SPEC-CALC-003 FR-01 y FR-06: los porcentajes de las tarjetas, en su orden.
+export const porcentajesDeSeries = (page) => page.locator('#series > li .porcentaje');
+
+// FR-09: añade un porcentaje con el campo de añadir, que abre si está cerrado.
+export async function anadirPorcentaje(page, texto) {
+  const abrir = page.getByRole('button', { name: 'Añadir porcentaje' });
+  if (await abrir.isVisible()) await abrir.click();
+  await page.getByLabel('Nuevo porcentaje').fill(texto);
+  await page.getByRole('button', { name: 'Añadir', exact: true }).click();
+}
+
+// FR-08: el botón "Quitar la serie del P %", que solo se ve con el foco. Se
+// activa con el teclado.
+export const botonQuitar = (page, porcentaje) => page.getByRole('button', { name: `Quitar la serie del ${porcentaje} %` });
+export const quitarSerie = (page, porcentaje) => botonQuitar(page, porcentaje).press('Enter');
+
+// FR-08: borra todas las series que se ven.
+export async function quitarTodas(page) {
+  const botones = page.getByRole('button', { name: /^Quitar la serie del / });
+  while (await botones.count()) await botones.first().press('Enter');
+}
+
+// FR-08: desliza con el puntero la tarjeta hacia la izquierda una fracción de
+// su ancho y la suelta.
+export async function deslizar(page, tarjeta, fraccion) {
+  await tarjeta.scrollIntoViewIfNeeded();
+  const caja = await tarjeta.locator('.serie').boundingBox();
+  const y = caja.y + caja.height / 2;
+  const x = caja.x + caja.width * 0.8;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  const pasos = 10;
+  for (let i = 1; i <= pasos; i++) await page.mouse.move(x - (caja.width * fraccion * i) / pasos, y);
+  await page.mouse.up();
+}

@@ -12,6 +12,13 @@ import {
   escribirTrabajo,
   terminarEdicion,
   alternarDisco,
+  cambiarCollarines,
+  abrirAnadir,
+  cancelarAnadir,
+  escribirPorcentaje,
+  anadirPorcentaje,
+  borrarSerie,
+  deshacerBorrado,
   MODOS,
   TEXTOS,
 } from '../../app/js/vista.js';
@@ -141,4 +148,120 @@ test('SPEC-CALC-003/AC-07 sin discos, "×n" con su anuncio y el collarín', () =
 
   assert.equal(serie({ ...inicial(), collarines: true }, 70).collarin, '+ collarín de 2,5 kg');
   assert.equal(serie(inicial(), 70).collarin, null);
+});
+
+const lista = (e) => e.porcentajes;
+const confirmar = (e, texto) => anadirPorcentaje(escribirPorcentaje(abrirAnadir(e), texto));
+
+test('SPEC-CALC-003/AC-11 borrar el 70 % deja 40 y 90 con su aviso; "Deshacer" lo pone en su sitio', () => {
+  let e = borrarSerie(inicial(), 70);
+  assert.deepEqual(lista(e), [40, 90]);
+  assert.equal(modeloVista(e).avisoBorrado, 'Serie del 70 % borrada');
+  assert.deepEqual(modeloVista(e).series.map((s) => s.quitar), ['Quitar la serie del 40 %', 'Quitar la serie del 90 %']);
+  e = deshacerBorrado(e);
+  assert.deepEqual(lista(e), [40, 70, 90]);
+  assert.equal(modeloVista(e).avisoBorrado, null);
+});
+
+test('SPEC-CALC-003/AC-13 "Deshacer" no duplica un porcentaje que ya volvió a la lista', () => {
+  let e = confirmar(borrarSerie(inicial(), 70), '70');
+  assert.deepEqual(lista(e), [40, 70, 90]);
+  // Añadir no cierra el aviso (SPEC-CALC-003 FR-08).
+  assert.equal(modeloVista(e).avisoBorrado, 'Serie del 70 % borrada');
+  e = deshacerBorrado(e);
+  assert.deepEqual(lista(e), [40, 70, 90]);
+  assert.equal(modeloVista(e).avisoBorrado, null);
+});
+
+test('SPEC-CALC-003/AC-13 añadir otro porcentaje no cierra el aviso y "Deshacer" recupera el borrado', () => {
+  let e = confirmar(borrarSerie(inicial(), 70), '50');
+  assert.deepEqual(lista(e), [40, 50, 90]);
+  assert.equal(modeloVista(e).avisoBorrado, 'Serie del 70 % borrada');
+  e = deshacerBorrado(e);
+  assert.deepEqual(lista(e), [40, 50, 70, 90]);
+  assert.equal(modeloVista(e).avisoBorrado, null);
+});
+
+test('SPEC-CALC-001/AC-46 con el peso de trabajo vacío no hay series que quitar y la lista se conserva', () => {
+  let e = escribirTrabajo(inicial(), '');
+  assert.deepEqual(modeloVista(e).series, []);
+  assert.deepEqual(lista(e), [40, 70, 90]);
+  e = escribirTrabajo(e, '100');
+  assert.deepEqual(modeloVista(e).series.map((s) => s.quitar), ['Quitar la serie del 40 %', 'Quitar la serie del 70 %', 'Quitar la serie del 90 %']);
+});
+
+test('SPEC-CALC-003/AC-13 solo se deshace el último borrado', () => {
+  let e = borrarSerie(borrarSerie(inicial(), 70), 40);
+  assert.equal(modeloVista(e).avisoBorrado, 'Serie del 40 % borrada');
+  e = deshacerBorrado(e);
+  assert.deepEqual(lista(e), [40, 90]);
+  // Sin aviso, "Deshacer" ya no hace nada.
+  assert.deepEqual(lista(deshacerBorrado(e)), [40, 90]);
+});
+
+test('SPEC-CALC-003/AC-13 activar los collarines cierra el aviso y la lista sigue sin el 70', () => {
+  const e = cambiarCollarines(borrarSerie(inicial(), 70), true);
+  assert.equal(modeloVista(e).avisoBorrado, null);
+  assert.deepEqual(lista(deshacerBorrado(e)), [40, 90]);
+});
+
+// SPEC-CALC-003 FR-08: el aviso se cierra al borrar otra serie, teclear en un peso
+// o cambiar el modo, la barra, los collarines o los discos habilitados.
+test('SPEC-CALC-003/AC-12 teclear en un peso, cambiar el modo, la barra o los discos cierran el aviso', () => {
+  const borrada = borrarSerie(inicial(), 70);
+  const acciones = [
+    (e) => escribirTrabajo(e, '105'),
+    (e) => escribirPesoBarra(elegirBarra(e, 'z'), '8'),
+    (e) => elegirModo(e, 'un-punto'),
+    (e) => elegirBarra(e, '15'),
+    (e) => alternarDisco(e, 2500),
+    (e) => borrarSerie(e, 40),
+  ];
+  for (const accion of acciones) {
+    const v = modeloVista(accion(borrada));
+    assert.notEqual(v.avisoBorrado, 'Serie del 70 % borrada', accion.toString());
+  }
+  // Terminar la edición de un peso, abrir el campo de añadir o escribir en él
+  // no cambian nada: el aviso sigue.
+  for (const accion of [(e) => terminarEdicion(e, 'trabajo'), abrirAnadir, (e) => escribirPorcentaje(abrirAnadir(e), '5')]) {
+    assert.equal(modeloVista(accion(borrada)).avisoBorrado, 'Serie del 70 % borrada', accion.toString());
+  }
+});
+
+test('SPEC-CALC-003/AC-14 confirmar cierra el campo si añade o está vacío, y lo deja abierto con el mensaje si no', () => {
+  let e = confirmar(inicial(), '50');
+  assert.deepEqual(lista(e), [40, 50, 70, 90]);
+  assert.equal(e.anadiendo, false);
+
+  e = confirmar(inicial(), '');
+  assert.equal(e.anadiendo, false);
+  assert.equal(e.errorPorcentaje, null);
+
+  e = confirmar(inicial(), '0');
+  assert.equal(e.anadiendo, true);
+  assert.equal(modeloVista(e).errorPorcentaje, 'Escribe un porcentaje entre 1 y 100.');
+  // El mensaje desaparece en cuanto cambia lo escrito.
+  assert.equal(escribirPorcentaje(e, '05').errorPorcentaje, null);
+
+  e = confirmar(inicial(), '1000');
+  assert.equal(e.anadiendo, true);
+  assert.equal(e.errorPorcentaje, 'Escribe un porcentaje entre 1 y 100.');
+
+  e = confirmar(inicial(), '70');
+  assert.equal(e.anadiendo, true);
+  assert.equal(e.errorPorcentaje, 'Ya tienes una serie del 70 %.');
+  assert.deepEqual(lista(e), [40, 70, 90]);
+});
+
+test('SPEC-CALC-003/AC-14 cancelar cierra el campo sin cambiar la lista y se vuelve a abrir vacío', () => {
+  let e = cancelarAnadir(escribirPorcentaje(abrirAnadir(inicial()), '30'));
+  assert.equal(e.anadiendo, false);
+  assert.deepEqual(lista(e), [40, 70, 90]);
+  e = abrirAnadir(e);
+  assert.equal(modeloVista(e).textoPorcentaje, '');
+  assert.equal(modeloVista(e).errorPorcentaje, null);
+  // Cerrar el campo con un error y volver a abrirlo también lo deja vacío.
+  e = abrirAnadir(cancelarAnadir(confirmar(inicial(), '0')));
+  assert.equal(e.errorPorcentaje, null);
+  assert.equal(e.textoPorcentaje, '');
 });

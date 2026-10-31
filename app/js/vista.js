@@ -68,6 +68,9 @@ export const TEXTOS = {
   // SPEC-CALC-003 FR-06: D diferencia, n repeticiones y W peso del disco.
   anuncioDiferencia: (d) => `${d} kg menos que el objetivo. Ver detalle`,
   anuncioDisco: (n, w) => (n === 1 ? `1 disco de ${w} kg` : `${n} discos de ${w} kg`),
+  // SPEC-CALC-003 FR-08: P porcentaje.
+  serieBorrada: (p) => `Serie del ${p} % borrada`,
+  quitarSerie: (p) => `Quitar la serie del ${p} %`,
 };
 
 // FR-04: ordenados de menor a mayor y sin repetidos.
@@ -87,6 +90,8 @@ const TRABAJO_INICIAL = '100';
 // `trabajoConfirmado`, el texto confirmado del peso de trabajo (FR-11).
 // `finales` cuenta los finales de edición de cada peso: guardarCambios solo
 // escribe un peso cuando termina su edición (almacenamiento.js).
+// SPEC-CALC-003: `anadiendo` dice si el campo de añadir está abierto (FR-09) y
+// `borrado`, el porcentaje que se puede recuperar con "Deshacer", o null (FR-08).
 export function estadoInicial(porcentajes, discos = DISCOS_CENT, {
   trabajo = TRABAJO_INICIAL,
   recta = PESO_BARRA_INICIAL_CENT,
@@ -107,6 +112,8 @@ export function estadoInicial(porcentajes, discos = DISCOS_CENT, {
     collarines,
     textoPorcentaje: '',
     errorPorcentaje: null,
+    anadiendo: false,
+    borrado: null,
   };
   return {
     ...estado,
@@ -149,31 +156,55 @@ export function terminarEdicion(estado, campo) {
 // Elegir la barra que ya está elegida no es cambiar de barra.
 export function elegirModo(estado, modo, foco = null) {
   const e = foco ? terminarEdicion(estado, foco) : estado;
-  return { ...e, modo, pesoBarra: textosBarra(e.barraConfirmada) };
+  return { ...e, modo, pesoBarra: textosBarra(e.barraConfirmada), borrado: null };
 }
 
 export function elegirBarra(estado, barra, foco = null) {
   if (barra === estado.barra) return estado;
   const e = foco ? terminarEdicion(estado, foco) : estado;
-  return { ...e, barra, pesoBarra: textosBarra(e.barraConfirmada) };
+  return { ...e, barra, pesoBarra: textosBarra(e.barraConfirmada), borrado: null };
 }
 
 // FR-02, FR-03: lo tecleado se conserva tal cual. Las series se calculan con
 // ello (FR-10), pero solo se confirma al terminar la edición (FR-11).
+// SPEC-CALC-003 FR-08: cambiar el modo o la barra y teclear en un peso cierran
+// el aviso de "Deshacer".
 export function escribirPesoBarra(estado, texto) {
-  return { ...estado, pesoBarra: { ...estado.pesoBarra, [estado.barra]: texto } };
+  return { ...estado, pesoBarra: { ...estado.pesoBarra, [estado.barra]: texto }, borrado: null };
 }
 
 export function escribirTrabajo(estado, texto) {
-  return { ...estado, trabajo: texto };
+  return { ...estado, trabajo: texto, borrado: null };
+}
+
+// FR-15. SPEC-CALC-003 FR-08: también cierra el aviso de "Deshacer".
+export function cambiarCollarines(estado, collarines) {
+  return { ...estado, collarines, borrado: null };
+}
+
+// SPEC-CALC-003 FR-09: el campo de añadir se abre siempre vacío y sin mensaje,
+// y cancelarlo descarta lo escrito y el mensaje sin cambiar la lista.
+export function abrirAnadir(estado) {
+  return { ...estado, anadiendo: true, textoPorcentaje: '', errorPorcentaje: null };
+}
+
+export function cancelarAnadir(estado) {
+  return { ...estado, anadiendo: false, textoPorcentaje: '', errorPorcentaje: null };
+}
+
+// SPEC-CALC-003 FR-09: el mensaje desaparece en cuanto cambia lo escrito.
+export function escribirPorcentaje(estado, texto) {
+  return { ...estado, textoPorcentaje: texto, errorPorcentaje: null };
 }
 
 // FR-04: si es válido y no está, lo añade en su sitio; si no, deja la lista
-// como estaba y guarda el mensaje.
+// como estaba y guarda el mensaje. SPEC-CALC-003 FR-09: el campo se cierra si
+// se añade o está vacío, y sigue abierto con el mensaje si no. Añadir no
+// cierra el aviso de "Deshacer" (SPEC-CALC-003 FR-08, AC-13).
 export function anadirPorcentaje(estado) {
   const r = analizarPorcentaje(estado.textoPorcentaje);
   // Vacío o solo espacios: la lista no cambia y no hay mensaje.
-  if (r.estado === 'vacio') return { ...estado, errorPorcentaje: null };
+  if (r.estado === 'vacio') return { ...estado, errorPorcentaje: null, anadiendo: false };
   if (r.estado === 'invalido') return { ...estado, errorPorcentaje: TEXTOS.errorPorcentaje };
   if (estado.porcentajes.includes(r.valor)) {
     return { ...estado, errorPorcentaje: TEXTOS.porcentajeRepetido(r.valor) };
@@ -183,6 +214,7 @@ export function anadirPorcentaje(estado) {
     porcentajes: ordenarSinRepetidos([...estado.porcentajes, r.valor]),
     textoPorcentaje: '',
     errorPorcentaje: null,
+    anadiendo: false,
   };
 }
 
@@ -190,12 +222,28 @@ export function quitarPorcentaje(estado, indice) {
   return { ...estado, porcentajes: estado.porcentajes.filter((_, i) => i !== indice) };
 }
 
+// SPEC-CALC-003 FR-08: quita la serie y la deja para "Deshacer". Un borrado
+// nuevo sustituye al anterior: solo se deshace el último.
+export function borrarSerie(estado, porcentaje) {
+  const indice = estado.porcentajes.indexOf(porcentaje);
+  if (indice === -1) return estado;
+  return { ...quitarPorcentaje(estado, indice), borrado: porcentaje };
+}
+
+// FR-08: vuelve a poner el porcentaje en su orden, salvo que ya esté otra vez
+// en la lista, y cierra el aviso.
+export function deshacerBorrado(estado) {
+  if (estado.borrado === null) return estado;
+  return { ...estado, porcentajes: ordenarSinRepetidos([...estado.porcentajes, estado.borrado]), borrado: null };
+}
+
 // SPEC-CALC-002 FR-02: tocar un tipo lo habilita o lo deshabilita.
+// SPEC-CALC-003 FR-08: también cierra el aviso de "Deshacer".
 export function alternarDisco(estado, cent) {
   const discos = estado.discos.includes(cent)
     ? estado.discos.filter((d) => d !== cent)
     : DISCOS_CENT.filter((d) => d === cent || estado.discos.includes(d));
-  return { ...estado, discos };
+  return { ...estado, discos, borrado: null };
 }
 
 const iguales = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -268,6 +316,7 @@ function modeloSerie(estado, barra, barraCent, trabajoCent, porcentaje) {
   const serie = {
     valor: porcentaje,
     porcentaje: `${porcentaje} %`,
+    quitar: TEXTOS.quitarSerie(porcentaje),
     total: null,
     diferencia: null,
     anuncioDiferencia: null,
@@ -327,6 +376,9 @@ export function modeloVista(estado) {
     porcentajes: estado.porcentajes.map((p) => `${p} %`),
     textoPorcentaje: estado.textoPorcentaje,
     errorPorcentaje: estado.errorPorcentaje,
+    anadiendo: estado.anadiendo,
+    // SPEC-CALC-003 FR-08: el aviso de "Deshacer", hasta la siguiente acción.
+    avisoBorrado: estado.borrado === null ? null : TEXTOS.serieBorrada(estado.borrado),
     indicacionPorcentajes: estado.porcentajes.length === 0 ? TEXTOS.anadirPorcentajes : null,
     discos: DISCOS_CENT.map((cent) => ({
       cent,
