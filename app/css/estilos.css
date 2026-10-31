@@ -535,9 +535,11 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
 .cancelar svg { width: 18px; height: 18px; }
 .confirmar { padding: 0 14px; background: var(--acento); color: var(--tinta-acento); font-weight: 700; }
 
-/* FR-08: el aviso de "Deshacer" se queda abajo al desplazarse y, al final de
-   la página, debajo del botón de añadir, así que nunca lo tapa. Sin aviso, la
-   región sigue en el árbol de accesibilidad y solo se anula su hueco. */
+/* FR-08: el aviso de "Deshacer" se queda abajo al desplazarse. Va justo antes
+   del botón de añadir: cuando el botón está en pantalla, el sitio del aviso
+   también lo está, así que el aviso deja de estar pegado abajo y no lo tapa.
+   Sin aviso, la región sigue en el árbol de accesibilidad y solo se anula su
+   hueco. */
 .region-borrado { position: sticky; bottom: max(16px, env(safe-area-inset-bottom)); display: flex; justify-content: center; }
 .region-borrado:has(> [hidden]) { margin-top: -14px; }
 .aviso-borrado {

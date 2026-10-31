@@ -524,4 +524,10 @@ test('SPEC-CALC-001/FR-11 con el foco en un peso, salir del campo no se come el 
   await trabajo(page).fill('105');
   await page.locator('.diferencia').first().click();
   await expect(page.locator('.detalle').first()).toBeVisible();
+
+  // SPEC-CALC-003 FR-09: un clic en un botón, fuera de las tarjetas.
+  await trabajo(page).fill('106');
+  await page.getByRole('button', { name: 'Añadir porcentaje' }).click();
+  await expect(page.getByLabel('Nuevo porcentaje')).toBeVisible();
+  expect(await guardado(page, CLAVE_TRABAJO)).toBe('"106"');
 });

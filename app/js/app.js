@@ -290,7 +290,9 @@ function enlazarGesto(item, tarjeta, quitar, valor) {
         };
         tarjeta.classList.add('sale');
         colocar(-ancho);
-        tarjeta.addEventListener('transitionend', terminar, { once: true });
+        tarjeta.addEventListener('transitionend', (e) => {
+          if (e.target === tarjeta && e.propertyName === 'transform') terminar();
+        });
         setTimeout(terminar, SALIDA_MS);
       }
     } else if (deslizaba) {
@@ -512,10 +514,15 @@ function enlazarAnadir() {
   // cancelar prevalece y confirmar no pasa dos veces. Fuera de los botones, el
   // toque lleva al campo. Si aun así el toque en un botón le quita el foco, se
   // espera a su clic.
+  // En iOS, el foco cambia con los eventos de ratón que siguen al pointerup, así
+  // que no se olvida al levantar el dedo, sino con el clic o con el teclado.
   let botonPulsado = false;
   document.addEventListener('pointerdown', (e) => {
     botonPulsado = Boolean(e.target.closest?.('#form-porcentaje button'));
   }, { capture: true });
+  for (const tipo of ['click', 'keydown']) {
+    document.addEventListener(tipo, () => { botonPulsado = false; });
+  }
   form.addEventListener('mousedown', (e) => {
     if (e.target === campo) return;
     e.preventDefault();

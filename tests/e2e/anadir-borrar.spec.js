@@ -187,8 +187,10 @@ test('SPEC-CALC-003/AC-12 con el teclado: "Quitar" se ve con el foco, borra y el
   await quitarSerie(page, 70);
   await expect(deshacer(page)).toBeFocused();
   await trabajo(page).focus();
-  await trabajo(page).fill('');
+  await trabajo(page).selectText();
+  await expect(aviso(page)).toBeVisible();
   await trabajo(page).pressSequentially('105');
+  await expect(trabajo(page)).toHaveValue('105');
   await expect(aviso(page)).toBeHidden();
   await expect(trabajo(page)).toBeFocused();
 });
@@ -545,4 +547,53 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
   r = await contraste(page, ['#aviso-borrado']);
   expect(r.fallos).toEqual([]);
   expect(r.medidos).toBe(2);
+});
+
+// FR-08 y FR-13: con "Reducir movimiento", la tarjeta sigue al dedo, pero al
+// soltarla no sale de lado ni vuelve con transición.
+test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta no tienen transición', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const t = tarjeta(page, 70);
+  await t.scrollIntoViewIfNeeded();
+  const caja = await t.boundingBox();
+  const y = caja.y + caja.height / 2;
+  const x = caja.x + caja.width * 0.8;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
+  expect((await t.locator('.serie').boundingBox()).x).toBeLessThan(caja.x);
+  await page.mouse.up();
+  // Vuelve sin transición: en el mismo instante ya está en su sitio.
+  expect(await t.locator('.serie').evaluate((el) => [el.className, el.style.transform, el.getAnimations().length]))
+    .toEqual(['serie', '', 0]);
+
+  await page.evaluate(() => {
+    window.borradaAlSoltar = null;
+    document.querySelector('#series').addEventListener('pointerup', () => {
+      queueMicrotask(() => { window.borradaAlSoltar = !document.body.textContent.includes('70 kg'); });
+    }, { once: true });
+  });
+  await deslizar(page, t, 0.5);
+  // Se borra al soltar, sin esperar a una salida de lado.
+  expect(await page.evaluate(() => window.borradaAlSoltar)).toBe(true);
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+});
+
+test('SPEC-CALC-003/AC-11 con muchas series, el aviso de "Deshacer" no tapa "+ Añadir porcentaje"', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const p of ['50', '55', '60', '65', '75', '80']) await anadirPorcentaje(page, p);
+  await quitarSerie(page, 40);
+  await expect(aviso(page)).toBeVisible();
+  const boton = abrir(page);
+  for (const margen of [0, 10, 30, 60, 90, 150, 300]) {
+    // Desplaza hasta que el botón quede `margen` px por encima del borde de abajo.
+    await boton.evaluate((el, m) => {
+      const r = el.getBoundingClientRect();
+      window.scrollBy(0, r.bottom - (window.innerHeight - m));
+    }, margen);
+    const a = await aviso(page).boundingBox();
+    const b = await boton.boundingBox();
+    const solapan = a.y < b.y + b.height && b.y < a.y + a.height;
+    expect(solapan, `botón a ${margen} px del borde`).toBe(false);
+  }
 });
