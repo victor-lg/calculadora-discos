@@ -454,8 +454,8 @@ test.describe('sin dibujo 3D', () => {
   });
 });
 
-// NFR-01 y NFR-02 de lo que añade este PR. Las pruebas de toda la pantalla
-// (AC-20 a AC-22) van en el último PR de VIC-11.
+// NFR-01 y NFR-02 de añadir y borrar. Las pruebas de toda la pantalla
+// (AC-20 a AC-22) están en accesibilidad.spec.js.
 test('SPEC-CALC-003 NFR-01 añadir, "Quitar" con el foco y "Deshacer" miden al menos 44 × 44 px', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const medir = async (locator, nombre) => {

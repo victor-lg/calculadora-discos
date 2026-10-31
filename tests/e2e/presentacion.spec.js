@@ -270,8 +270,8 @@ test('SPEC-CALC-001/AC-45 con la recta en 8 sin salir del campo, plegar la deja 
   expect(await guardado(page, CLAVE_RECTA)).toBe('8');
 });
 
-// NFR-01 y NFR-02 de lo que añade este PR. Las pruebas de toda la pantalla
-// (AC-20 a AC-22) van en el último PR de VIC-11.
+// NFR-01 y NFR-02 de los controles de arriba. Las pruebas de toda la pantalla
+// (AC-20 a AC-22) están en accesibilidad.spec.js.
 test('SPEC-CALC-003 NFR-01 los controles de arriba miden al menos 44 × 44 px', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await desplegarPaneles(page);
@@ -464,8 +464,8 @@ test('SPEC-CALC-003 NFR-01 las marcas de diferencia miden al menos 44 × 44 px',
 });
 
 // Mide el contraste de cada texto visible de las tarjetas frente a su fondo,
-// con el mismo cálculo que el test de contraste de arriba. AC-21 (PR 4 de
-// VIC-11) medirá la pantalla entera.
+// con el mismo cálculo que el test de contraste de arriba. AC-21 mide la
+// pantalla entera en accesibilidad.spec.js.
 const contrasteTarjetas = (page) => page.evaluate(() => {
   const rgb = (c) => c.match(/[\d.]+/g).map(Number);
   const lum = ([r, g, b]) => {

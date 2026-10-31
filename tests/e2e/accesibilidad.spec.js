@@ -15,7 +15,43 @@ const aviso = (page) => page.locator('#aviso-borrado');
 const deshacer = (page) => page.getByRole('button', { name: 'Deshacer' });
 const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 
+// Contraste de WCAG 2.x, compartido por las medidas de AC-21. Un color con
+// transparencia se compone con lo que tiene debajo, también el fondo: se
+// apilan los fondos de los antecesores hasta llegar a uno opaco.
+function instalarContraste() {
+  const rgba = (c) => {
+    const n = c.match(/[\d.]+/g).map(Number);
+    return n.length === 3 ? [...n, 1] : n;
+  };
+  const sobre = ([r, g, b, a], [fr, fg, fb]) => [r * a + fr * (1 - a), g * a + fg * (1 - a), b * a + fb * (1 - a), 1];
+  const lum = ([r, g, b]) => {
+    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  // El fondo que se ve detrás de `el`, como [r, g, b, 1].
+  const fondo = (el) => {
+    const capas = [];
+    for (let e = el; e; e = e.parentElement) {
+      const c = rgba(getComputedStyle(e).backgroundColor);
+      if (c[3] === 0) continue;
+      capas.push(c);
+      if (c[3] === 1) break;
+    }
+    let base = [255, 255, 255, 1];
+    if (!capas.length || capas.at(-1)[3] !== 1) base = rgba(getComputedStyle(document.documentElement).backgroundColor);
+    if (base[3] !== 1) base = [255, 255, 255, 1];
+    return capas.reverse().reduce((debajo, c) => sobre(c, debajo), base);
+  };
+  // `color` (texto CSS) sobre `debajo` ([r, g, b, 1]).
+  const razon = (color, debajo) => {
+    const [x, y] = [lum(sobre(rgba(color), debajo)), lum(debajo)].sort((m, n) => n - m);
+    return (x + 0.05) / (y + 0.05);
+  };
+  window.contraste = { rgba, sobre, fondo, razon };
+}
+
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(instalarContraste);
   await page.goto('./');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
 });
@@ -86,39 +122,15 @@ test('SPEC-CALC-003/AC-20 a 390 px, todo lo que se puede pulsar mide al menos 44
 // Mide el contraste (WCAG 2.x) de cada texto que se ve, del valor y el marcador
 // de los campos y de los indicadores que no son texto de NFR-02.
 const medirContraste = (page) => page.evaluate(() => {
-  const rgba = (c) => {
-    const n = c.match(/[\d.]+/g).map(Number);
-    return n.length === 3 ? [...n, 1] : n;
-  };
-  const lum = ([r, g, b]) => {
-    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  // Un color con transparencia se mezcla con el fondo que tiene debajo.
-  const sobre = (c, fondo) => {
-    const [r, g, b, a] = rgba(c);
-    const [fr, fg, fb] = rgba(fondo);
-    return [r * a + fr * (1 - a), g * a + fg * (1 - a), b * a + fb * (1 - a)];
-  };
-  const razon = (c, fondo) => {
-    const [x, y] = [lum(sobre(c, fondo)), lum(rgba(fondo))].sort((m, n) => n - m);
-    return (x + 0.05) / (y + 0.05);
-  };
-  const fondo = (el) => {
-    for (let e = el; e; e = e.parentElement) {
-      const c = getComputedStyle(e).backgroundColor;
-      if (rgba(c)[3] !== 0) return c;
-    }
-    return getComputedStyle(document.body).backgroundColor;
-  };
+  const { rgba, sobre, fondo, razon } = window.contraste;
   const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
     && !el.closest('.oculto') && el.getBoundingClientRect().width > 1;
   const esGrande = (s) => parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.66 && Number(s.fontWeight) >= 700);
 
   const fallos = [];
-  let textos = 0;
+  const textos = [];
   const texto = (el, color, s, nombre) => {
-    textos++;
+    textos.push(nombre);
     const r = razon(color, fondo(el));
     if (r < (esGrande(s) ? 3 : 4.5)) fallos.push(`${nombre}: ${r.toFixed(2)}`);
   };
@@ -151,7 +163,7 @@ const medirContraste = (page) => page.evaluate(() => {
     noTexto.push(['pista del interruptor', razon(pista.borderTopColor, alrededor)]);
     // El círculo se distingue de la pista, encendido o apagado.
     noTexto.push(['círculo del interruptor', razon(getComputedStyle(interruptor, '::after').backgroundColor,
-      rgba(pista.backgroundColor)[3] === 0 ? alrededor : pista.backgroundColor)]);
+      sobre(rgba(pista.backgroundColor), alrededor))]);
   }
   // FR-04: un tipo deshabilitado se distingue por su peso tachado y en gris.
   for (const peso of document.querySelectorAll('.disco .peso-disco')) {
@@ -169,25 +181,7 @@ const medirContraste = (page) => page.evaluate(() => {
 // del propio control o de su etiqueta, o el borde que cambia de color en los
 // campos (el peso de trabajo, el peso de la barra y el campo de añadir).
 const medirFoco = (page) => page.evaluate(() => {
-  const rgba = (c) => {
-    const n = c.match(/[\d.]+/g).map(Number);
-    return n.length === 3 ? [...n, 1] : n;
-  };
-  const lum = ([r, g, b]) => {
-    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const razon = (a, b) => {
-    const [x, y] = [lum(rgba(a)), lum(rgba(b))].sort((m, n) => n - m);
-    return (x + 0.05) / (y + 0.05);
-  };
-  const fondo = (el) => {
-    for (let e = el; e; e = e.parentElement) {
-      const c = getComputedStyle(e).backgroundColor;
-      if (rgba(c)[3] !== 0) return c;
-    }
-    return getComputedStyle(document.body).backgroundColor;
-  };
+  const { fondo, razon } = window.contraste;
   const el = document.activeElement;
   const nombre = el.getAttribute('aria-label') || el.labels?.[0]?.textContent.trim() || el.textContent.trim() || el.id;
   const con = [el, el.closest('.segmento, .ficha, .disco')].find((e) => e && getComputedStyle(e).outlineStyle !== 'none');
@@ -229,7 +223,7 @@ test('SPEC-CALC-003/AC-21 contraste de los textos e indicadores en los estados d
   await recorrerEstados(page, async (estado) => {
     const r = await medirContraste(page);
     expect(r.fallos, estado).toEqual([]);
-    expect(r.textos, estado).toBeGreaterThan(15);
+    expect(r.textos.length, estado).toBeGreaterThan(15);
   });
 });
 
@@ -246,10 +240,12 @@ test('SPEC-CALC-003/AC-21 contraste del fondo de borrar antes y después del 35 
   await expect(t).not.toHaveClass(/listo/);
   let r = await medirContraste(page);
   expect(r.fallos, 'antes del 35 %').toEqual([]);
+  expect(r.textos, 'antes del 35 %').toContain('"Borrar"');
   await page.mouse.move(x - caja.width * 0.5, y, { steps: 5 });
   await expect(t).toHaveClass(/listo/);
   r = await medirContraste(page);
   expect(r.fallos, 'después del 35 %').toEqual([]);
+  expect(r.textos, 'después del 35 %').toContain('"Borrar"');
   await page.mouse.move(x, y, { steps: 5 });
   await page.mouse.up();
 });
@@ -426,7 +422,9 @@ test('SPEC-CALC-003/AC-22 al 200 % (195 px), nada se corta ni se solapa ni hay d
   await page.keyboard.press('Escape');
   await trabajo(page).fill('999,99');
   await medir('peso de trabajo de 6 caracteres');
-  await trabajo(page).fill('40');
+  // Con la Z de 8,5 kg, el 70 % de 10 kg (7 kg) no llega a la barra.
+  await trabajo(page).fill('10');
+  await expect(tarjeta(page, 70).locator('.linea')).toHaveText('Solo la barra');
   await medir('"Solo la barra"');
 });
 
