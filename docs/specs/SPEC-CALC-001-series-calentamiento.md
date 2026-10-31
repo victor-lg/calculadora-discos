@@ -2,7 +2,7 @@
 id: SPEC-CALC-001
 titulo: Series de calentamiento con cálculo de discos
 estado: aprobada
-version: 0.7
+version: 0.8
 riesgo: R1
 sustituye: null
 adr: [ADR-0001, ADR-0002, ADR-0004, ADR-0005]
@@ -55,6 +55,10 @@ mismo PR); y tras un fallo al guardar, cada final de edición de un peso reinten
 guardar su valor confirmado, aunque el campo esté vacío o no sea válido. Tras la
 ronda 2 decidió que el resumen y la ficha de la recta y la Z muestran el peso del
 campo mientras es válido y, si no, el confirmado (SPEC-CALC-003 FR-03).
+La versión 0.8 (VIC-11) aclara en FR-04 que un porcentaje se quita desde su serie
+(SPEC-CALC-003 FR-08) y que, mientras la app no muestra series, no se puede quitar
+ninguno. Es una aclaración de Víctor del 2026-10-31, sin reglas nuevas, en el mismo
+PR que SPEC-CALC-003 v0.3. Tras la ronda 1 de G4, AC-46 lo comprueba.
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -124,7 +128,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
     2. con algo que no sean cifras y un separador ("10 0", "100,5,", "abc"): "Escribe el peso solo con cifras y, si hace falta, una coma decimal." (el punto se sigue aceptando como separador);
     3. con un valor de 0 o mayor que 500: "El peso de trabajo debe estar entre 0 y 500 kg.".
 - **FR-04:** los porcentajes de calentamiento forman una lista:
-  - la persona puede añadir y quitar porcentajes en cualquier momento;
+  - la persona puede añadir porcentajes en cualquier momento. Un porcentaje se quita desde su serie (SPEC-CALC-003 FR-08), así que, mientras la app no muestra series, no se puede quitar ninguno;
   - cada uno es un número entero del 1 al 100, escrito solo con cifras: "40,0" se rechaza;
   - los espacios al principio y al final se ignoran, con la misma definición de espacio que en FR-03: " 40 " equivale a 40;
   - si la persona intenta añadir un porcentaje vacío o que solo tiene espacios, la app no añade nada y no muestra ningún mensaje;
@@ -335,6 +339,7 @@ Los AC suponen los 7 tipos de disco habilitados (SPEC-CALC-002) y los collarines
   - con el foco en el peso de trabajo, si la persona escribe "110" y pliega el panel Carga, se guarda "110";
   - con la recta guardada en 7,5 kg y elegida, si la persona cambia su peso a 0,5 y pliega el panel Carga, el campo conserva "0,5", la región de avisos muestra "Revisa el peso de la barra en Carga.", el resumen dice "Barra · Recta 7,5 kg" y la recta sigue guardada en 7,5 kg. Si después elige la Z y vuelve a la recta, el "0,5" se ha descartado y el campo muestra "7,5";
   - con la recta guardada en 7,5 kg y elegida, si la persona cambia su peso a 8 y pliega el panel, el resumen dice "Barra · Recta 8 kg" y la recta queda guardada en 8 kg.
+- **AC-46 → FR-04:** con los porcentajes 40, 70 y 90 y el peso de trabajo vacío, la app no muestra series ni ninguna forma de quitar un porcentaje. Al escribir 100, vuelven las series del 40, 70 y 90 %.
 
 ## 6. Casos límite, errores y decisiones pendientes
 
