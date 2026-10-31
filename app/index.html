@@ -71,7 +71,7 @@
     <section class="plegable" aria-labelledby="titulo-discos">
       <h2 class="cabecera-panel">
         <button id="boton-discos" class="pliegue" type="button" aria-expanded="false" aria-controls="panel-discos">
-          <span class="eyebrow" id="titulo-discos">Mis discos</span>
+          <span class="titulo-panel" id="titulo-discos">Mis discos</span>
           <span class="puntos" id="puntos-discos" aria-hidden="true"></span>
           <span class="cuenta" id="cuenta-discos"></span>
           <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>
@@ -85,15 +85,16 @@
       </div>
     </section>
 
-    <!-- SPEC-CALC-003 FR-05: los avisos generales, en este orden. -->
+    <!-- SPEC-CALC-003 FR-05: los avisos generales, en este orden, con el icono
+         de aviso de la referencia visual (§11). -->
     <div id="avisos" class="avisos" aria-live="polite">
-      <p id="error-trabajo" class="aviso"></p>
-      <p id="indicacion-trabajo" class="aviso"></p>
-      <p id="aviso-peso-barra" class="aviso"></p>
-      <p id="indicacion-porcentajes" class="aviso"></p>
-      <p id="indicacion-discos" class="aviso"></p>
-      <p id="aviso-barra" class="aviso"></p>
-      <p id="aviso-guardado" class="aviso"></p>
+      <p id="error-trabajo" class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg><span class="texto-aviso"></span></p>
+      <p id="indicacion-trabajo" class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg><span class="texto-aviso"></span></p>
+      <p id="aviso-peso-barra" class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg><span class="texto-aviso"></span></p>
+      <p id="indicacion-porcentajes" class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg><span class="texto-aviso"></span></p>
+      <p id="indicacion-discos" class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg><span class="texto-aviso"></span></p>
+      <p id="aviso-barra" class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg><span class="texto-aviso"></span></p>
+      <p id="aviso-guardado" class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg><span class="texto-aviso"></span></p>
     </div>
 
     <!-- SPEC-CALC-003 FR-06 y FR-08: una tarjeta por serie, que se puede borrar.

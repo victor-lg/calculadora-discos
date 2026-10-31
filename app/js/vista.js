@@ -383,6 +383,7 @@ export function modeloVista(estado) {
     discos: DISCOS_CENT.map((cent) => ({
       cent,
       nombre: `${formatearKg(cent)} kg`,
+      peso: formatearKg(cent),
       habilitado: estado.discos.includes(cent),
     })),
     // SPEC-CALC-003 FR-04: el resumen del panel Mis discos.
