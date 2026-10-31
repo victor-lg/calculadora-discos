@@ -131,11 +131,11 @@ function alternarDiferencia(marca, valor) {
 // de la diferencia y el aviso de capacidad.
 function pintarSerie(s) {
   const li = crear('li', 'serie');
-  const texto = crear('div', 'texto');
+  const columna = crear('div', 'texto');
   const cabecera = crear('div', 'cabecera');
   cabecera.append(crear('span', 'porcentaje', s.porcentaje));
-  texto.append(cabecera, crear('span', 'total', s.total));
-  li.append(texto);
+  columna.append(cabecera, crear('span', 'total', s.total));
+  li.append(columna);
   if (s.diferencia) {
     const id = `detalle-${s.valor}`;
     const desplegada = desplegadas.has(s.valor);
@@ -153,7 +153,7 @@ function pintarSerie(s) {
     li.append(detalle);
   }
   // FR-09: sin discos, la línea y su explicación, siempre visible.
-  if (s.linea) texto.append(crear('p', 'linea', s.linea), crear('p', 'explicacion', s.explicacion));
+  if (s.linea) columna.append(crear('p', 'linea', s.linea), crear('p', 'explicacion', s.explicacion));
   if (s.grupos) {
     const discos = crear('ul', 'discos');
     for (const g of s.grupos) {
@@ -167,9 +167,9 @@ function pintarSerie(s) {
       item.append(visible, crear('span', 'oculto', g.anuncio));
       discos.append(item);
     }
-    texto.append(crear('p', 'etiqueta', s.etiquetaDiscos), discos);
+    columna.append(crear('p', 'etiqueta', s.etiquetaDiscos), discos);
   }
-  if (s.collarin) texto.append(crear('p', 'collarin', s.collarin));
+  if (s.collarin) columna.append(crear('p', 'collarin', s.collarin));
   if (s.avisoCapacidad) li.append(crear('p', 'capacidad', s.avisoCapacidad));
   return li;
 }

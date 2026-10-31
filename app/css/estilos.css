@@ -400,7 +400,8 @@ input[aria-invalid="true"] { border-color: var(--rojo); }
   align-items: center;
 }
 .serie:has(> .dibujo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
-.serie p { margin: 0; }
+/* :where() deja la especificidad en la de .serie: los márgenes de cada línea mandan. */
+.serie :where(p) { margin: 0; }
 .serie .texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cabecera { display: flex; align-items: center; gap: 4px; min-height: 44px; }
 .porcentaje { font-family: var(--fuente-num); font-size: 18px; font-weight: 600; color: var(--texto-2); }

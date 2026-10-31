@@ -3,7 +3,7 @@
 // y SPEC-CALC-001 AC-45.
 import { test, expect } from '@playwright/test';
 import {
-  trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar, discosDeSeries,
+  trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar,
 } from './pantalla.js';
 
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
@@ -374,7 +374,7 @@ test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferenci
   await expect(t.locator('.porcentaje')).toHaveText('70 %');
   await expect(t.locator('.total')).toHaveText('72,5 kg');
   await expect(t.locator('.etiqueta')).toHaveText('Por lado');
-  await expect.poll(async () => (await discosDeSeries(page))[1]).toBe('25 + 1,25');
+  await expect(t.locator('.disco-serie')).toHaveText(['25', '1,25']);
   // Cada disco con su punto de color, que es el de su tipo.
   const puntos = t.locator('.discos .punto');
   await expect(puntos).toHaveCount(2);
@@ -383,6 +383,9 @@ test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferenci
 
   const marca = t.getByRole('button', { name: '1 kg menos que el objetivo. Ver detalle' });
   await expect(marca).toHaveText('−1 kg');
+  // Plegada, en gris (--linea).
+  const fondo = () => marca.locator('.pastilla').evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await fondo()).toBe('rgb(43, 47, 53)');
   await expect(marca).toHaveAttribute('aria-expanded', 'false');
   const detalle = t.locator('.detalle');
   await expect(detalle).toBeHidden();
@@ -400,15 +403,16 @@ test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferenci
   expect(cajaDetalle.y).toBeGreaterThanOrEqual(caja.y);
   expect(cajaDetalle.y + cajaDetalle.height).toBeLessThanOrEqual(caja.y + caja.height);
   // La marca toma el color de acento.
-  const fondoMarca = await marca.locator('.pastilla').evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(fondoMarca).toBe('rgb(255, 138, 42)');
+  expect(await fondo()).toBe('rgb(255, 138, 42)');
 
   await marca.click();
   await expect(marca).toHaveAttribute('aria-expanded', 'false');
   await expect(detalle).toBeHidden();
 });
 
-test('SPEC-CALC-003/AC-06 la explicación desplegada sigue abierta al repintar las tarjetas', async ({ page }) => {
+// Decisión de presentación sin AC (FR-06 no dice qué pasa al repintar): la
+// explicación no se cierra por cambios ajenos a la marca.
+test('la explicación desplegada sigue abierta al repintar las tarjetas', async ({ page }) => {
   await trabajo(page).fill('105');
   await tarjeta(page, 70).locator('.diferencia').click();
   await page.getByRole('button', { name: 'Quitar 40 %' }).click();
