@@ -22,6 +22,14 @@ const FICHEROS = [
   'iconos/icono-180.png',
   'iconos/icono-192.png',
   'iconos/icono-512.png',
+  'fuentes/OFL.txt',
+  'fuentes/barlow-latin-400-normal.woff2',
+  'fuentes/barlow-latin-500-normal.woff2',
+  'fuentes/barlow-latin-600-normal.woff2',
+  'fuentes/barlow-semi-condensed-latin-500-normal.woff2',
+  'fuentes/barlow-semi-condensed-latin-600-normal.woff2',
+  'fuentes/barlow-semi-condensed-latin-700-normal.woff2',
+  'fuentes/barlow-semi-condensed-latin-800-normal.woff2',
 ];
 
 self.addEventListener('install', (event) => {

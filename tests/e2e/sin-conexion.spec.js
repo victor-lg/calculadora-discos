@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test';
 import {
   trabajo, pesoBarra, barra, desplegarPaneles, discosDeSeries, anadirPorcentaje, quitarSerie,
+  cargarFuentes, FUENTES_CARGADAS,
 } from './pantalla.js';
 import { readFileSync } from 'node:fs';
 import { arrancar } from './servidor.js';
@@ -135,6 +136,8 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
   await page.goto(servidor.base);
   await expect(page.getByRole('heading', { name: 'Series de calentamiento' })).toBeVisible();
   expect(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  // SPEC-CALC-003 §11 (AC-24): también las fuentes salen de la caché.
+  expect(await cargarFuentes(page)).toEqual(FUENTES_CARGADAS);
 
   await trabajo(page).fill('100');
   await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '70 %', '90 %']);

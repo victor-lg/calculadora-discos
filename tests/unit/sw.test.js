@@ -84,8 +84,8 @@ test('SPEC-CALC-001/AC-13 la CSP es la acordada y va la primera en el head', () 
   assert.equal(
     head,
     '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; connect-src \'self\'; '
-      + 'script-src \'self\'; style-src \'self\'; img-src \'self\'; manifest-src \'self\'; '
-      + 'worker-src \'self\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'">',
+      + 'script-src \'self\'; style-src \'self\'; img-src \'self\'; font-src \'self\'; '
+      + 'manifest-src \'self\'; worker-src \'self\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'">',
   );
   assert.equal(html.match(/Content-Security-Policy/g).length, 1);
 });

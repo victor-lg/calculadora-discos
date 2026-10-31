@@ -2,6 +2,61 @@
    visual (docs/diseno/notas-diseno-interfaz.md §3.6). NFR-02 manda sobre ella:
    --borde-campo sustituye a --linea donde hace falta 3:1 (bordes de campos,
    interruptores y su línea inferior). */
+/* SPEC-CALC-003 §11: las fuentes se sirven desde la propia app, nunca de
+   terceros. Copias del subconjunto latino de @fontsource/barlow y
+   @fontsource/barlow-semi-condensed 5.3.0, con licencia OFL (fuentes/OFL.txt).
+   Barlow para la interfaz (400–600) y Barlow Semi Condensed para los números
+   (500–800), como en la referencia visual §3.6. */
+@font-face {
+  font-family: "Barlow";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fuentes/barlow-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fuentes/barlow-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fuentes/barlow-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fuentes/barlow-semi-condensed-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fuentes/barlow-semi-condensed-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fuentes/barlow-semi-condensed-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../fuentes/barlow-semi-condensed-latin-800-normal.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
   --fondo: #0d0e10;

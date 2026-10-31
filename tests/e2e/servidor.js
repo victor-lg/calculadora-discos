@@ -15,6 +15,8 @@ const TIPOS = {
   '.css': 'text/css; charset=utf-8',
   '.webmanifest': 'application/manifest+json',
   '.png': 'image/png',
+  '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
 };
 
 function leerCuerpo(peticion) {
