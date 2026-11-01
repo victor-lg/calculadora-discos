@@ -356,15 +356,17 @@ function enlazarGesto(item, tarjeta, quitar, valor) {
 // "Reducir movimiento", se borra sin más. Si la salida no termina, se sigue
 // igual.
 function salir(item, tarjeta, valor, opciones) {
-  const datos = { ...opciones, turno: nuevoTurno() };
+  const datos = { ...opciones, turno: nuevoTurno(), item };
   item.classList.add('arrastra', 'listo');
   if (sinMovimiento()) {
     borrar(valor, datos);
     return;
   }
   const cerrar = () => cerrarHueco(item, () => borrar(valor, datos));
-  // Mientras sale, la tarjeta ya no se puede tocar ni enfocar.
+  // Mientras sale, la tarjeta ya no se puede tocar ni enfocar, y si algo
+  // repinta las tarjetas, se conserva tal cual (pintar).
   item.inert = true;
+  saliendo.set(valor, item);
   tarjeta.classList.add('sale');
   tarjeta.style.transform = `translateX(${-tarjeta.getBoundingClientRect().width}px)`;
   tarjeta.addEventListener('transitionend', (e) => {
@@ -410,6 +412,8 @@ function revisarPlazo() {
 // el aviso del último.
 let turnos = 0;
 let ultimoTurno = 0;
+// Las tarjetas que están saliendo, por porcentaje, hasta que se borran.
+const saliendo = new Map();
 const nuevoTurno = () => {
   turnos += 1;
   return turnos;
@@ -417,8 +421,9 @@ const nuevoTurno = () => {
 
 // FR-08: borra la serie y muestra el aviso, con un plazo nuevo. Tras borrar con
 // el botón "Quitar", el foco pasa a "Deshacer".
-function borrar(valor, { foco = false, turno }) {
+function borrar(valor, { foco = false, turno, item }) {
   ocultarQuitar();
+  if (saliendo.get(valor) === item) saliendo.delete(valor);
   const indice = estado.porcentajes.indexOf(valor);
   // Si el porcentaje ya no está en la lista, no hay nada que borrar.
   if (indice === -1) return;
@@ -430,9 +435,13 @@ function borrar(valor, { foco = false, turno }) {
   const nuevo = borrarSerie(estado, valor);
   anularPlazo();
   plazo = { vence: Date.now() + PLAZO_AVISO_MS, reloj: null };
+  // Mientras la tarjeta salía, el foco quedó en ella o en la página; si la
+  // persona lo ha llevado a otro sitio, no se mueve.
+  const activo = document.activeElement;
+  const sinMover = !activo || activo === document.body || item?.contains(activo);
   actualizar(nuevo);
   revisarPlazo();
-  if (foco) $('deshacer').focus();
+  if (foco && sinMover) $('deshacer').focus();
 }
 
 // La parte de arriba se actualiza en su sitio, sin reconstruir ningún control:
@@ -504,7 +513,8 @@ function pintar() {
   const firma = JSON.stringify(v.series);
   if (firma !== seriesPintadas) {
     seriesPintadas = firma;
-    $('series').replaceChildren(...v.series.map(pintarSerie));
+    // FR-08: la tarjeta que está saliendo sigue su salida, sin reaparecer.
+    $('series').replaceChildren(...v.series.map((s) => saliendo.get(s.valor) ?? pintarSerie(s)));
   }
 }
 

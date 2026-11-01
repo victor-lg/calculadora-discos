@@ -247,11 +247,24 @@ test('SPEC-CALC-003/AC-13 al borrar el 70 y después el 40, "Deshacer" recupera 
 
 // FR-08: pulsar "Quitar" en otra tarjeta mientras la primera aún sale. El
 // último borrado es el que se pidió el último, aunque su tarjeta acabe antes.
+// Si algo repinta las tarjetas mientras una sale (aquí, el final del otro
+// borrado), esa tarjeta sigue saliendo: no reaparece ni se puede tocar.
 test('SPEC-CALC-003/AC-13 al quitar el 70 y enseguida el 40, el aviso es del 40 y "Deshacer" recupera solo el 40', async ({ page }) => {
+  await page.evaluate(() => {
+    window.reaparece = [];
+    const series = document.getElementById('series');
+    new MutationObserver(() => {
+      for (const li of series.children) {
+        const porcentaje = li.querySelector('.porcentaje').textContent;
+        if (['40 %', '70 %'].includes(porcentaje) && !(li.inert && li.classList.contains('listo'))) window.reaparece.push(porcentaje);
+      }
+    }).observe(series, { childList: true });
+  });
   await botonQuitar(page, 70).press('Enter');
   await botonQuitar(page, 40).press('Enter');
   await expect(porcentajesDeSeries(page)).toHaveText(['90 %']);
   await expect(aviso(page)).toContainText('Serie del 40 % borrada');
+  expect(await page.evaluate(() => window.reaparece)).toEqual([]);
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
 });
@@ -259,105 +272,129 @@ test('SPEC-CALC-003/AC-13 al quitar el 70 y enseguida el 40, el aviso es del 40 
 // SPEC-CALC-003 §10: los plazos del aviso se prueban con un reloj controlado,
 // parado. Con él, los temporizadores de la salida de la tarjeta tampoco corren
 // solos: tras pulsar "Quitar" se avanza el reloj hasta que termina, como mucho
-// SALIDA_MS + CIERRE_MS de app.js (la animación dura 200 + 260 ms). Desde ahí
-// se cuentan los tiempos de AC-13: si la animación termina antes, el aviso
-// lleva visible algo más, nunca menos.
+// SALIDA_MS + CIERRE_MS de app.js (la animación dura 200 + 260 ms). Las
+// transiciones CSS sí corren con el tiempo real y pueden terminarla antes, así
+// que se anota la hora del reloj en que aparece cada aviso y los tiempos de
+// AC-13 se cuentan desde ella.
 const ANIMACION_MS = 400 + 450;
+
+async function pararReloj(page) {
+  await page.clock.install();
+  await page.reload();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await page.evaluate(() => {
+    const avisoBorrado = document.getElementById('aviso-borrado');
+    let texto = null;
+    new MutationObserver(() => {
+      const ahora = avisoBorrado.hidden ? null : avisoBorrado.textContent;
+      if (ahora && ahora !== texto) window.avisoAparecio = Date.now();
+      texto = ahora;
+    }).observe(avisoBorrado, { subtree: true, childList: true, characterData: true, attributes: true });
+  });
+}
+
+// Quita la serie con su botón, avanza el reloj hasta el final de la salida y
+// comprueba que aparece su aviso.
+async function borrarConReloj(page, porcentaje) {
+  await botonQuitar(page, porcentaje).press('Enter');
+  await page.clock.runFor(ANIMACION_MS);
+  await expect(aviso(page)).toContainText(`Serie del ${porcentaje} % borrada`);
+}
+
+// La hora del reloj `ms` después de que apareciera el último aviso.
+const desdeAviso = (page, ms) => page.evaluate((x) => window.avisoAparecio + x, ms);
+
+// Avanza el reloj hasta `ms` después de que apareciera el último aviso.
+async function hasta(page, ms) {
+  const objetivo = await desdeAviso(page, ms);
+  await page.clock.runFor(objetivo - await page.evaluate(() => Date.now()));
+}
 
 test.describe('SPEC-CALC-003/AC-13 el plazo de 5 s del aviso', () => {
   test.beforeEach(async ({ page }) => {
-    await page.clock.install();
-    await page.reload();
-    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+    await pararReloj(page);
   });
 
-  // Quita la serie con su botón, avanza el reloj hasta el final de la salida y
-  // comprueba que aparece su aviso.
-  async function borrar(page, porcentaje) {
-    await botonQuitar(page, porcentaje).press('Enter');
-    await page.clock.runFor(ANIMACION_MS);
-    await expect(aviso(page)).toContainText(`Serie del ${porcentaje} % borrada`);
-  }
-
-  // La app pasa a segundo plano y vuelve `ms` después, avisando con `regreso`
-  // ('visibilitychange', o 'pageshow', lo que llega en iOS al volver a una PWA
-  // desde la caché). Mientras, como en iOS, sus temporizadores no corren: solo
-  // cambia la hora (setSystemTime no dispara ninguno).
+  // La app pasa a segundo plano y vuelve `ms` después de que apareciera el
+  // aviso, avisando con `regreso` ('visibilitychange', o 'pageshow', lo que
+  // llega en iOS al volver a una PWA desde la caché). Mientras, como en iOS,
+  // sus temporizadores no corren: solo cambia la hora (setSystemTime no
+  // dispara ninguno).
   async function segundoPlano(page, ms, regreso) {
     const visibilidad = (estado) => Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => estado });
     await page.evaluate(`(${visibilidad})('hidden'); document.dispatchEvent(new Event('visibilitychange'));`);
-    await page.clock.setSystemTime(await page.evaluate(() => Date.now()) + ms);
+    await page.clock.setSystemTime(await desdeAviso(page, ms));
     await page.evaluate(`(${visibilidad})('visible');`);
     if (regreso === 'pageshow') await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
     else await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   }
 
   test('a los 4 s sigue y "Deshacer" recupera; a los 5 s desaparece sin "Deshacer"', async ({ page }) => {
-    await borrar(page, 70);
-    await page.clock.runFor(4000);
+    await borrarConReloj(page, 70);
+    await hasta(page, 4000);
     await expect(aviso(page)).toBeVisible();
     await deshacer(page).click();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
 
-    await borrar(page, 70);
-    await page.clock.runFor(4000);
+    await borrarConReloj(page, 70);
+    await hasta(page, 4999);
     await expect(aviso(page)).toBeVisible();
-    await page.clock.runFor(1000);
+    await hasta(page, 5000);
     await expect(aviso(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
     await expect(deshacer(page)).toHaveCount(0);
   });
 
   test('añadir el 50 a los 3 s no reinicia el plazo: a los 5 s desaparece', async ({ page }) => {
-    await borrar(page, 70);
-    await page.clock.runFor(3000);
+    await borrarConReloj(page, 70);
+    await hasta(page, 3000);
     await anadirPorcentaje(page, '50');
+    await hasta(page, 4999);
     await expect(aviso(page)).toBeVisible();
-    await page.clock.runFor(2000);
+    await hasta(page, 5000);
     await expect(aviso(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '90 %']);
   });
 
   test('borrar el 40 a los 3 s empieza un plazo nuevo', async ({ page }) => {
-    await borrar(page, 70);
-    await page.clock.runFor(3000);
-    await borrar(page, 40);
-    await page.clock.runFor(4000);
+    await borrarConReloj(page, 70);
+    await hasta(page, 3000);
+    await borrarConReloj(page, 40);
+    await hasta(page, 4999);
     await expect(aviso(page)).toContainText('Serie del 40 % borrada');
-    await page.clock.runFor(1000);
+    await hasta(page, 5000);
     await expect(aviso(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['90 %']);
   });
 
   test('"Deshacer" a los 2 s anula el plazo: el borrado del 40 1 s después dura 5 s', async ({ page }) => {
-    await borrar(page, 70);
-    await page.clock.runFor(2000);
+    await borrarConReloj(page, 70);
+    await hasta(page, 2000);
     await deshacer(page).click();
     await expect(aviso(page)).toBeHidden();
     await page.clock.runFor(1000);
-    await borrar(page, 40);
-    await page.clock.runFor(4000);
+    await borrarConReloj(page, 40);
+    await hasta(page, 4999);
     await expect(aviso(page)).toContainText('Serie del 40 % borrada');
-    await page.clock.runFor(1000);
+    await hasta(page, 5000);
     await expect(aviso(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['70 %', '90 %']);
   });
 
   for (const regreso of ['visibilitychange', 'pageshow']) {
     test(`en segundo plano cuenta el tiempo real, al volver con ${regreso}`, async ({ page }) => {
-      await borrar(page, 70);
+      await borrarConReloj(page, 70);
       await segundoPlano(page, 10_000, regreso);
       await expect(aviso(page)).toBeHidden();
       await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
       await expect(deshacer(page)).toHaveCount(0);
 
-      await borrar(page, 40);
+      await borrarConReloj(page, 40);
       await segundoPlano(page, 3000, regreso);
       await expect(aviso(page)).toContainText('Serie del 40 % borrada');
-      // 4 s después de aparecer, sigue; a los 5 s, desaparece.
-      await page.clock.runFor(1000);
+      await hasta(page, 4999);
       await expect(aviso(page)).toBeVisible();
-      await page.clock.runFor(1000);
+      await hasta(page, 5000);
       await expect(aviso(page)).toBeHidden();
       await expect(porcentajesDeSeries(page)).toHaveText(['90 %']);
     });
@@ -365,20 +402,38 @@ test.describe('SPEC-CALC-003/AC-13 el plazo de 5 s del aviso', () => {
 });
 
 // FR-08: el plazo no se detiene con el foco en el aviso; al desaparecer, el
-// foco pasa a "+ Añadir porcentaje".
+// foco pasa a "+ Añadir porcentaje" o, si está abierto, al campo de añadir.
 test('SPEC-CALC-003/AC-12 con el foco en "Deshacer", a los 5 s el aviso desaparece y el foco pasa a añadir', async ({ page }) => {
-  await page.clock.install();
-  await page.reload();
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
-  await botonQuitar(page, 70).press('Enter');
-  await page.clock.runFor(ANIMACION_MS);
+  await pararReloj(page);
+  await borrarConReloj(page, 70);
   await expect(deshacer(page)).toBeFocused();
-  await page.clock.runFor(4000);
+  await hasta(page, 4999);
   await expect(deshacer(page)).toBeFocused();
-  await page.clock.runFor(1000);
+  await hasta(page, 5000);
   await expect(aviso(page)).toBeHidden();
   await expect(abrir(page)).toBeFocused();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+});
+
+test('SPEC-CALC-003/AC-12 con el campo de añadir abierto, a los 5 s el foco pasa del aviso al campo', async ({ page }) => {
+  await pararReloj(page);
+  await abrir(page).click();
+  await campo(page).pressSequentially('0');
+  await borrarConReloj(page, 90);
+  await expect(error(page)).toBeVisible();
+  await expect(deshacer(page)).toBeFocused();
+  await hasta(page, 5000);
+  await expect(aviso(page)).toBeHidden();
+  await expect(campo(page)).toBeFocused();
+});
+
+// FR-08: si mientras la tarjeta sale la persona lleva el foco a otro sitio, el
+// foco no pasa a "Deshacer" al aparecer el aviso.
+test('SPEC-CALC-003/AC-12 si tras "Quitar" el foco va al peso de trabajo, se queda allí', async ({ page }) => {
+  await botonQuitar(page, 70).press('Enter');
+  await trabajo(page).focus();
+  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
+  await expect(trabajo(page)).toBeFocused();
 });
 
 test('SPEC-CALC-003/AC-13 activar los collarines cierra el aviso y la lista sigue sin el 70', async ({ page }) => {

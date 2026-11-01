@@ -81,6 +81,7 @@ export async function anadirPorcentaje(page, texto) {
 export const botonQuitar = (page, porcentaje) => page.getByRole('button', { name: `Quitar la serie del ${porcentaje} %` });
 export async function quitarSerie(page, porcentaje) {
   await botonQuitar(page, porcentaje).press('Enter');
+  await expect(botonQuitar(page, porcentaje)).toHaveCount(0);
   await expect(page.locator('#texto-borrado')).toHaveText(`Serie del ${porcentaje} % borrada`);
 }
 
