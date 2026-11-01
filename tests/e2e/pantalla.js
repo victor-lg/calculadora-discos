@@ -1,4 +1,5 @@
 // Localizadores de la pantalla de SPEC-CALC-003 que comparten los E2E.
+import { expect } from '@playwright/test';
 
 export const trabajo = (page) => page.getByLabel('Peso de trabajo', { exact: true });
 export const pesoBarra = (page) => page.getByLabel('Peso de la barra', { exact: true });
@@ -74,14 +75,24 @@ export async function anadirPorcentaje(page, texto) {
 }
 
 // FR-08: el botón "Quitar la serie del P %", que solo se ve con el foco. Se
-// activa con el teclado.
+// activa con el teclado. La tarjeta sale de lado y cierra su hueco antes de
+// borrarse, así que quitarSerie espera a su aviso. Con el reloj controlado,
+// sus temporizadores no corren solos: se usa botonQuitar y se avanza el reloj.
 export const botonQuitar = (page, porcentaje) => page.getByRole('button', { name: `Quitar la serie del ${porcentaje} %` });
-export const quitarSerie = (page, porcentaje) => botonQuitar(page, porcentaje).press('Enter');
+export async function quitarSerie(page, porcentaje) {
+  await botonQuitar(page, porcentaje).press('Enter');
+  await expect(page.locator('#texto-borrado')).toHaveText(`Serie del ${porcentaje} % borrada`);
+}
 
-// FR-08: borra todas las series que se ven.
+// FR-08: borra todas las series que se ven. Cada tarjeta sale de lado y cierra
+// su hueco antes de borrarse, así que se espera a que se vaya antes de pasar a
+// la siguiente.
 export async function quitarTodas(page) {
   const botones = page.getByRole('button', { name: /^Quitar la serie del / });
-  while (await botones.count()) await botones.first().press('Enter');
+  for (let quedan = await botones.count(); quedan > 0; quedan -= 1) {
+    await botones.first().press('Enter');
+    await expect(botones).toHaveCount(quedan - 1);
+  }
 }
 
 // FR-08: desliza con el puntero la tarjeta hacia la izquierda una fracción de
