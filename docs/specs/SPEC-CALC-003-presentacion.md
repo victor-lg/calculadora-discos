@@ -2,7 +2,7 @@
 id: SPEC-CALC-003
 titulo: Presentación de la calculadora
 estado: aprobada
-version: 0.3
+version: 0.4
 riesgo: R1
 sustituye: null
 adr: [ADR-0001, ADR-0003, ADR-0005]
@@ -36,7 +36,8 @@ como alternativa al gesto de borrar (FR-08, WCAG 2.5.7). Son propuestas de Claud
 los 500 ms de la pulsación larga, a quién pasa el foco (FR-08, FR-09) y cómo
 reaparecen las series (FR-10).
 Tras la ronda 3 de G4 (2026-10-26), Víctor decidió que el aviso de "Deshacer" no
-tiene plazo y dura hasta la siguiente acción (FR-08, WCAG 2.2.1). El resto de
+tiene plazo y dura hasta la siguiente acción (FR-08, WCAG 2.2.1; sustituida en
+v0.4). El resto de
 los cambios de esa ronda son aclaraciones, sin otra ronda de revisión.
 La versión 0.2 (VIC-13) solo cambia el peso de la recta y la Z en el resumen de
 Carga y en sus fichas (FR-03, AC-03): el del campo mientras es válido y, si no, el
@@ -51,6 +52,17 @@ aviso abierto y después pulsa "Deshacer". Es una aclaración de Víctor del
 2026-10-31, sin reglas nuevas, en el mismo PR que SPEC-CALC-001 v0.8. Tras la
 ronda 1 de G4, FR-08 da la lista de acciones que cierran el aviso como cerrada y
 AC-13 comprueba que el aviso sigue visible después de añadir.
+La versión 0.4 (VIC-14) da al aviso de "Deshacer" un plazo de 5 s, como en la
+maqueta (FR-08, AC-12, AC-13), y anota en §11 la excepción a WCAG 2.2.1. Lo
+decidió Víctor el 2026-10-31, porque es el único usuario de la app; sustituye la
+decisión de la ronda 3 de G4 del PR #16. Las acciones de FR-08 lo siguen cerrando
+antes y añadir un porcentaje sigue sin cerrarlo. Son propuestas de Claude, para
+revisar en el PR, que añadir no reinicie el plazo, que un borrado nuevo lo
+reinicie (como en la maqueta), que no se detenga con el foco en el aviso y que
+cuente el tiempo real, también con la app en segundo plano. Tras la ronda 1 de
+G4, sin otra ronda: cerrar el aviso por cualquier causa anula su plazo, los
+tiempos se cuentan desde que aparece el aviso y con un reloj controlado en los
+tests, AC-13 comprueba el segundo plano y §11 nombra a VoiceOver en la excepción.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -142,11 +154,11 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - la referencia visual (escena, medidas de discos, barras, máquina y collarín) es la de §11.
 - **FR-08:** borrar una serie:
   - la persona desliza la tarjeta hacia la izquierda; deslizar en vertical sigue desplazando la página. Mientras arrastra, debajo aparece un fondo con "Borrar" en rojo claro sobre un granate tenue; pasado el 35 % del ancho de la tarjeta, el fondo pasa a rojo vivo, el texto a blanco y el icono crece;
-  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso no tiene plazo: dura hasta que la persona borre otra serie, teclee en un peso o cambie el modo, la barra, los collarines o los discos habilitados, o hasta que pulse "Deshacer". Ninguna otra acción lo cierra; en particular, añadir un porcentaje no lo cierra. Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
+  - si la suelta pasado el 35 %, la tarjeta sale de lado, su hueco se cierra, se quita el porcentaje de la lista (SPEC-CALC-001 FR-04) y aparece el aviso "Serie del P % borrada" con el botón "Deshacer". El aviso desaparece solo 5 s después de aparecer. Se cierra antes si la persona borra otra serie, teclea en un peso o cambia el modo, la barra, los collarines o los discos habilitados, o si pulsa "Deshacer". Ninguna otra acción lo cierra ni reinicia el plazo; en particular, añadir un porcentaje no lo hace. Al cerrarse el aviso por cualquier causa, su plazo se anula y no afecta a un aviso posterior. El plazo no se detiene con el foco en el aviso y cuenta el tiempo real, también con la app en segundo plano: si al volver han pasado 5 s, el aviso ya no está (excepción a WCAG 2.2.1 de §11). Se anuncia a los lectores de pantalla y no tapa el botón "+ Añadir porcentaje";
   - si la suelta sin pasar el 35 %, la tarjeta vuelve a su sitio y la lista no cambia;
   - cada tarjeta tiene un botón "Quitar la serie del P %", que hace lo mismo que el gesto, aviso incluido. Está oculto a la vista salvo cuando recibe el foco o cuando la persona mantiene pulsada la tarjeta 500 ms sin moverla; así se puede borrar con un toque, sin arrastrar (WCAG 2.5.7). Si el dedo se mueve antes de los 500 ms, es el gesto de deslizar; si se mueve después, no pasa nada más. Al soltar tras la pulsación larga, no se activa nada de la tarjeta (ni la marca de diferencia), y durante la pulsación no aparecen la selección de texto ni el menú del sistema. Mostrado por la pulsación larga, se oculta al tocar fuera de él;
   - tras borrar con este botón, el foco pasa a "Deshacer". Si el foco sigue en el aviso cuando desaparece o cuando se pulsa "Deshacer", pasa al botón "+ Añadir porcentaje" o, si el campo de añadir está abierto, a ese campo. Si la persona ha llevado el foco a otro sitio, no se mueve;
-  - "Deshacer" vuelve a poner el porcentaje en la lista, en su orden. Si ese porcentaje ya está otra vez en la lista, "Deshacer" no añade nada. Al pulsarlo, el aviso se cierra. Solo se puede deshacer el último borrado: un borrado nuevo sustituye el aviso anterior. Cuando el aviso desaparece, ya no se puede deshacer.
+  - "Deshacer" vuelve a poner el porcentaje en la lista, en su orden. Si ese porcentaje ya está otra vez en la lista, "Deshacer" no añade nada. Al pulsarlo, el aviso se cierra. Solo se puede deshacer el último borrado: un borrado nuevo sustituye el aviso anterior y empieza un plazo de 5 s nuevo. Cuando el aviso desaparece, ya no se puede deshacer.
 - **FR-09:** añadir una serie:
   - al pulsar "+ Añadir porcentaje", un botón con el borde discontinuo y a todo el ancho, se convierte en un campo con "Porcentaje" como texto de ayuda, "%" pegado a la cifra, un botón "✕", anunciado como "Cancelar", y un botón "Añadir";
   - el campo abre el teclado numérico, sin coma, y no deja teclear más de 3 caracteres. Un texto pegado más largo no se recorta: se conserva entero y se valida (SPEC-CALC-001 FR-04);
@@ -200,12 +212,17 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
   - un 20 % del ancho y soltar: la tarjeta vuelve a su sitio y siguen las tres series;
   - un 50 % del ancho y soltar: la tarjeta desaparece, la lista es 40 y 90 y aparece "Serie del 70 % borrada" con "Deshacer". Al pulsar "Deshacer", vuelve la tarjeta del 70 % entre la del 40 y la del 90 y el aviso se cierra;
   - mantener pulsada la tarjeta del 70 % 500 ms sin moverla muestra "Quitar la serie del 70 %"; al tocarlo se borra la serie, con el mismo aviso. Si en vez de eso se toca fuera, el botón se oculta y la lista no cambia.
-- **AC-12 → FR-08:** con el teclado, al llevar el foco al botón "Quitar la serie del 70 %", el botón se ve; al activarlo, se borra la serie, aparece el mismo aviso y el foco pasa a "Deshacer", que la recupera; entonces el foco pasa a "+ Añadir porcentaje". Si tras borrar la persona lleva el foco al peso de trabajo y escribe 105, el aviso desaparece y el foco sigue en el peso de trabajo.
-- **AC-13 → FR-08:** "Deshacer" no duplica ni recupera de más:
+- **AC-12 → FR-08:** con el teclado, al llevar el foco al botón "Quitar la serie del 70 %", el botón se ve; al activarlo, se borra la serie, aparece el mismo aviso y el foco pasa a "Deshacer", que la recupera; entonces el foco pasa a "+ Añadir porcentaje". Si tras borrar la persona lleva el foco al peso de trabajo y escribe 105, el aviso desaparece y el foco sigue en el peso de trabajo. Si tras borrar con el botón el foco se queda en "Deshacer", a los 5 s el aviso desaparece y el foco pasa a "+ Añadir porcentaje".
+- **AC-13 → FR-08:** "Deshacer" no duplica ni recupera de más, y el aviso dura 5 s. Los tiempos se cuentan desde que aparece el último aviso, y los puntos sin tiempo ocurren antes de los 5 s:
   - al borrar el 70 % y añadir 70, el aviso y "Deshacer" siguen visibles; al pulsar "Deshacer", la lista es 40, 70 y 90, con un solo 70;
   - al borrar el 70 % y añadir 50, el aviso sigue visible y "Deshacer" recupera el 70: la lista es 40, 50, 70 y 90;
   - al borrar el 70 % y después el 40 %, el aviso dice "Serie del 40 % borrada" y "Deshacer" recupera solo el 40;
-  - al borrar el 70 % y esperar un minuto sin hacer nada, el aviso sigue visible y "Deshacer" lo recupera;
+  - al borrar el 70 % y esperar 4 s sin hacer nada, el aviso sigue visible y "Deshacer" lo recupera;
+  - al borrar el 70 % y esperar 5 s sin hacer nada, el aviso desaparece, la lista sigue siendo 40 y 90 y no queda ningún "Deshacer";
+  - al borrar el 70 %, esperar 3 s, añadir 50 y esperar otros 2 s, el aviso desaparece y la lista es 40, 50 y 90;
+  - al borrar el 70 %, esperar 3 s y borrar el 40 %, el aviso "Serie del 40 % borrada" sigue visible 4 s después de aparecer y desaparece a los 5 s;
+  - al borrar el 70 %, pulsar "Deshacer" a los 2 s y borrar el 40 % 1 s después, el aviso "Serie del 40 % borrada" sigue visible 4 s después de aparecer y desaparece a los 5 s;
+  - al borrar el 70 % y pasar la app a segundo plano: si vuelve a los 10 s, el aviso ya no está y la lista es 40 y 90; si vuelve a los 3 s, el aviso sigue visible y desaparece 2 s después;
   - al borrar el 70 % y activar los collarines, el aviso desaparece y la lista sigue siendo 40 y 90.
 - **AC-14 → FR-09:** al pulsar "+ Añadir porcentaje", aparece el campo con "Porcentaje", "%", "✕" y "Añadir", que no deja teclear más de 3 caracteres y pide el teclado numérico. Cada punto parte de ese estado:
   - al escribir 50 y pulsar Intro, la lista es 40, 50, 70 y 90, el campo se cierra y el foco está en "+ Añadir porcentaje";
@@ -231,6 +248,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 - **AC-24 → FR-01, FR-02, FR-06, FR-07, FR-08, FR-10, FR-11, FR-13, FR-15, NFR-03:** en el iPhone, registrado en el PR con la versión de iOS:
   - el gesto de borrar funciona con el dedo, con su umbral, sin chocar con el gesto de volver del sistema, y la pulsación larga muestra "Quitar" sin seleccionar texto;
   - con el campo de añadir abierto y "5" escrito, pasar a otra app y volver no añade nada;
+  - tras borrar una serie, pasar a otra app y volver pasados 10 s, el aviso de "Deshacer" ya no está (FR-08);
   - la animación se ve y desaparece con "Reducir movimiento";
   - tras dejar la app un rato en segundo plano y volver, los dibujos se ven bien;
   - con la app abierta en Safari y el zoom de página al 200 %, se cumple AC-22;
@@ -243,7 +261,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 - **Casos límite y errores:**
   - varios avisos generales a la vez: se muestran todos, en el orden de FR-05 (AC-05);
   - deslizar sin pasar el umbral: la tarjeta vuelve y no se borra nada (AC-11);
-  - deshacer cuando el porcentaje ya volvió a la lista o tras otro borrado: no se duplica nada; el aviso no tiene plazo, se cierra solo con las acciones de FR-08 y añadir un porcentaje no lo cierra (AC-13);
+  - deshacer cuando el porcentaje ya volvió a la lista o tras otro borrado: no se duplica nada; el aviso desaparece a los 5 s o antes con las acciones de FR-08, y añadir un porcentaje no lo cierra ni reinicia el plazo (AC-13);
   - confirmar con "Añadir" o con Intro, que a la vez quitan el foco al campo: se añade una sola vez (AC-14);
   - perder el foco con un porcentaje vacío, no válido o repetido: se cierra sin mensaje, o se queda abierto con el error (AC-14);
   - más discos de los que caben: se dibujan los que caben y la etiqueta cita solo esos (AC-10);
@@ -269,8 +287,9 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 
 ## 11. Dependencias y restricciones
 
+- **Excepción aceptada a WCAG 2.2.1 (tiempo ajustable):** el aviso de "Deshacer" desaparece a los 5 s (FR-08) y la persona no puede detener, ampliar ni desactivar ese plazo. Con VoiceOver o con Control por botón, puede no dar tiempo a llegar a "Deshacer". Víctor la acepta porque es el único usuario de la app. Si la app llega a tener más usuarios, esta excepción se revisa.
 - Las reglas y los textos de las series vienen de SPEC-CALC-001 v0.8 y SPEC-CALC-002 v0.3. Esta spec no los cambia.
 - La tecnología del dibujo la fija ADR-0003, que modifica la regla de "cero dependencias en tiempo de ejecución" de ADR-0001 §3.1. Esta spec no se fusiona antes que ADR-0003.
 - Todo lo que usa la presentación (fuentes, librería 3D e iconos) se sirve desde el propio origen de la app, sin red de terceros (SPEC-CALC-001 NFR-01 y NFR-02, ADR-0001 §3.4).
 - **Referencia visual:** `docs/diseno/maqueta-interfaz.html`, `docs/diseno/discos-3d.html` (banco del modelado) y `docs/diseno/notas-diseno-interfaz.md` §3.2, §3.6, §4 y §6 (iconos, colores, tipografía, radios, márgenes, escena, medidas IPF de los discos, barras, máquina, collarín y duraciones). Son la referencia que acepta Víctor en la prueba manual (AC-24), no requisitos con AC propio. Donde la maqueta contradiga SPEC-CALC-001, SPEC-CALC-002 o esta spec (por ejemplo, en el contraste de NFR-02, en cómo elige los discos, en qué guarda, en que reescribe lo tecleado en el campo de porcentaje o en que no tiene pulsación larga), mandan las specs. Sus fuentes y three.js se cargan de terceros; eso no pasa a la app.
-- **Pruebas:** la lógica, con tests unitarios; los AC de esta spec, salvo AC-23 y AC-24, con E2E de Playwright, sin comparar el dibujo píxel a píxel: basta con que haya dibujo, que su etiqueta sea la correcta y que su estado observable (FR-16) sea el esperado. AC-23 y AC-24 son pruebas manuales en el iPhone. Los AC del dibujo (AC-09, AC-10, AC-15 a AC-17 y AC-19) solo cuentan en un navegador de la CI que dibuje en 3D: el test comprueba antes que el dibujo está activo, para no pasar en falso por la vista de FR-14.
+- **Pruebas:** los plazos del aviso de "Deshacer" (AC-12, AC-13) se prueban con un reloj controlado, no esperando el tiempo real. La lógica, con tests unitarios; los AC de esta spec, salvo AC-23 y AC-24, con E2E de Playwright, sin comparar el dibujo píxel a píxel: basta con que haya dibujo, que su etiqueta sea la correcta y que su estado observable (FR-16) sea el esperado. AC-23 y AC-24 son pruebas manuales en el iPhone. Los AC del dibujo (AC-09, AC-10, AC-15 a AC-17 y AC-19) solo cuentan en un navegador de la CI que dibuje en 3D: el test comprueba antes que el dibujo está activo, para no pasar en falso por la vista de FR-14.
