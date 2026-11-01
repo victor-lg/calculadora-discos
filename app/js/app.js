@@ -435,9 +435,14 @@ function borrar(valor, { foco = false, turno, item }) {
   const nuevo = borrarSerie(estado, valor);
   anularPlazo();
   plazo = { vence: Date.now() + PLAZO_AVISO_MS, reloj: null };
+  // Mientras la tarjeta salía, el foco quedó en ella o en la página; si la
+  // persona lo ha llevado a otro sitio, no se mueve (decisión de Víctor en el
+  // PR #32).
+  const activo = document.activeElement;
+  const sinMover = !activo || activo === document.body || item?.contains(activo);
   actualizar(nuevo);
   revisarPlazo();
-  if (foco) $('deshacer').focus();
+  if (foco && sinMover) $('deshacer').focus();
 }
 
 // La parte de arriba se actualiza en su sitio, sin reconstruir ningún control:

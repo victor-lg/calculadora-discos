@@ -470,6 +470,25 @@ test('SPEC-CALC-003/AC-12 con el campo de añadir abierto, a los 5 s el foco pas
   await expect(campo(page)).toBeFocused();
 });
 
+// SPEC-CALC-003 FR-08, decisión de Víctor en el PR #32: si mientras la tarjeta
+// sale la persona lleva el foco a otro sitio, al aparecer el aviso el foco no
+// pasa a "Deshacer". Con el reloj parado, el foco se mueve antes de que
+// termine la salida.
+test('SPEC-CALC-003 FR-08 si durante la salida el foco va al peso de trabajo, se queda allí al aparecer el aviso', async ({ page }) => {
+  await pararReloj(page);
+  await botonQuitar(page, 70).press('Enter');
+  await trabajo(page).focus();
+  await page.clock.runFor(ANIMACION_MS);
+  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
+  await expect(trabajo(page)).toBeFocused();
+  // Sin mover el foco, pasa a "Deshacer" (AC-12).
+  await deshacer(page).click();
+  await botonQuitar(page, 40).press('Enter');
+  await page.clock.runFor(ANIMACION_MS);
+  await expect(aviso(page)).toContainText('Serie del 40 % borrada');
+  await expect(deshacer(page)).toBeFocused();
+});
+
 test('SPEC-CALC-003/AC-13 activar los collarines cierra el aviso y la lista sigue sin el 70', async ({ page }) => {
   await quitarSerie(page, 70);
   await expect(aviso(page)).toBeVisible();
