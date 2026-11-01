@@ -277,6 +277,16 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
         if (window.registro.posiciones.length < 120) requestAnimationFrame(ver);
       };
       requestAnimationFrame(ver);
+      // Las transiciones también se anotan en cuanto cambian las clases o el
+      // estilo de las tarjetas: WebKit sin pantalla, con carga, pinta pocos
+      // fotogramas y la salida de 200 ms podía empezar y acabar entre dos.
+      const series = document.getElementById('series');
+      new MutationObserver(() => {
+        for (const a of series.getAnimations({ subtree: true })) {
+          const clave = `${a.transitionProperty} ${a.effect.getTiming().duration} ${a.effect.getTiming().easing}`;
+          if (!window.registro.transiciones.includes(clave)) window.registro.transiciones.push(clave);
+        }
+      }).observe(series, { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
     });
     await deslizar(page, t70, 0.5);
     await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '90 %']);
