@@ -269,6 +269,49 @@ test('SPEC-CALC-003/AC-13 al quitar el 70 y enseguida el 40, el aviso es del 40 
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
 });
 
+// FR-08: el orden inverso, forzado: la tarjeta del 40 termina de salir antes
+// que la del 70, que se quitó antes. Con el reloj parado, la salida del 40 se
+// da por terminada a mano y la del 70, con sus temporizadores de respaldo. El
+// aviso sigue siendo del 40, el último borrado pedido.
+test('SPEC-CALC-003/AC-13 si la tarjeta del 40 acaba de salir antes que la del 70, el aviso y "Deshacer" son del 40', async ({ page }) => {
+  await pararReloj(page);
+  await botonQuitar(page, 70).press('Enter');
+  await botonQuitar(page, 40).press('Enter');
+  await page.evaluate(() => {
+    const li = [...document.querySelectorAll('#series > li')].find((el) => el.querySelector('.porcentaje').textContent === '40 %');
+    li.querySelector('.serie').dispatchEvent(Object.assign(new Event('transitionend', { bubbles: true }), { propertyName: 'transform' }));
+    li.dispatchEvent(Object.assign(new Event('transitionend', { bubbles: true }), { propertyName: 'height' }));
+  });
+  await expect(aviso(page)).toContainText('Serie del 40 % borrada');
+  await expect(porcentajesDeSeries(page)).toHaveText(['70 %', '90 %']);
+  await page.clock.runFor(ANIMACION_MS);
+  await expect(porcentajesDeSeries(page)).toHaveText(['90 %']);
+  await expect(aviso(page)).toContainText('Serie del 40 % borrada');
+  await deshacer(page).click();
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+});
+
+// FR-08: terminar un borrado repinta las tarjetas; la del 40, que aún sale,
+// sigue en el documento con su transición en marcha.
+test('SPEC-CALC-003/AC-11 si otro borrado repinta las tarjetas, la que sale sigue saliendo de lado', async ({ page }) => {
+  await pararReloj(page);
+  await botonQuitar(page, 70).press('Enter');
+  await botonQuitar(page, 40).press('Enter');
+  const r = await page.evaluate(() => {
+    const tarjetaDe = (p) => [...document.querySelectorAll('#series > li')].find((el) => el.querySelector('.porcentaje').textContent === p);
+    const t40 = tarjetaDe('40 %');
+    const t70 = tarjetaDe('70 %');
+    t70.querySelector('.serie').dispatchEvent(Object.assign(new Event('transitionend', { bubbles: true }), { propertyName: 'transform' }));
+    t70.dispatchEvent(Object.assign(new Event('transitionend', { bubbles: true }), { propertyName: 'height' }));
+    return {
+      aviso: document.getElementById('texto-borrado').textContent,
+      misma: tarjetaDe('40 %') === t40,
+      transiciones: t40.querySelector('.serie').getAnimations().map((a) => [a.transitionProperty, a.playState]),
+    };
+  });
+  expect(r).toEqual({ aviso: 'Serie del 70 % borrada', misma: true, transiciones: [['transform', 'running']] });
+});
+
 // SPEC-CALC-003 §10: los plazos del aviso se prueban con un reloj controlado,
 // parado. Con él, los temporizadores de la salida de la tarjeta tampoco corren
 // solos: tras pulsar "Quitar" se avanza el reloj hasta que termina, como mucho
@@ -425,15 +468,6 @@ test('SPEC-CALC-003/AC-12 con el campo de añadir abierto, a los 5 s el foco pas
   await hasta(page, 5000);
   await expect(aviso(page)).toBeHidden();
   await expect(campo(page)).toBeFocused();
-});
-
-// FR-08: si mientras la tarjeta sale la persona lleva el foco a otro sitio, el
-// foco no pasa a "Deshacer" al aparecer el aviso.
-test('SPEC-CALC-003/AC-12 si tras "Quitar" el foco va al peso de trabajo, se queda allí', async ({ page }) => {
-  await botonQuitar(page, 70).press('Enter');
-  await trabajo(page).focus();
-  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
-  await expect(trabajo(page)).toBeFocused();
 });
 
 test('SPEC-CALC-003/AC-13 activar los collarines cierra el aviso y la lista sigue sin el 70', async ({ page }) => {

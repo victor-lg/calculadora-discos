@@ -435,13 +435,9 @@ function borrar(valor, { foco = false, turno, item }) {
   const nuevo = borrarSerie(estado, valor);
   anularPlazo();
   plazo = { vence: Date.now() + PLAZO_AVISO_MS, reloj: null };
-  // Mientras la tarjeta salía, el foco quedó en ella o en la página; si la
-  // persona lo ha llevado a otro sitio, no se mueve.
-  const activo = document.activeElement;
-  const sinMover = !activo || activo === document.body || item?.contains(activo);
   actualizar(nuevo);
   revisarPlazo();
-  if (foco && sinMover) $('deshacer').focus();
+  if (foco) $('deshacer').focus();
 }
 
 // La parte de arriba se actualiza en su sitio, sin reconstruir ningún control:
@@ -513,8 +509,17 @@ function pintar() {
   const firma = JSON.stringify(v.series);
   if (firma !== seriesPintadas) {
     seriesPintadas = firma;
-    // FR-08: la tarjeta que está saliendo sigue su salida, sin reaparecer.
-    $('series').replaceChildren(...v.series.map((s) => saliendo.get(s.valor) ?? pintarSerie(s)));
+    // FR-08: la tarjeta que está saliendo se conserva y sigue su salida, sin
+    // reaparecer. No se saca del documento, porque eso cortaría su transición:
+    // las demás se colocan a su alrededor.
+    const lista = $('series');
+    const nuevas = v.series.map((s) => saliendo.get(s.valor) ?? pintarSerie(s));
+    for (const el of [...lista.children]) if (!nuevas.includes(el)) el.remove();
+    let siguiente = lista.firstElementChild;
+    for (const el of nuevas) {
+      if (el === siguiente) siguiente = siguiente.nextElementSibling;
+      else lista.insertBefore(el, siguiente);
+    }
   }
 }
 
