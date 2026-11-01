@@ -163,6 +163,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 /* El sitio del número lo fija app.js (ajustarPeso): todo el ancho salvo "kg". */
 #trabajo-auto {
   max-width: none;
+  /* Vacío, el campo conserva sitio donde tocar (NFR-01): sin esto medía 3 px. */
+  min-width: 44px;
   font-family: var(--fuente-num);
   font-weight: 600;
   font-size: 64px;
@@ -310,18 +312,21 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   height: 28px;
   border-radius: 999px;
   border: 2px solid var(--borde-campo);
-  background: var(--fondo);
+  background: var(--borde-campo);
 }
+/* Como en la referencia visual: un círculo de 22 px a 3 px del borde de la
+   pista, apagado y encendido. La pista apagada va rellena del color de su
+   borde, para que el margen se vea igual en los dos estados. */
 .interruptor input::after {
   content: "";
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  left: 8px;
-  width: 18px;
-  height: 18px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: var(--texto-2);
+  background: var(--texto);
 }
 .interruptor input:checked::before { background: var(--acento); border-color: var(--acento); }
 .interruptor input:checked::after { transform: translate(18px, -50%); background: var(--tinta-acento); }

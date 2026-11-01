@@ -3,7 +3,7 @@
 // tras la prueba en el iPhone de AC-24. Lo que solo fija la referencia visual
 // cita AC-24, que es donde se acepta; la prueba manual sigue haciendo falta.
 import { test, expect } from '@playwright/test';
-import { trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, deslizar } from './pantalla.js';
+import { trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, deslizar, botonQuitar } from './pantalla.js';
 
 const GRIS = 'rgb(166, 171, 179)';
 const ROJO = 'rgb(229, 72, 77)';
@@ -145,6 +145,44 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
     }
   });
 
+  // Como en la referencia: pista de 46 × 28 px y círculo de 22 px, a 3 px del
+  // borde de la pista arriba, abajo y en el lado en que está, apagado y
+  // encendido.
+  test('(FR-03) el círculo del interruptor de collarines, con los mismos márgenes apagado y encendido', async ({ page }) => {
+    await desplegarPaneles(page);
+    const margenes = () => page.evaluate(() => {
+      const input = document.getElementById('collarines');
+      const pista = getComputedStyle(input, '::before');
+      const circulo = getComputedStyle(input, '::after');
+      const dx = new DOMMatrixReadOnly(circulo.transform).m41;
+      const izquierda = parseFloat(circulo.left) + dx - parseFloat(pista.left);
+      const ancho = parseFloat(circulo.width);
+      return {
+        pista: [parseFloat(pista.width), parseFloat(pista.height)],
+        circulo: ancho,
+        izquierda,
+        derecha: parseFloat(pista.width) - izquierda - ancho,
+        vertical: (parseFloat(pista.height) - parseFloat(circulo.height)) / 2,
+      };
+    });
+    const apagado = await margenes();
+    expect(apagado).toMatchObject({ pista: [46, 28], circulo: 22, izquierda: 3, vertical: 3 });
+    await page.locator('label.interruptor').click();
+    await expect(page.getByRole('switch', { name: 'Collarines de competición' })).toBeChecked();
+    const encendido = await margenes();
+    expect(encendido).toMatchObject({ pista: [46, 28], circulo: 22, derecha: 3, vertical: 3 });
+  });
+
+  // NFR-01: vacío, el peso de trabajo conserva sitio donde tocar.
+  test('(FR-02) el peso de trabajo vacío mide al menos 44 px de ancho y se puede volver a tocar', async ({ page }) => {
+    await trabajo(page).fill('');
+    await trabajo(page).blur();
+    const caja = await trabajo(page).boundingBox();
+    expect(caja.width).toBeGreaterThanOrEqual(44);
+    await page.mouse.click(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    await expect(trabajo(page)).toBeFocused();
+  });
+
   test('(FR-03) un peso de barra no válido tiene el borde rojo también con el foco', async ({ page }) => {
     await desplegarPaneles(page);
     await barra(page, 'Z').check();
@@ -239,6 +277,16 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
         if (window.registro.posiciones.length < 120) requestAnimationFrame(ver);
       };
       requestAnimationFrame(ver);
+      // Las transiciones también se anotan en cuanto cambian las clases o el
+      // estilo de las tarjetas: WebKit sin pantalla, con carga, pinta pocos
+      // fotogramas y la salida de 200 ms podía empezar y acabar entre dos.
+      const series = document.getElementById('series');
+      new MutationObserver(() => {
+        for (const a of series.getAnimations({ subtree: true })) {
+          const clave = `${a.transitionProperty} ${a.effect.getTiming().duration} ${a.effect.getTiming().easing}`;
+          if (!window.registro.transiciones.includes(clave)) window.registro.transiciones.push(clave);
+        }
+      }).observe(series, { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
     });
     await deslizar(page, t70, 0.5);
     await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '90 %']);
@@ -274,6 +322,40 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
     });
     await deslizar(page, tarjeta(page, 70), 0.5);
     await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '90 %']);
+    // Con el botón "Quitar", lo mismo.
+    await botonQuitar(page, 40).press('Enter');
+    await expect(page.locator('#series .porcentaje')).toHaveText(['90 %']);
     expect(await page.evaluate(() => window.transiciones)).toBe(0);
+  });
+
+  // FR-08: el botón "Quitar la serie del P %" hace lo mismo que el gesto: la
+  // tarjeta sale de lado (200 ms) y después su hueco se cierra (260 ms). Hasta
+  // entonces la lista no cambia.
+  test('con el botón "Quitar", la misma salida de lado y el mismo cierre del hueco', async ({ page }) => {
+    const t90 = tarjeta(page, 90);
+    const inicio70 = (await tarjeta(page, 70).boundingBox()).y;
+    // Las transiciones de las tarjetas, en cuanto cambian sus clases o su
+    // estilo: WebKit sin pantalla apenas pinta fotogramas si no hay entrada, y
+    // una transición puede empezar y acabar entre dos.
+    await page.evaluate(() => {
+      window.transiciones = [];
+      const series = document.getElementById('series');
+      new MutationObserver(() => {
+        for (const a of series.getAnimations({ subtree: true })) {
+          const clave = `${a.effect.target.className} ${a.transitionProperty} ${a.effect.getTiming().duration} ${a.effect.getTiming().easing}`;
+          if (!window.transiciones.includes(clave)) window.transiciones.push(clave);
+        }
+      }).observe(series, { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+    });
+    await botonQuitar(page, 70).press('Enter');
+    await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '70 %', '90 %']);
+    await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '90 %']);
+    await expect.poll(async () => (await t90.boundingBox()).y).toBe(inicio70);
+    expect(await page.evaluate(() => window.transiciones)).toEqual(expect.arrayContaining([
+      'serie sale transform 200 ease-in',
+      'deslizable arrastra listo se-cierra height 260 cubic-bezier(0.2, 0.8, 0.2, 1)',
+      'deslizable arrastra listo se-cierra margin-bottom 260 cubic-bezier(0.2, 0.8, 0.2, 1)',
+    ]));
+    await expect(page.locator('#aviso-borrado')).toContainText('Serie del 70 % borrada');
   });
 });

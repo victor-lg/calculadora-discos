@@ -12,8 +12,10 @@ import {
   cancelarAnadir,
   escribirPorcentaje,
   anadirPorcentaje,
+  quitarPorcentaje,
   borrarSerie,
   deshacerBorrado,
+  cerrarAviso,
   alternarDisco,
   modeloVista,
 } from './vista.js';
@@ -216,7 +218,8 @@ function pintarSerie(s) {
   if (s.avisoCapacidad) li.append(crear('p', 'capacidad', s.avisoCapacidad));
   const quitar = crear('button', 'quitar', s.quitar);
   quitar.type = 'button';
-  quitar.addEventListener('click', () => borrar(s.valor, { foco: true }));
+  // FR-08: el botón hace lo mismo que el gesto, salida de lado incluida.
+  quitar.addEventListener('click', () => salir(item, li, s.valor, { foco: true }));
   li.append(quitar);
   item.append(fondo, li);
   enlazarGesto(item, li, quitar, s.valor);
@@ -333,23 +336,8 @@ function enlazarGesto(item, tarjeta, quitar, valor) {
     fin();
     // Tras el gesto o la pulsación larga no se activa nada de la tarjeta.
     if (deslizaba || larga) suprimirClic(tarjeta);
-    if (borra) {
-      item.classList.add('arrastra', 'listo');
-      if (sinMovimiento()) borrar(valor);
-      else {
-        // La tarjeta sale de lado y después cierra su hueco y se borra. Si la
-        // salida no termina, se sigue igual.
-        const cerrar = () => cerrarHueco(item, () => borrar(valor));
-        // Mientras sale, la tarjeta ya no se puede tocar ni enfocar.
-        item.inert = true;
-        tarjeta.classList.add('sale');
-        colocar(-ancho);
-        tarjeta.addEventListener('transitionend', (e) => {
-          if (e.target === tarjeta && e.propertyName === 'transform') cerrar();
-        });
-        setTimeout(cerrar, SALIDA_MS);
-      }
-    } else if (deslizaba) {
+    if (borra) salir(item, tarjeta, valor);
+    else if (deslizaba) {
       if (!sinMovimiento()) tarjeta.classList.add('vuelve');
       colocar(0);
     }
@@ -363,6 +351,30 @@ function enlazarGesto(item, tarjeta, quitar, valor) {
   tarjeta.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
+// FR-08 y FR-13: la tarjeta sale de lado, después cierra su hueco y se borra,
+// tanto con el gesto como con el botón "Quitar" (`opciones` va a borrar). Con
+// "Reducir movimiento", se borra sin más. Si la salida no termina, se sigue
+// igual.
+function salir(item, tarjeta, valor, opciones) {
+  const datos = { ...opciones, turno: nuevoTurno(), item };
+  item.classList.add('arrastra', 'listo');
+  if (sinMovimiento()) {
+    borrar(valor, datos);
+    return;
+  }
+  const cerrar = () => cerrarHueco(item, () => borrar(valor, datos));
+  // Mientras sale, la tarjeta ya no se puede tocar ni enfocar, y si algo
+  // repinta las tarjetas, se conserva tal cual (pintar).
+  item.inert = true;
+  saliendo.set(valor, item);
+  tarjeta.classList.add('sale');
+  tarjeta.style.transform = `translateX(${-tarjeta.getBoundingClientRect().width}px)`;
+  tarjeta.addEventListener('transitionend', (e) => {
+    if (e.target === tarjeta && e.propertyName === 'transform') cerrar();
+  });
+  setTimeout(cerrar, SALIDA_MS);
+}
+
 // El clic que sigue al gesto o a la pulsación larga no llega a la tarjeta. En
 // táctil, el clic puede llegar en otra tarea; si no llega, se deja de esperar.
 function suprimirClic(tarjeta) {
@@ -374,12 +386,63 @@ function suprimirClic(tarjeta) {
   setTimeout(() => tarjeta.removeEventListener('click', parar, { capture: true }), SALIDA_MS);
 }
 
-// FR-08: borra la serie y muestra el aviso. Tras borrar con el botón "Quitar",
-// el foco pasa a "Deshacer".
-function borrar(valor, { foco = false } = {}) {
+// FR-08: el aviso de "Deshacer" desaparece 5 s después de aparecer. Se guarda
+// la hora a la que vence, en tiempo real: en segundo plano, iOS congela los
+// temporizadores, así que al volver se compara con el reloj (revisarPlazo).
+const PLAZO_AVISO_MS = 5000;
+let plazo = null;
+
+function anularPlazo() {
+  if (!plazo) return;
+  clearTimeout(plazo.reloj);
+  plazo = null;
+}
+
+function revisarPlazo() {
+  if (!plazo) return;
+  clearTimeout(plazo.reloj);
+  const falta = plazo.vence - Date.now();
+  if (falta > 0) plazo.reloj = setTimeout(revisarPlazo, falta);
+  else actualizar(cerrarAviso(estado));
+}
+
+// FR-08: solo se deshace el último borrado. Cada borrado toma un turno al
+// empezar; como las tarjetas tardan en salir, uno anterior puede terminar
+// después de otro posterior: entonces quita su porcentaje, pero no sustituye
+// el aviso del último.
+let turnos = 0;
+let ultimoTurno = 0;
+// Las tarjetas que están saliendo, por porcentaje, hasta que se borran.
+const saliendo = new Map();
+const nuevoTurno = () => {
+  turnos += 1;
+  return turnos;
+};
+
+// FR-08: borra la serie y muestra el aviso, con un plazo nuevo. Tras borrar con
+// el botón "Quitar", el foco pasa a "Deshacer".
+function borrar(valor, { foco = false, turno, item }) {
   ocultarQuitar();
-  actualizar(borrarSerie(estado, valor));
-  if (foco) $('deshacer').focus();
+  if (saliendo.get(valor) === item) saliendo.delete(valor);
+  const indice = estado.porcentajes.indexOf(valor);
+  // Si el porcentaje ya no está en la lista, no hay nada que borrar.
+  if (indice === -1) return;
+  if (turno < ultimoTurno) {
+    actualizar(quitarPorcentaje(estado, indice));
+    return;
+  }
+  ultimoTurno = turno;
+  const nuevo = borrarSerie(estado, valor);
+  anularPlazo();
+  plazo = { vence: Date.now() + PLAZO_AVISO_MS, reloj: null };
+  // Mientras la tarjeta salía, el foco quedó en ella o en la página; si la
+  // persona lo ha llevado a otro sitio, no se mueve (decisión de Víctor en el
+  // PR #32).
+  const activo = document.activeElement;
+  const sinMover = !activo || activo === document.body || item?.contains(activo);
+  actualizar(nuevo);
+  revisarPlazo();
+  if (foco && sinMover) $('deshacer').focus();
 }
 
 // La parte de arriba se actualiza en su sitio, sin reconstruir ningún control:
@@ -451,7 +514,17 @@ function pintar() {
   const firma = JSON.stringify(v.series);
   if (firma !== seriesPintadas) {
     seriesPintadas = firma;
-    $('series').replaceChildren(...v.series.map(pintarSerie));
+    // FR-08: la tarjeta que está saliendo se conserva y sigue su salida, sin
+    // reaparecer. No se saca del documento, porque eso cortaría su transición:
+    // las demás se colocan a su alrededor.
+    const lista = $('series');
+    const nuevas = v.series.map((s) => saliendo.get(s.valor) ?? pintarSerie(s));
+    for (const el of [...lista.children]) if (!nuevas.includes(el)) el.remove();
+    let siguiente = lista.firstElementChild;
+    for (const el of nuevas) {
+      if (el === siguiente) siguiente = siguiente.nextElementSibling;
+      else lista.insertBefore(el, siguiente);
+    }
   }
 }
 
@@ -460,6 +533,9 @@ function pintar() {
 // editarlos (SPEC-CALC-002 FR-09 si falla).
 function actualizar(nuevo) {
   estado = guardarCambios(almacen, estado, nuevo);
+  // SPEC-CALC-003 FR-08: al cerrarse el aviso por cualquier causa, su plazo se
+  // anula.
+  if (estado.borrado === null) anularPlazo();
   pintar();
 }
 
@@ -616,8 +692,13 @@ document.fonts?.addEventListener('loadingdone', () => ajustarPeso({ forzar: true
 document.fonts?.ready.then(() => ajustarPeso({ forzar: true }));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') terminarAlSalir();
+  else revisarPlazo();
 });
 window.addEventListener('pagehide', terminarAlSalir);
+// SPEC-CALC-003 FR-08: al volver a la app, el aviso que ya venció desaparece y
+// el que no, desaparece cuando le toque. En iOS, volver a una PWA desde la
+// caché de páginas solo avisa con pageshow.
+window.addEventListener('pageshow', revisarPlazo);
 
 // ADR-0001 §3.2: se pide almacenamiento persistente, sin depender del resultado.
 navigator.storage?.persist?.().catch(() => {});

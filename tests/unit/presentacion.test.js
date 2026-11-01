@@ -19,6 +19,7 @@ import {
   anadirPorcentaje,
   borrarSerie,
   deshacerBorrado,
+  cerrarAviso,
   MODOS,
   TEXTOS,
 } from '../../app/js/vista.js';
@@ -203,6 +204,16 @@ test('SPEC-CALC-003/AC-13 solo se deshace el último borrado', () => {
   assert.deepEqual(lista(e), [40, 90]);
   // Sin aviso, "Deshacer" ya no hace nada.
   assert.deepEqual(lista(deshacerBorrado(e)), [40, 90]);
+});
+
+test('SPEC-CALC-003/AC-13 al cumplirse el plazo, el aviso se cierra, la lista sigue sin el 70 y ya no se puede deshacer', () => {
+  const e = cerrarAviso(borrarSerie(inicial(), 70));
+  assert.equal(modeloVista(e).avisoBorrado, null);
+  assert.deepEqual(lista(e), [40, 90]);
+  assert.deepEqual(lista(deshacerBorrado(e)), [40, 90]);
+  // Sin aviso abierto, no cambia nada.
+  const sinAviso = inicial();
+  assert.equal(cerrarAviso(sinAviso), sinAviso);
 });
 
 test('SPEC-CALC-003/AC-13 activar los collarines cierra el aviso y la lista sigue sin el 70', () => {

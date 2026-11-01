@@ -230,6 +230,12 @@ export function borrarSerie(estado, porcentaje) {
   return { ...quitarPorcentaje(estado, indice), borrado: porcentaje };
 }
 
+// FR-08: el aviso se cierra solo cuando se cumple su plazo; ya no se puede
+// deshacer.
+export function cerrarAviso(estado) {
+  return estado.borrado === null ? estado : { ...estado, borrado: null };
+}
+
 // FR-08: vuelve a poner el porcentaje en su orden, salvo que ya esté otra vez
 // en la lista, y cierra el aviso.
 export function deshacerBorrado(estado) {
@@ -377,7 +383,7 @@ export function modeloVista(estado) {
     textoPorcentaje: estado.textoPorcentaje,
     errorPorcentaje: estado.errorPorcentaje,
     anadiendo: estado.anadiendo,
-    // SPEC-CALC-003 FR-08: el aviso de "Deshacer", hasta la siguiente acción.
+    // SPEC-CALC-003 FR-08: el aviso de "Deshacer" (su plazo lo cuenta app.js).
     avisoBorrado: estado.borrado === null ? null : TEXTOS.serieBorrada(estado.borrado),
     indicacionPorcentajes: estado.porcentajes.length === 0 ? TEXTOS.anadirPorcentajes : null,
     discos: DISCOS_CENT.map((cent) => ({
