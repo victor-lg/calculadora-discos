@@ -61,13 +61,19 @@ export function crearMotor({ alPerder }) {
   // entorno tarda, y el texto de las tarjetas no tiene que esperarlo.
   const escena = new Scene();
 
+  // Desde que se pierde, el motor se libera y no pinta nada más.
   let perdido = false;
   const perder = () => {
     if (perdido) return;
     perdido = true;
+    observador.disconnect();
+    renderer.dispose();
     alPerder();
   };
   lienzo3d.addEventListener('webglcontextlost', perder);
+  // Un sombreador que no compila no lanza ningún error en three.js: dejaría el
+  // lienzo vacío con una etiqueta que describe la carga.
+  renderer.debug.onShaderError = perder;
 
   const camara = new OrthographicCamera();
   let equipo = null;
@@ -161,6 +167,7 @@ export function crearMotor({ alPerder }) {
     medir(ancho, alto);
     encuadrar(ancho, alto);
     renderer.render(escena, camara);
+    if (perdido) return;
     // Si el contexto se ha perdido y aún no ha llegado su evento, no se borra
     // lo pintado: se sigue viendo hasta que la app pasa a la vista de FR-14.
     if (renderer.getContext().isContextLost()) throw new Error('Contexto perdido');
@@ -231,6 +238,7 @@ export function crearMotor({ alPerder }) {
     renderer.toneMappingExposure = 1.4;
     renderer.render(escenaMini, cam);
     renderer.toneMappingExposure = 1.05;
+    if (renderer.getContext().isContextLost()) throw new Error('Contexto perdido');
     lienzo.width = ancho;
     lienzo.height = alto;
     lienzo.getContext('2d').drawImage(lienzo3d, 0, 0);

@@ -409,7 +409,8 @@ test('SPEC-CALC-001/AC-38 en Dos lados los collarines no cuentan y se conservan 
 });
 
 test('SPEC-CALC-001/AC-39 el aviso de capacidad aparece solo cuando los discos no caben', () => {
-  // Esta interfaz no dibuja la carga: el aviso va sin "Se dibujan los que caben." (FR-16).
+  // Sin dibujo (SPEC-CALC-003 FR-14), el aviso va sin "Se dibujan los que caben."
+  // (FR-16); con dibujo lo comprueban tests/unit/dibujo.test.js y los E2E.
   const todos = serie({ modo: 'un-punto', trabajo: '500', porcentajes: [100] });
   assert.deepEqual(todos.discos, ['25 ×20']);
   assert.equal(todos.avisoCapacidad, 'No caben en la manga: faltan 23 cm.');
