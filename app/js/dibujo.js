@@ -24,22 +24,25 @@ const RESOLUCION_MAXIMA = 2;
 // Las miniaturas, de frente y todas a la misma escala (notas §4.3).
 const MINIATURA = { ancho: 264, alto: 90, mitad: 410, centro: new Vector3(30, -2, 0), direccion: new Vector3(0, 0.28, 0.96).normalize() };
 
-// El renderizador, con la salida de las notas §4.1, y la escena con su entorno
-// y sus luces. Lanza un error si el dispositivo no puede dibujar en 3D o no
-// tiene lienzos 2D donde copiar los dibujos.
+// El renderizador, con la salida de las notas §4.1. Lanza un error si el
+// dispositivo no puede dibujar en 3D o no tiene lienzos 2D donde copiar los
+// dibujos; entonces libera el contexto que hubiera creado.
 function preparar() {
   const lienzo3d = document.createElement('canvas');
   const renderer = new WebGLRenderer({ canvas: lienzo3d, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  try {
+    if (!document.createElement('canvas').getContext('2d') || !('ResizeObserver' in window)) throw new Error('Sin lienzo 2D');
+  } catch (e) {
+    renderer.dispose();
+    renderer.forceContextLoss();
+    throw e;
+  }
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
-  const escena = new Scene();
-  escena.environment = entorno(renderer);
-  escena.add(...luces());
-  if (!document.createElement('canvas').getContext('2d')) throw new Error('Sin lienzo 2D');
-  return { lienzo3d, renderer, escena };
+  return { lienzo3d, renderer };
 }
 
 // Prepara el dibujo. Devuelve null si el dispositivo no puede dibujar en 3D o
@@ -53,7 +56,10 @@ export function crearMotor({ alPerder }) {
   } catch {
     return null;
   }
-  const { lienzo3d, renderer, escena } = base;
+  const { lienzo3d, renderer } = base;
+  // La escena se ilumina antes del primer dibujo, no al arrancar: generar el
+  // entorno tarda, y el texto de las tarjetas no tiene que esperarlo.
+  const escena = new Scene();
 
   let perdido = false;
   const perder = () => {
@@ -89,18 +95,24 @@ export function crearMotor({ alPerder }) {
   };
 
   // SPEC-CALC-003 §11: los discos se rotulan con Barlow Semi Condensed; hasta
-  // que está cargada no se modela ninguno.
+  // que está cargada no se modela ninguno. Después se ilumina la escena; un
+  // fallo ahí es un fallo al prepararlo (FR-14).
   let listo = false;
   // Las miniaturas por pintar: se pintan una vez, cuando se ven por primera
   // vez (el panel Carga arranca plegado).
   const miniaturas = new Map();
   Promise.all(FUENTES_ROTULO.map((f) => document.fonts?.load(f).catch(() => {})))
-    .then(() => {
+    .then(() => requestAnimationFrame(() => {
+      try {
+        escena.environment = entorno(renderer);
+        escena.add(...luces());
+      } catch {
+        perder();
+        return;
+      }
       listo = true;
-      requestAnimationFrame(() => {
-        pintarPendientes();
-      });
-    });
+      pintarPendientes();
+    }));
 
   function montar(carga) {
     const grupo = new Group();
@@ -149,6 +161,9 @@ export function crearMotor({ alPerder }) {
     medir(ancho, alto);
     encuadrar(ancho, alto);
     renderer.render(escena, camara);
+    // Si el contexto se ha perdido y aún no ha llegado su evento, no se borra
+    // lo pintado: se sigue viendo hasta que la app pasa a la vista de FR-14.
+    if (renderer.getContext().isContextLost()) throw new Error('Contexto perdido');
     const ctx = lienzo.getContext('2d');
     ctx.clearRect(0, 0, ancho, alto);
     ctx.drawImage(lienzo3d, 0, 0);
@@ -187,6 +202,8 @@ export function crearMotor({ alPerder }) {
         t.firma = firma;
       }
     } catch {
+      // SPEC-CALC-003 FR-14: un error al pintar se trata como un fallo al
+      // prepararlo (decisión de Víctor del 2026-11-03, PR #33).
       perder();
     }
   }

@@ -163,10 +163,11 @@ test('SPEC-CALC-003 FR-13 con "Reducir movimiento", el dibujo aparece sin transi
   expect(animaciones).toBe(0);
 });
 
-// SPEC-CALC-003 FR-15, provisional (PR 1 de VIC-12): si el sistema retira el
-// contexto gráfico, la app pasa a la vista de FR-14 hasta el siguiente
-// arranque, y nunca se ve un dibujo que no corresponde al texto.
-test('SPEC-CALC-003 FR-15 al perder el contexto, la app pasa a la vista sin dibujo', async ({ page }) => {
+// Provisional, hasta que el PR 3 de VIC-12 implemente FR-15 (AC-19), que lo
+// sustituye: si el sistema retira el contexto gráfico, la app pasa a la vista
+// de FR-14 hasta el siguiente arranque, y nunca se ve un dibujo que no
+// corresponde al texto. No da FR-15 por cumplido.
+test('provisional: al perder el contexto, la app pasa a la vista sin dibujo hasta el siguiente arranque', async ({ page }) => {
   await desplegarPaneles(page);
   await page.getByLabel('Un punto').check();
   await anadirPorcentaje(page, '100');

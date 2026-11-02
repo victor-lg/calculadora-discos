@@ -51,7 +51,6 @@ const EQUIPOS = {
   z: { manga: 240, agarre: { r: 12.5, curva: true } },
   maquina: { manga: 320, maquina: true },
 };
-export const MANGA = Object.fromEntries(Object.entries(EQUIPOS).map(([id, e]) => [id, e.manga]));
 
 // Notas §4.1: entorno de estudio hecho con planos emisivos, para los reflejos.
 function estudio(pmrem) {
@@ -93,7 +92,7 @@ export function luces() {
   return [luz, recorte];
 }
 
-export const sombra = (o) => o.traverse((m) => {
+const sombra = (o) => o.traverse((m) => {
   if (m.isMesh && !m.material.transparent) {
     m.castShadow = true;
     m.receiveShadow = true;
