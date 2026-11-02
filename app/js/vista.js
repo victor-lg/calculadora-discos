@@ -1,7 +1,7 @@
 // Modelo de vista: a partir del estado en memoria, decide qué se muestra y con
 // qué textos. La interfaz lo pinta tal cual, sin lógica propia.
 import { analizarPeso, analizarPesoBarra, analizarPorcentaje } from './entrada.js';
-import { calcularSerie, excesoMangaMm, COLLARIN_CENT, DISCOS_CENT } from './calculo.js';
+import { calcularSerie, excesoMangaMm, discosQueCaben, COLLARIN_CENT, DISCOS_CENT } from './calculo.js';
 import { formatearKg } from './formato.js';
 
 export const MODOS = Object.freeze([
@@ -57,8 +57,10 @@ export const TEXTOS = {
     `El ${p} % son ${o} kg: faltan ${f} kg para poner el disco más pequeño (${y} kg) y el collarín a cada lado.`,
   faltaUnPunto: (p, o, f, y) =>
     `El ${p} % son ${o} kg: faltan ${f} kg para poner el disco más pequeño (${y} kg).`,
-  // FR-16, sin "Se dibujan los que caben.": esta interfaz no dibuja la carga.
+  // FR-16: con "Se dibujan los que caben." solo si la tarjeta muestra el
+  // dibujo (SPEC-CALC-003 FR-14 y FR-15).
   noCaben: (x) => `No caben en la manga: faltan ${x} cm.`,
+  noCabenConDibujo: (x) => `No caben en la manga: faltan ${x} cm. Se dibujan los que caben.`,
   // SPEC-CALC-003 FR-03, FR-04 y FR-05: textos propios de la presentación.
   resumenBarra: (nombre, peso, collarines) => `Barra · ${nombre} ${peso} kg${collarines ? ' · collarines' : ''}`,
   resumenMaquina: { 'dos-lados': 'Dos lados · máquina', 'un-punto': 'Un punto · máquina' },
@@ -71,6 +73,9 @@ export const TEXTOS = {
   // SPEC-CALC-003 FR-08: P porcentaje.
   serieBorrada: (p) => `Serie del ${p} % borrada`,
   quitarSerie: (p) => `Quitar la serie del ${p} %`,
+  // SPEC-CALC-003 FR-07: G son los discos dibujados de un lado, "n de W" los
+  // repetidos, separados por " + ". Sin discos, TEXTOS.sinDiscos.
+  etiquetaCarga: (g) => `Carga: ${g} kg`,
 };
 
 // FR-04: ordenados de menor a mayor y sin repetidos.
@@ -272,16 +277,21 @@ function barraElegida(estado) {
   return BARRAS.find((b) => b.id === estado.barra);
 }
 
-// FR-08: cada tipo una vez, de mayor a menor, con "×n" si se repite.
-// SPEC-CALC-003 FR-06: con su tipo (el color del punto) y su anuncio.
-function gruposDiscos(discos) {
+// Los discos seguidos del mismo tipo, con cuántos hay.
+function agrupar(discos) {
   const grupos = [];
   for (const d of discos) {
     const ultimo = grupos[grupos.length - 1];
     if (ultimo && ultimo.cent === d) ultimo.n++;
     else grupos.push({ cent: d, n: 1 });
   }
-  return grupos.map(({ cent, n }) => ({
+  return grupos;
+}
+
+// FR-08: cada tipo una vez, de mayor a menor, con "×n" si se repite.
+// SPEC-CALC-003 FR-06: con su tipo (el color del punto) y su anuncio.
+function gruposDiscos(discos) {
+  return agrupar(discos).map(({ cent, n }) => ({
     cent,
     peso: formatearKg(cent),
     veces: n > 1 ? `×${n}` : null,
@@ -310,6 +320,21 @@ function serieSinDiscos(estado, barraCent, objetivo, porcentaje) {
   return { linea: TEXTOS.soloBarra, total: `${b} kg`, explicacion };
 }
 
+// SPEC-CALC-003 FR-07: lo que dibuja la tarjeta. `equipo` es el id de la barra
+// elegida o 'maquina'; `discos`, los de un lado (o del único punto) que caben,
+// de dentro afuera; `collarin`, si se dibuja después del último. La máquina no
+// lleva collarín, y una serie con collarines siempre lleva algún disco.
+function modeloDibujo(estado, discos, collarines, mangaDmm) {
+  const dibujados = discosQueCaben(discos, mangaDmm);
+  const grupos = agrupar(dibujados).map(({ cent, n }) => (n > 1 ? `${n} de ${formatearKg(cent)}` : formatearKg(cent)));
+  return {
+    equipo: estado.modo === 'barra' ? estado.barra : 'maquina',
+    discos: dibujados,
+    collarin: collarines,
+    etiqueta: grupos.length ? TEXTOS.etiquetaCarga(grupos.join(' + ')) : TEXTOS.sinDiscos,
+  };
+}
+
 function modeloSerie(estado, barra, barraCent, trabajoCent, porcentaje) {
   const s = calcularSerie({
     modo: estado.modo,
@@ -334,9 +359,15 @@ function modeloSerie(estado, barra, barraCent, trabajoCent, porcentaje) {
     grupos: null,
     collarin: null,
     avisoCapacidad: null,
+    avisoCapacidadDibujo: null,
+    dibujo: null,
   };
+  const mangaDmm = estado.modo === 'barra' ? barra.mangaDmm : MANGA_MAQUINA_DMM;
   // FR-09: sin discos ni collarines, y sin diferencia.
-  if (s.minimo) return { ...serie, ...serieSinDiscos(estado, barraCent, s.objetivo, porcentaje) };
+  if (s.minimo) {
+    return { ...serie, ...serieSinDiscos(estado, barraCent, s.objetivo, porcentaje), dibujo: modeloDibujo(estado, [], false, mangaDmm) };
+  }
+  serie.dibujo = modeloDibujo(estado, s.discos, s.collarines, mangaDmm);
   serie.total = `${formatearKg(s.cargado)} kg`;
   serie.etiquetaDiscos = estado.modo === 'un-punto' ? TEXTOS.totalEnDiscos : TEXTOS.porLado;
   serie.grupos = gruposDiscos(s.discos);
@@ -354,8 +385,11 @@ function modeloSerie(estado, barra, barraCent, trabajoCent, porcentaje) {
     );
   }
   // FR-16: el exceso, en milímetros, se muestra en centímetros (FR-14).
-  const exceso = excesoMangaMm(s.discos, estado.modo === 'barra' ? barra.mangaDmm : MANGA_MAQUINA_DMM);
-  if (exceso > 0) serie.avisoCapacidad = TEXTOS.noCaben(formatearKg(exceso * 10));
+  const exceso = excesoMangaMm(s.discos, mangaDmm);
+  if (exceso > 0) {
+    serie.avisoCapacidad = TEXTOS.noCaben(formatearKg(exceso * 10));
+    serie.avisoCapacidadDibujo = TEXTOS.noCabenConDibujo(formatearKg(exceso * 10));
+  }
   return serie;
 }
 

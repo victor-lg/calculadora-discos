@@ -263,6 +263,17 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   -webkit-mask-image: linear-gradient(to right, transparent, #000 30%);
   mask-image: linear-gradient(to right, transparent, #000 30%);
 }
+/* SPEC-CALC-003 FR-07: con el dibujo 3D, la miniatura sustituye al dibujo
+   plano, con el mismo fundido a la izquierda (referencia visual de §11). */
+.miniatura {
+  display: block;
+  width: 100%;
+  max-width: 88px;
+  height: 30px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 22%);
+  mask-image: linear-gradient(to right, transparent, #000 22%);
+}
+:root[data-dibujo="3d"] .ficha svg { display: none; }
 .ficha .nombre { font-size: 14px; font-weight: 600; line-height: 1.1; }
 .ficha .peso-ficha { font-family: var(--fuente-num); font-size: 15px; color: var(--texto-2); font-variant-numeric: tabular-nums; }
 .ficha:has(input:checked) { background: var(--superficie-2); box-shadow: inset 0 0 0 1.5px var(--acento); }
@@ -464,6 +475,14 @@ input[aria-invalid="true"], .peso-barra input[aria-invalid="true"] { border-colo
   align-items: center;
 }
 .serie:has(> .dibujo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+/* FR-07: el lienzo de la tarjeta (proporción 1,25, notas §4.1). No recibe los
+   toques: el gesto de borrar y la pulsación larga son de la tarjeta. La
+   máquina se funde arriba y abajo. */
+.dibujo { display: block; width: 100%; height: auto; aspect-ratio: 1.25; pointer-events: none; }
+.dibujo[data-equipo="maquina"] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 89%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 89%, transparent);
+}
 /* :where() deja la especificidad en la de .serie: los márgenes de cada línea mandan. */
 .serie :where(p) { margin: 0; }
 .serie .texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }

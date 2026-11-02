@@ -101,3 +101,17 @@ export function excesoMangaMm(discos, mangaDmm) {
   const grosor = discos.reduce((suma, d) => suma + GROSOR_DMM.get(d), 0);
   return Math.max(0, Math.ceil((grosor - mangaDmm) / 10));
 }
+
+// SPEC-CALC-003 FR-07: los discos que se dibujan, en el orden dado (de dentro
+// afuera), hasta el primero que no cabe en la manga útil, aunque alguno de los
+// que vienen después sí cupiera.
+export function discosQueCaben(discos, mangaDmm) {
+  let grosor = 0;
+  const caben = [];
+  for (const d of discos) {
+    grosor += GROSOR_DMM.get(d);
+    if (grosor > mangaDmm) break;
+    caben.push(d);
+  }
+  return caben;
+}

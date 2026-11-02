@@ -505,7 +505,10 @@ test('SPEC-CALC-001/AC-35 SPEC-CALC-001/AC-39 discos agrupados y aviso de capaci
   await page.getByLabel('Un punto').check();
   await expect(series(page).locator('.etiqueta')).toHaveText('Total en discos');
   await expect.poll(() => discosDeSeries(page)).toEqual(['25 ×20']);
-  await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
+  // FR-16: la tarjeta muestra el dibujo, así que el aviso dice que se dibujan
+  // los que caben. Sin dibujo lo comprueba SPEC-CALC-003/AC-18.
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm. Se dibujan los que caben.');
 });
 
 // SPEC-CALC-003 FR-08: el primer toque es el gesto de borrar una tarjeta.
