@@ -247,19 +247,27 @@ test('provisional: al perder el contexto, la app pasa a la vista sin dibujo hast
 // SPEC-CALC-003 FR-11 a FR-13: la animación de la carga. Sus tiempos se prueban
 // con el reloj controlado (§11): se instala antes de abrir la app y se para con
 // los dibujos ya pintados. Desde entonces, los fotogramas solo pasan al
-// avanzarlo.
+// avanzarlo. En la CI cada fotograma se pinta por software, así que se pintan
+// los menos posibles: se avanza a saltos y, donde basta, con menos series.
 const INICIO = [
   ['40 %', 'Carga: 10 kg', '1000'],
   ['70 %', 'Carga: 25 kg', '2500'],
   ['90 %', 'Carga: 25 + 10 kg', '2500,1000'],
 ];
 
-async function pararReloj(page) {
+// `quitar`: las series que se borran antes, sin animación.
+async function pararReloj(page, quitar = []) {
+  if (quitar.length) {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const p of quitar) await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
+    await expect(series(page)).toHaveCount(3 - quitar.length);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+  }
   await page.clock.install();
   await page.reload();
   await exigirDibujo3D(page);
   // AC-16: al abrir la app, ningún dibujo tiene una animación en curso.
-  await comprobarDibujos(page, INICIO);
+  await comprobarDibujos(page, INICIO.filter(([p]) => !quitar.includes(parseInt(p, 10))));
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
 }
 
@@ -331,13 +339,14 @@ test('SPEC-CALC-003/AC-16 al cambiar de 100 a 105, el texto cambia al teclear y 
 test('SPEC-CALC-003/AC-17 si la carga cambia en plena animación, el dibujo acaba en la carga actual', async ({ page }) => {
   await pararReloj(page);
   await trabajo(page).fill('200');
-  await page.clock.runFor(400 + 100);
+  await page.clock.fastForward(400);
+  await page.clock.fastForward(100);
   await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
   // Más de 400 ms después del primer cambio, y con el 70 % animándose.
   await trabajo(page).fill('105');
-  await page.clock.runFor(399);
+  await page.clock.fastForward(399);
   await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
-  await page.clock.runFor(20);
+  await page.clock.fastForward(20);
   await hastaQuePare(page);
   await expect(dibujo(page, 70)).toHaveAttribute('aria-label', 'Carga: 25 + 1,25 kg');
   await expect(dibujo(page, 70)).toHaveAttribute('data-discos', '2500,125');
@@ -350,8 +359,7 @@ test('SPEC-CALC-003/AC-17 si la carga cambia en plena animación, el dibujo acab
 });
 
 test('SPEC-CALC-003 FR-11 secuencia: sale el collarín, salen los discos de fuera adentro, entran del más pesado al más ligero y entra el collarín', async ({ page }) => {
-  test.setTimeout(120_000);
-  await pararReloj(page);
+  await pararReloj(page, [40, 70]);
   await desplegarPaneles(page);
   await registrar(page);
   // Los collarines se dibujan al momento, sin la espera de los pesos.
@@ -365,7 +373,8 @@ test('SPEC-CALC-003 FR-11 secuencia: sale el collarín, salen los discos de fuer
   // collarín (110 kg). El de 25 se queda.
   await trabajo(page).fill('110');
   await page.clock.runFor(400);
-  await hastaQuePare(page, 50);
+  // Cada estado dura al menos 300 ms.
+  await hastaQuePare(page, 100);
   // Con solo el de 25, la tarjeta está un instante: el de 10 empieza a entrar
   // cuando el de 5 termina de salir, y pueden caer en el mismo fotograma.
   const visto = (await registro(page))['90 %'];
@@ -395,15 +404,16 @@ test('SPEC-CALC-003 FR-11 cada tarjeta que se anima empieza 90 ms después de la
 });
 
 test('SPEC-CALC-003 FR-11 al cambiar de equipo, las tarjetas se vacían y se cargan de nuevo', async ({ page }) => {
-  await pararReloj(page);
+  await pararReloj(page, [90]);
   await desplegarPaneles(page);
   await registrar(page);
   // 70 %: de 25 en la olímpica de 20 a 25 + 2,5 en la de 15. El de 25 no se
-  // conserva: la tarjeta se vacía.
+  // conserva: la tarjeta se vacía y, como empieza 90 ms después del 40 %, se ve
+  // vacía en el primer fotograma.
   await barra(page, 'Olímpica 15').check();
   await page.clock.runFor(20);
   await expect(dibujo(page, 70)).toHaveAttribute('data-equipo', '15');
-  await hastaQuePare(page, 50);
+  await hastaQuePare(page, 150);
   expect((await registro(page))['70 %']).toEqual(['2500', '', '2500', '2500,250']);
   await expect(dibujo(page, 70)).toHaveAttribute('aria-label', 'Carga: 25 + 2,5 kg');
 });
@@ -445,8 +455,8 @@ test('SPEC-CALC-003/AC-15 una tarjeta añadida entra con un fundido; las que vue
 });
 
 test('SPEC-CALC-003/AC-15 con "Reducir movimiento", nada se anima: añadir, borrar, deshacer, desplegar y cambiar el peso', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
   await pararReloj(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await registrar(page);
   await page.evaluate(() => {
     window.movimientos = [];
