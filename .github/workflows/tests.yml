@@ -19,9 +19,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
+  # Los E2E se reparten en 3 trozos que corren a la vez (VIC-12): en la CI no hay GPU,
+  # el dibujo 3D se pinta por software y cada E2E tarda unas 4 veces más. Todos siguen
+  # corriendo con el dibujo activo. Cada trozo tiene sus propios 15 minutos.
+  e2e:
+    name: e2e (${{ matrix.trozo }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        trozo: [1, 2, 3]
     # Imagen oficial de Playwright: trae Chromium, WebKit y sus dependencias del sistema,
     # así que no hay que instalarlos en cada ejecución (con --with-deps se agotaban los
     # 15 minutos esperando al servidor de paquetes de Ubuntu; PR #12 y #14).
@@ -58,10 +66,26 @@ jobs:
         name: Instalar dependencias (versiones exactas del lockfile, sin scripts de instalación)
         run: npm ci --ignore-scripts
 
-      - if: steps.hay.outputs.si == 'true'
+      # Los unitarios son rápidos: solo en el primer trozo.
+      - if: steps.hay.outputs.si == 'true' && matrix.trozo == 1
         name: Tests unitarios
         run: node --test "tests/unit/**/*.test.js"
 
       - if: steps.hay.outputs.si == 'true'
-        name: Tests E2E (Chromium y WebKit)
-        run: npx playwright test
+        name: Tests E2E (Chromium y WebKit), trozo ${{ matrix.trozo }} de 3
+        run: npx playwright test --shard=${{ matrix.trozo }}/3
+
+  # El check obligatorio del ruleset se llama "tests": este job lo mantiene y solo
+  # sale en verde si los 3 trozos terminan bien (también si alguno se cancela o falla).
+  tests:
+    needs: e2e
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: ¿Han pasado los 3 trozos?
+        env:
+          RESULTADO: ${{ needs.e2e.result }}
+        run: |
+          echo "Resultado de los E2E: $RESULTADO"
+          test "$RESULTADO" = "success"
