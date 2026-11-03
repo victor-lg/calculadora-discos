@@ -13,7 +13,23 @@ import {
   Vector3,
   WebGLRenderer,
 } from '../vendor/three/three.module.min.js';
-import { entorno, luces, estructura, disco, collarin, posiciones, mediaBarra, FUENTES_ROTULO } from './modelo3d.js';
+import {
+  entorno,
+  luces,
+  estructura,
+  disco,
+  collarin,
+  posiciones,
+  mediaBarra,
+  grosor,
+  largoManga,
+  abrirPalanca,
+  abrirRanura,
+  PALANCA_ABIERTA,
+  RANURA_ABIERTA,
+  RANURA_CERRADA,
+  FUENTES_ROTULO,
+} from './modelo3d.js';
 
 // Notas §4.1: cámara ortográfica "aún más de frente", con 540 mm de alto
 // visible en las barras y 600 en la máquina; lienzo de proporción 1,25 y hasta
@@ -23,6 +39,26 @@ const OBJETIVO = new Vector3(110, -10, 0);
 const RESOLUCION_MAXIMA = 2;
 // Las miniaturas, de frente y todas a la misma escala (notas §4.3).
 const MINIATURA = { ancho: 264, alto: 90, mitad: 410, centro: new Vector3(30, -2, 0), direccion: new Vector3(0, 0.28, 0.96).normalize() };
+
+// SPEC-CALC-003 FR-11 y notas §6: mientras se escribe un peso, el dibujo espera
+// 400 ms desde la última tecla, y cada tarjeta empieza su animación 90 ms
+// después de la anterior. Las curvas, como en la referencia visual.
+const ESPERA_MS = 400;
+const DESFASE_MS = 90;
+// Lo que puede ocupar como mucho cada fotograma pintando tarjetas, salvo la primera.
+const PRESUPUESTO_MS = 12;
+const salida = (x) => x * x * x;
+const entrada = (x) => 1 - (1 - x) ** 3;
+const rebote = (x) => 1 + 2.9 * (x - 1) ** 3 + 1.9 * (x - 1) ** 2;
+// FR-13: con "Reducir movimiento", ninguna animación.
+const sinMovimiento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function mover(o, que, valor) {
+  if (que === 'x') o.position.x = valor;
+  else if (que === 'palanca') abrirPalanca(o, valor);
+  else abrirRanura(o, valor);
+}
 
 // El renderizador, con la salida de las notas §4.1. Lanza un error si el
 // dispositivo no puede dibujar en 3D o no tiene lienzos 2D donde copiar los
@@ -85,9 +121,17 @@ export function crearMotor({ alPerder }) {
     renderer.setSize(ancho, alto, false);
   };
 
-  // Cada lienzo de tarjeta, con la carga que tiene que mostrar, el grupo de
-  // piezas que la dibuja y la firma de lo último que se pintó.
+  // Cada lienzo de tarjeta, con la carga que tiene que mostrar (`carga`), la
+  // que muestra (`mostrada`, FR-16), el grupo con sus discos y su collarín, los
+  // movimientos en curso y la firma de lo último que se pintó.
   const tarjetas = new Map();
+  // FR-11: las cargas nuevas que aún no se han empezado a dibujar, y el reloj
+  // de la espera mientras se escribe un peso.
+  const cola = new Map();
+  let reloj = null;
+  let enCola = false;
+  // La tarjeta por la que empieza a pintar el siguiente fotograma.
+  let turno = 0;
   const observador = new ResizeObserver(() => pintarPendientes());
   // Un cambio de carga sin cambio de tamaño se pinta antes del siguiente fotograma.
   let programado = false;
@@ -120,20 +164,180 @@ export function crearMotor({ alPerder }) {
       pintarPendientes();
     }));
 
-  function montar(carga) {
-    const grupo = new Group();
+  // FR-10 y FR-11: la tarjeta, ya cargada y sin animación.
+  function montar(t) {
+    t.grupo = new Group();
+    t.piezas = [];
+    t.collar = null;
+    poner(t, 0);
+    t.mostrada = t.carga;
+  }
+
+  // Coloca en su sitio, sin animación, los discos de la carga desde el
+  // índice `k` y el collarín, si lo lleva.
+  function poner(t, k) {
+    const x = posiciones(t.carga.discos);
+    for (let i = k; i < t.carga.discos.length; i++) {
+      const o = disco(t.carga.discos[i]);
+      o.position.x = x.discos[i];
+      t.grupo.add(o);
+      t.piezas.push({ cent: t.carga.discos[i], o });
+    }
+    if (t.carga.collarin) {
+      t.collar = collarin();
+      t.collar.position.x = x.collarin;
+      t.grupo.add(t.collar);
+    }
+  }
+
+  // FR-12: los movimientos en curso terminan de golpe, en su posición final.
+  function acabar(t) {
+    for (const m of t.movimientos) {
+      if (!m.empezado) m.alEmpezar?.();
+      mover(m.o, m.que, m.hasta);
+      m.alAcabar?.();
+    }
+    t.movimientos = [];
+  }
+
+  // SPEC-CALC-003 FR-11 y notas §6: cambia la carga de una tarjeta. Se
+  // conservan los discos interiores que no cambian y solo se anima lo que
+  // cambia: sale el collarín, salen los discos que sobran de fuera hacia dentro
+  // y de uno en uno, entran los nuevos del más pesado al más ligero y entra el
+  // collarín, que se cierra. Al cambiar de equipo, la tarjeta se vacía y se
+  // carga de nuevo. Devuelve si se anima.
+  function cambiar(t, carga, retraso) {
+    acabar(t);
+    const antes = t.carga;
+    t.carga = carga;
+    // Una tarjeta que aún no se ha pintado se monta ya con la carga nueva.
+    if (!t.grupo) {
+      t.mostrada = carga;
+      return false;
+    }
+    t.sucio = true;
+    if (carga.equipo !== antes.equipo) {
+      for (const { o } of t.piezas) t.grupo.remove(o);
+      if (t.collar) t.grupo.remove(t.collar);
+      t.piezas = [];
+      t.collar = null;
+    }
+    let k = 0;
+    while (k < t.piezas.length && t.piezas[k].cent === carga.discos[k]) k++;
+    if (k === t.piezas.length && k === carga.discos.length && Boolean(t.collar) === carga.collarin) {
+      t.mostrada = carga;
+      return false;
+    }
+    const sobran = t.piezas.splice(k).reverse();
+    if (sinMovimiento()) {
+      for (const { o } of sobran) t.grupo.remove(o);
+      if (t.collar) t.grupo.remove(t.collar);
+      t.collar = null;
+      poner(t, k);
+      t.mostrada = carga;
+      return false;
+    }
+
+    const inicio = performance.now();
+    const fin = largoManga(carga.equipo);
+    const fuera = (cent) => fin + 40 + grosor(cent) / 2;
     const x = posiciones(carga.discos);
-    carga.discos.forEach((cent, i) => {
-      const d = disco(cent);
-      d.position.x = x.discos[i];
-      grupo.add(d);
-    });
+    // Añade un movimiento que empieza `desde` ms después del inicio y devuelve
+    // cuándo termina.
+    const movimiento = (o, que, de, a, desde, dur, curva, extra = {}) => {
+      t.movimientos.push({ o, que, desde: de, hasta: a, t0: inicio + desde, dur, curva, ...extra });
+      return desde + dur;
+    };
+    let ms = retraso;
+    // 1. Se abre la palanca y sale el collarín.
+    if (t.collar) {
+      const c = t.collar;
+      t.collar = null;
+      movimiento(c, 'ranura', RANURA_CERRADA, RANURA_ABIERTA, ms + 60, 160, entrada);
+      ms = movimiento(c, 'palanca', 0, PALANCA_ABIERTA, ms, 220, entrada);
+      ms = movimiento(c, 'x', c.position.x, fin + 80, ms, 260, salida, { alAcabar: () => t.grupo.remove(c) });
+    }
+    // 2. Salen los que sobran, de fuera hacia dentro: el siguiente no se mueve
+    // hasta que el anterior ha salido de la manga.
+    for (const { cent, o } of sobran) {
+      const hasta = fuera(cent) + 60;
+      ms = movimiento(o, 'x', o.position.x, hasta, ms, 140 + (hasta - o.position.x) * 0.5, salida, { alAcabar: () => t.grupo.remove(o) });
+    }
+    // 3. Entran los nuevos, del más pesado al más ligero, ocultos hasta que les
+    // toca; cada uno empieza al 75 % del anterior.
+    let anterior = null;
+    for (let i = k; i < carga.discos.length; i++) {
+      const cent = carga.discos[i];
+      const o = disco(cent);
+      const desdeX = fuera(cent);
+      o.position.x = desdeX;
+      o.visible = false;
+      t.grupo.add(o);
+      t.piezas.push({ cent, o });
+      const dur = 220 + (desdeX - x.discos[i]) * 0.7;
+      const empieza = anterior ? anterior.empieza + anterior.dur * 0.75 : ms;
+      movimiento(o, 'x', desdeX, x.discos[i], empieza, dur, entrada, { alEmpezar: () => { o.visible = true; } });
+      anterior = { empieza, dur };
+      ms = Math.max(ms, empieza + dur);
+    }
+    // 4. Entra el collarín con la palanca abierta y la cierra al llegar.
     if (carga.collarin) {
       const c = collarin();
-      c.position.x = x.collarin;
-      grupo.add(c);
+      abrirPalanca(c, PALANCA_ABIERTA);
+      abrirRanura(c, RANURA_ABIERTA);
+      c.position.x = fin + 80;
+      c.visible = false;
+      t.grupo.add(c);
+      t.collar = c;
+      ms = movimiento(c, 'x', fin + 80, x.collarin, ms + 60, 200 + (fin + 80 - x.collarin) * 0.6, entrada, { alEmpezar: () => { c.visible = true; } });
+      movimiento(c, 'palanca', PALANCA_ABIERTA, 0, ms + 40, 340, rebote);
+      movimiento(c, 'ranura', RANURA_ABIERTA, RANURA_CERRADA, ms + 200, 180, entrada);
     }
-    return grupo;
+    return true;
+  }
+
+  // Avanza los movimientos de una tarjeta hasta `ahora`. Al terminar el último,
+  // el dibujo muestra su carga (FR-16). Devuelve si hay que repintarla: no,
+  // mientras espera su desfase sin que nada se mueva.
+  function avanzar(t, ahora) {
+    if (!t.movimientos.length) return false;
+    let mueve = false;
+    t.movimientos = t.movimientos.filter((m) => {
+      const k = (ahora - m.t0) / m.dur;
+      if (k < 0) return true;
+      mueve = true;
+      if (!m.empezado) {
+        m.empezado = true;
+        m.alEmpezar?.();
+      }
+      mover(m.o, m.que, m.desde + (m.hasta - m.desde) * m.curva(Math.min(1, k)));
+      if (k < 1) return true;
+      m.alAcabar?.();
+      return false;
+    });
+    if (!t.movimientos.length) t.mostrada = t.carga;
+    return mueve;
+  }
+
+  // FR-11: empieza a dibujar las cargas de la cola, en el orden de las
+  // tarjetas; cada una que se anima empieza 90 ms después de la anterior.
+  function aplicarCola() {
+    clearTimeout(reloj);
+    reloj = null;
+    enCola = false;
+    if (perdido) return;
+    const lista = [...cola].filter(([lienzo]) => tarjetas.has(lienzo) && lienzo.isConnected);
+    cola.clear();
+    lista.sort(([a], [b]) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    let n = 0;
+    for (const [lienzo, carga] of lista) {
+      if (!cambiar(tarjetas.get(lienzo), carga, n * DESFASE_MS)) continue;
+      // FR-16: la animación está en curso desde ahora, aunque la tarjeta aún
+      // no se haya repintado; deja de estarlo al pintar su último fotograma.
+      lienzo.dataset.animando = 'true';
+      n += 1;
+    }
+    programar();
   }
 
   function usarEquipo(id) {
@@ -156,7 +360,7 @@ export function crearMotor({ alPerder }) {
   // Pinta una tarjeta y expone lo que muestra (SPEC-CALC-003 FR-16): la
   // etiqueta accesible describe la carga dibujada.
   function pintar(lienzo, t, ancho, alto) {
-    t.grupo ??= montar(t.carga);
+    if (!t.grupo) montar(t);
     for (const otra of tarjetas.values()) if (otra.grupo) otra.grupo.visible = otra === t;
     if (!t.grupo.parent) escena.add(t.grupo);
     usarEquipo(t.carga.equipo);
@@ -174,16 +378,20 @@ export function crearMotor({ alPerder }) {
     const ctx = lienzo.getContext('2d');
     ctx.clearRect(0, 0, ancho, alto);
     ctx.drawImage(lienzo3d, 0, 0);
+    // Los discos y el collarín, los que se ven en la escena, de dentro afuera;
+    // la etiqueta, la de la carga que muestra al terminar de cambiar.
+    const vistas = t.grupo.children.filter((o) => o.visible).sort((a, b) => a.position.x - b.position.x);
     lienzo.dataset.equipo = t.carga.equipo;
-    lienzo.dataset.discos = t.carga.discos.join(',');
-    lienzo.dataset.collarin = String(t.carga.collarin);
-    lienzo.dataset.animando = 'false';
-    lienzo.setAttribute('aria-label', t.carga.etiqueta);
+    lienzo.dataset.discos = vistas.filter((o) => o.userData.cent).map((o) => o.userData.cent).join(',');
+    lienzo.dataset.collarin = String(vistas.some((o) => o.name === 'collarin'));
+    lienzo.dataset.animando = String(t.movimientos.length > 0);
+    lienzo.setAttribute('aria-label', t.mostrada.etiqueta);
     lienzo.removeAttribute('aria-hidden');
   }
 
-  // ADR-0003 §3.5: solo se repintan las tarjetas que lo necesitan. Las que ya
-  // no están en la página se olvidan.
+  // ADR-0003 §3.5: solo se repintan las tarjetas que lo necesitan: las que
+  // cambian de tamaño o de carga y las que tienen una animación en curso. Las
+  // que ya no están en la página se olvidan.
   function pintarPendientes() {
     for (const [lienzo, t] of tarjetas) {
       if (lienzo.isConnected) continue;
@@ -199,15 +407,32 @@ export function crearMotor({ alPerder }) {
       pintarMiniatura({ lienzo, id });
     }
     const resolucion = Math.min(window.devicePixelRatio || 1, RESOLUCION_MAXIMA);
+    const ahora = performance.now();
+    // Si pintar es lento (por ejemplo, sin GPU), cada fotograma pinta hasta
+    // agotar su presupuesto y deja las demás tarjetas para el siguiente,
+    // empezando cada vez por otra: así la página sigue respondiendo. La
+    // animación va por tiempo, así que no se retrasa.
+    const lista = [...tarjetas];
+    let quedan = false;
     try {
-      for (const [lienzo, t] of tarjetas) {
+      for (let i = 0; i < lista.length; i++) {
+        const [lienzo, t] = lista[(turno + i) % lista.length];
         const ancho = Math.round(lienzo.clientWidth * resolucion);
         const alto = Math.round(lienzo.clientHeight * resolucion);
         const firma = `${ancho}×${alto}`;
-        if (!ancho || !alto || t.firma === firma) continue;
+        const mueve = avanzar(t, ahora);
+        if (!ancho || !alto || (t.firma === firma && !t.sucio && !mueve)) continue;
+        if (performance.now() - ahora > PRESUPUESTO_MS) {
+          t.sucio = true;
+          if (!quedan) turno = (turno + i) % lista.length;
+          quedan = true;
+          continue;
+        }
         pintar(lienzo, t, ancho, alto);
         t.firma = firma;
+        t.sucio = false;
       }
+      if (quedan || lista.some(([, t]) => t.movimientos.length)) programar();
     } catch {
       // SPEC-CALC-003 FR-14: un error al pintar se trata como un fallo al
       // prepararlo (decisión de Víctor del 2026-11-03, PR #33).
@@ -246,19 +471,35 @@ export function crearMotor({ alPerder }) {
 
   return {
     // SPEC-CALC-003 FR-07 y FR-10: el lienzo de una tarjeta (index.html,
-    // #plantilla-dibujo) con su carga, que aparece ya cargado. Hasta pintarse
-    // no se anuncia. Un lienzo que ya tiene esa carga no se repinta.
-    dibujar(lienzo, carga) {
+    // #plantilla-dibujo) con su carga. Un lienzo nuevo aparece ya cargado y
+    // hasta pintarse no se anuncia. En uno que ya está, la carga nueva se
+    // anima (FR-11): con `esperar`, 400 ms después de la última llamada que
+    // espera; sin él, al momento, junto con las que estuvieran esperando. Un
+    // lienzo que ya tiene esa carga no cambia.
+    dibujar(lienzo, carga, { esperar = false } = {}) {
       const t = tarjetas.get(lienzo);
       if (!t) {
-        tarjetas.set(lienzo, { carga, grupo: null, firma: null });
+        tarjetas.set(lienzo, { carga, mostrada: carga, grupo: null, piezas: [], collar: null, movimientos: [], firma: null, sucio: false });
         observador.observe(lienzo);
         return;
       }
-      if (JSON.stringify(t.carga) === JSON.stringify(carga)) return;
-      if (t.grupo) escena.remove(t.grupo);
-      Object.assign(t, { carga, grupo: null, firma: null });
-      programar();
+      if (igual(cola.get(lienzo) ?? t.carga, carga)) return;
+      cola.set(lienzo, carga);
+      if (esperar) {
+        this.esperar();
+        return;
+      }
+      clearTimeout(reloj);
+      reloj = null;
+      if (enCola) return;
+      enCola = true;
+      queueMicrotask(aplicarCola);
+    },
+    // FR-11: una tecla en un campo de peso vuelve a empezar la espera.
+    esperar() {
+      if (enCola || !cola.size) return;
+      clearTimeout(reloj);
+      reloj = setTimeout(aplicarCola, ESPERA_MS);
     },
     // SPEC-CALC-003 FR-07: la miniatura de una ficha de barra.
     miniatura(lienzo, id) {

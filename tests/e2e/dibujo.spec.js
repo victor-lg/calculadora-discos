@@ -3,7 +3,7 @@
 // comprueban antes y fallan si no lo está, para no pasar en falso por la vista
 // de FR-14 (SPEC-CALC-003 §11, ADR-0003 §4).
 import { test, expect as esperar } from '@playwright/test';
-import { trabajo, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar } from './pantalla.js';
+import { trabajo, pesoBarra, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar, vigilarEntradas, entradas } from './pantalla.js';
 
 // En la CI, sin GPU, cada dibujo se pinta por software, y con varios tests a la
 // vez puede tardar más de los 5 s de espera por defecto.
@@ -41,6 +41,7 @@ const pintado = (lienzo) => lienzo.evaluate((c) => {
 
 test.beforeEach(async ({ page }) => {
   await vigilarContextos(page);
+  await vigilarEntradas(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await exigirDibujo3D(page);
@@ -242,4 +243,315 @@ test('provisional: al perder el contexto, la app pasa a la vista sin dibujo hast
   await expect(series(page)).toHaveCount(4);
   await expect(page.locator('.dibujo')).toHaveCount(0);
   for (const svg of await page.locator('#lista-barras .ficha svg').all()) await expect(svg).toBeVisible();
+});
+
+// SPEC-CALC-003 FR-11 a FR-13: la animación de la carga. Sus tiempos se prueban
+// con el reloj controlado (§11): se instala antes de abrir la app y se para con
+// los dibujos ya pintados. Desde entonces, los fotogramas solo pasan al
+// avanzarlo. En la CI cada fotograma se pinta por software, así que se pintan
+// los menos posibles: se avanza a saltos y, donde basta, con menos series.
+const INICIO = [
+  ['40 %', 'Carga: 10 kg', '1000'],
+  ['70 %', 'Carga: 25 kg', '2500'],
+  ['90 %', 'Carga: 25 + 10 kg', '2500,1000'],
+];
+
+// `quitar`: las series que se borran antes, sin animación.
+async function pararReloj(page, quitar = []) {
+  // En la CI, con el dibujo por software, cada fotograma pasa de medio segundo.
+  test.setTimeout(90_000);
+  if (quitar.length) {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const p of quitar) await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
+    await expect(series(page)).toHaveCount(3 - quitar.length);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+  }
+  await page.clock.install();
+  await page.reload();
+  await exigirDibujo3D(page);
+  // AC-16: al abrir la app, ningún dibujo tiene una animación en curso.
+  await comprobarDibujos(page, INICIO.filter(([p]) => !quitar.includes(parseInt(p, 10))));
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+}
+
+// Anota, por tarjeta, cada estado distinto que expone su dibujo (FR-16): los
+// discos que se ven, de dentro afuera, y si se ve el collarín.
+async function registrar(page) {
+  await page.evaluate(() => {
+    window.registro = {};
+    const anotar = (l) => {
+      const p = l.closest('li')?.querySelector('.porcentaje')?.textContent;
+      if (!p) return;
+      const e = `${l.dataset.discos}${l.dataset.collarin === 'true' ? ' +c' : ''}`;
+      const r = (window.registro[p] ??= []);
+      if (r.at(-1) !== e) r.push(e);
+    };
+    window.animados = new Set();
+    document.querySelectorAll('#series .dibujo').forEach(anotar);
+    new MutationObserver((ms) => ms.forEach(({ target: l }) => {
+      anotar(l);
+      if (l.dataset.animando === 'true') window.animados.add(l.closest('li')?.querySelector('.porcentaje')?.textContent);
+    })).observe(document.getElementById('series'), { subtree: true, attributes: true, attributeFilter: ['data-discos', 'data-collarin', 'data-animando'] });
+  });
+}
+const registro = (page) => page.evaluate(() => window.registro);
+const animados = (page) => page.evaluate(() => [...window.animados].sort());
+
+// Avanza el reloj a saltos de `paso` ms, un fotograma por salto, hasta que
+// ningún dibujo tiene una animación en curso. En la CI cada fotograma se pinta
+// por software: los saltos son tan largos como permite lo que se comprueba.
+async function hastaQuePare(page, paso = 100) {
+  for (let i = 0; i < 200; i++) {
+    await page.clock.fastForward(paso);
+    if (await page.locator('#series .dibujo[data-animando="true"]').count() === 0) return;
+  }
+  throw new Error('La animación no termina');
+}
+
+test('SPEC-CALC-003/AC-16 al cambiar de 100 a 105, el texto cambia al teclear y el dibujo espera 400 ms desde la última tecla', async ({ page }) => {
+  await pararReloj(page);
+  await registrar(page);
+  await trabajo(page).focus();
+  await page.keyboard.press('End');
+  // "10": el texto cambia al momento; el dibujo no.
+  await page.keyboard.press('Backspace');
+  await expect(tarjeta(page, 70).locator('.total')).toHaveText('20 kg');
+  await page.clock.runFor(300);
+  // "105", 300 ms después: la espera vuelve a empezar, y la carga de "10"
+  // nunca se dibuja.
+  await page.keyboard.type('5');
+  await expect(tarjeta(page, 70).locator('.total')).toHaveText('72,5 kg');
+  await expect(tarjeta(page, 90).locator('.total')).toHaveText('92,5 kg');
+  await page.clock.runFor(399);
+  expect(await estadoDibujos(page)).toEqual(INICIO.map(([p, etiqueta, discos]) => [p, etiqueta, discos, 'false', 'false']));
+  expect(await animados(page)).toEqual([]);
+  // A los 400 ms empieza la animación de las tarjetas cuya carga cambia.
+  await page.clock.runFor(20);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
+  await hastaQuePare(page);
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+  // El 40 %, cuya carga no cambia, no se anima.
+  expect(await animados(page)).toEqual(['70 %', '90 %']);
+  expect((await registro(page))['70 %']).toEqual(['2500', '2500,125']);
+});
+
+test('SPEC-CALC-003/AC-17 si la carga cambia en plena animación, el dibujo acaba en la carga actual', async ({ page }) => {
+  await pararReloj(page);
+  await trabajo(page).fill('200');
+  await page.clock.fastForward(400);
+  await page.clock.fastForward(100);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
+  // Más de 400 ms después del primer cambio, y con el 70 % animándose.
+  await trabajo(page).fill('105');
+  await page.clock.fastForward(399);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
+  await page.clock.fastForward(20);
+  await hastaQuePare(page, 300);
+  await expect(dibujo(page, 70)).toHaveAttribute('aria-label', 'Carga: 25 + 1,25 kg');
+  await expect(dibujo(page, 70)).toHaveAttribute('data-discos', '2500,125');
+  await expect(dibujo(page, 70)).toHaveAttribute('data-collarin', 'false');
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+});
+
+test('SPEC-CALC-003 FR-11 secuencia: sale el collarín, salen los discos de fuera adentro, entran del más pesado al más ligero y entra el collarín', async ({ page }) => {
+  await pararReloj(page, [40, 70]);
+  await desplegarPaneles(page);
+  await registrar(page);
+  // Los collarines se dibujan al momento, sin la espera de los pesos.
+  await page.getByLabel('Collarines de competición').check();
+  await page.clock.runFor(20);
+  await expect(dibujo(page, 90)).toHaveAttribute('data-animando', 'true');
+  await hastaQuePare(page);
+  await expect(dibujo(page, 90)).toHaveAttribute('aria-label', 'Carga: 25 + 5 + 2,5 kg');
+  await registrar(page);
+  // 90 %: de 25 + 5 + 2,5 con collarín (100 kg) a 25 + 10 + 1,25 con
+  // collarín (110 kg). El de 25 se queda.
+  await trabajo(page).fill('110');
+  await page.clock.runFor(400);
+  // Cada estado dura al menos 375 ms.
+  await hastaQuePare(page, 200);
+  // Con solo el de 25, la tarjeta está un instante: el de 10 empieza a entrar
+  // cuando el de 5 termina de salir, y pueden caer en el mismo fotograma.
+  const visto = (await registro(page))['90 %'];
+  expect(visto.filter((e) => e !== '2500')).toEqual([
+    '2500,500,250 +c',
+    '2500,500,250',
+    '2500,500',
+    '2500,1000',
+    '2500,1000,125',
+    '2500,1000,125 +c',
+  ]);
+  expect([-1, 3]).toContain(visto.indexOf('2500'));
+  await expect(dibujo(page, 90)).toHaveAttribute('aria-label', 'Carga: 25 + 10 + 1,25 kg');
+});
+
+test('SPEC-CALC-003 FR-11 cada tarjeta que se anima empieza 90 ms después de la anterior', async ({ page }) => {
+  await pararReloj(page);
+  await trabajo(page).fill('105');
+  await page.clock.runFor(400);
+  // El 70 % empieza al momento; el 90 %, 90 ms después. El 40 % no cambia.
+  await page.clock.runFor(40);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-discos', '2500,125');
+  await expect(dibujo(page, 90)).toHaveAttribute('data-discos', '2500,1000');
+  await page.clock.runFor(80);
+  await expect(dibujo(page, 90)).toHaveAttribute('data-discos', '2500,1000,125');
+  await expect(dibujo(page, 40)).toHaveAttribute('data-animando', 'false');
+});
+
+test('SPEC-CALC-003 FR-11 al cambiar de equipo, las tarjetas se vacían y se cargan de nuevo', async ({ page }) => {
+  await pararReloj(page, [90]);
+  await desplegarPaneles(page);
+  await registrar(page);
+  // 70 %: de 25 en la olímpica de 20 a 25 + 2,5 en la de 15. El de 25 no se
+  // conserva: la tarjeta se vacía y, como empieza 90 ms después del 40 %, se ve
+  // vacía en el primer fotograma.
+  await barra(page, 'Olímpica 15').check();
+  await page.clock.runFor(20);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-equipo', '15');
+  await hastaQuePare(page, 150);
+  expect((await registro(page))['70 %']).toEqual(['2500', '', '2500', '2500,250']);
+  await expect(dibujo(page, 70)).toHaveAttribute('aria-label', 'Carga: 25 + 2,5 kg');
+});
+
+test('SPEC-CALC-003/AC-15 una tarjeta añadida entra con un fundido; las que vuelven al corregir el peso, sin él; el dibujo no se anima', async ({ page }) => {
+  await pararReloj(page);
+  await registrar(page);
+  await anadirPorcentaje(page, '50');
+  expect(await entradas(page)).toEqual(['50 % 0→1']);
+  await page.clock.runFor(20);
+  await expect(dibujo(page, 50)).toHaveAttribute('aria-label', 'Carga: 15 kg');
+  await expect(dibujo(page, 50)).toHaveAttribute('data-animando', 'false');
+
+  // Al borrar el peso y volver a escribir 100 tecla a tecla, las tarjetas
+  // vuelven con "1" sin entrada y con el dibujo ya cargado, sin animación en
+  // curso. Después, "100" se dibuja como cualquier peso tecleado (FR-11).
+  // Decisión de Víctor en el PR #35.
+  await trabajo(page).fill('');
+  await expect(series(page)).toHaveCount(0);
+  await trabajo(page).pressSequentially('100');
+  await expect(series(page)).toHaveCount(4);
+  expect(await entradas(page)).toEqual([]);
+  await comprobarDibujos(page, ['40 %', '50 %', '70 %', '90 %'].map((p) => [p, 'Sin discos', '']));
+  await page.clock.runFor(400);
+  await hastaQuePare(page, 300);
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['50 %', 'Carga: 15 kg', '1500'],
+    ['70 %', 'Carga: 25 kg', '2500'],
+    ['90 %', 'Carga: 25 + 10 kg', '2500,1000'],
+  ]);
+  expect(await entradas(page)).toEqual([]);
+
+  // Con la lista vacía, la tarjeta añadida también entra con el fundido.
+  for (const p of [40, 50, 70, 90]) {
+    await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
+    await page.clock.runFor(1000);
+  }
+  await expect(series(page)).toHaveCount(0);
+  await entradas(page);
+  await anadirPorcentaje(page, '50');
+  expect(await entradas(page)).toEqual(['50 % 0→1']);
+});
+
+test('SPEC-CALC-003/AC-15 con "Reducir movimiento", nada se anima: añadir, borrar, deshacer, desplegar y cambiar el peso', async ({ page }) => {
+  await pararReloj(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await registrar(page);
+  await page.evaluate(() => {
+    window.movimientos = [];
+    for (const tipo of ['transitionrun', 'animationstart']) {
+      document.addEventListener(tipo, (e) => window.movimientos.push(`${tipo} ${e.target.className}`), true);
+    }
+  });
+  const enCurso = () => page.evaluate(() => document.getAnimations().length + window.movimientos.length);
+
+  await anadirPorcentaje(page, '50');
+  expect(await enCurso()).toBe(0);
+  await page.getByRole('button', { name: 'Quitar la serie del 70 %' }).press('Enter');
+  expect(await enCurso()).toBe(0);
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '90 %']);
+  await page.getByRole('button', { name: 'Deshacer' }).click();
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
+  expect(await enCurso()).toBe(0);
+  await desplegarPaneles(page);
+  expect(await enCurso()).toBe(0);
+  // El peso: la espera es la misma, pero el dibujo cambia de golpe.
+  await trabajo(page).fill('105');
+  await page.clock.runFor(399);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-discos', '2500');
+  await page.clock.runFor(20);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-discos', '2500,125');
+  await expect(dibujo(page, 70)).toHaveAttribute('aria-label', 'Carga: 25 + 1,25 kg');
+  await page.clock.runFor(2000);
+  // Con 105 kg, el 70 % tiene la marca de diferencia (AC-06).
+  await tarjeta(page, 70).locator('.diferencia').click();
+  await expect(tarjeta(page, 70).locator('.detalle')).toBeVisible();
+  expect(await enCurso()).toBe(0);
+  expect(await animados(page)).toEqual([]);
+  expect((await registro(page))['70 %']).toEqual(['2500', '2500,125']);
+});
+
+test('SPEC-CALC-003 FR-11 mientras se escribe el peso de la barra, el dibujo también espera 400 ms', async ({ page }) => {
+  await pararReloj(page, [40, 90]);
+  await desplegarPaneles(page);
+  await barra(page, 'Recta').check();
+  await page.clock.runFor(20);
+  await hastaQuePare(page, 300);
+  const antes = await dibujo(page, 70).getAttribute('data-discos');
+  await pesoBarra(page).fill('12');
+  await page.clock.runFor(399);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-discos', antes);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'false');
+  await page.clock.runFor(20);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
+  await hastaQuePare(page, 300);
+  await expect(dibujo(page, 70)).not.toHaveAttribute('data-discos', antes);
+});
+
+// ADR-0003 §3.5: si pintar es lento, cada fotograma pinta una tarjeta y deja
+// las demás para el siguiente, y todas acaban mostrando su carga. Se hace lento
+// copiar cada dibujo (20 ms más) y se cuentan las copias de cada fotograma.
+test('ADR-0003 §3.5 si pintar es lento, cada fotograma pinta una sola tarjeta y todas acaban en su carga', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.addInitScript(() => {
+    window.lento = false;
+    window.porFotograma = [];
+    let copias = 0;
+    const contar = () => {
+      if (copias) window.porFotograma.push(copias);
+      copias = 0;
+      requestAnimationFrame(contar);
+    };
+    requestAnimationFrame(contar);
+    const copiar = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function drawImage(...args) {
+      if (window.lento && this.canvas.classList.contains('dibujo')) {
+        const fin = performance.now() + 20;
+        while (performance.now() < fin);
+        copias += 1;
+      }
+      return copiar.apply(this, args);
+    };
+  });
+  await page.reload();
+  await exigirDibujo3D(page);
+  await comprobarDibujos(page, INICIO);
+  await page.evaluate(() => { window.lento = true; });
+  await trabajo(page).fill('105');
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+  const porFotograma = await page.evaluate(() => window.porFotograma);
+  expect(porFotograma.length).toBeGreaterThan(2);
+  expect(Math.max(...porFotograma)).toBe(1);
 });
