@@ -386,9 +386,12 @@ function molde(cent) {
   return g;
 }
 
+// Cada disco lleva su peso, para exponer lo que muestra el dibujo (FR-16).
 export function disco(cent) {
   if (!moldes.has(cent)) moldes.set(cent, molde(cent));
-  return moldes.get(cent).clone();
+  const d = moldes.get(cent).clone();
+  d.userData.cent = cent;
+  return d;
 }
 
 // Notas §5.1 y SPEC-CALC-001 FR-16: los discos se colocan de dentro afuera
@@ -410,6 +413,7 @@ let moldeCollarin = null;
 
 function crearCollarin() {
   const g = new Group();
+  g.name = 'collarin';
   const RE = 40;
   const RI = 25.4;
   const MEDIO = 0.16;
@@ -426,7 +430,9 @@ function crearCollarin() {
   // Cerrado, la ranura es de 3 mm.
   for (const s of [-1, 1]) {
     const oreja = new Mesh(new BoxGeometry(30, 15, 7), mat().grafito);
-    oreja.position.set(0, 44, s * (5.5 + 3 / 2));
+    oreja.name = 'oreja';
+    oreja.userData.lado = s;
+    oreja.position.set(0, 44, s * (5.5 + RANURA_CERRADA / 2));
     g.add(oreja);
   }
   const tornillo = new Mesh(new CylinderGeometry(2.6, 2.6, 30, 20), mat().cromo);
@@ -434,6 +440,7 @@ function crearCollarin() {
   tornillo.position.set(0, 47, 0);
   g.add(tornillo);
   const pivote = new Group();
+  pivote.name = 'palanca';
   pivote.position.set(0, 47, 0);
   const leva = new Mesh(new CylinderGeometry(9, 9, 12, 32), mat().palanca);
   leva.rotation.x = Math.PI / 2;
@@ -452,6 +459,25 @@ export function collarin() {
   moldeCollarin ??= crearCollarin();
   return moldeCollarin.clone();
 }
+
+// Notas §6: el collarín se abre (palanca levantada y ranura de 7 mm) para
+// salir y entrar, y se cierra al llegar. La copia no conserva funciones en
+// userData, así que las piezas se buscan por su nombre.
+export const PALANCA_ABIERTA = 1.15;
+export const RANURA_ABIERTA = 7;
+export const RANURA_CERRADA = 3;
+
+export function abrirPalanca(c, angulo) {
+  c.getObjectByName('palanca').rotation.z = angulo;
+}
+
+export function abrirRanura(c, mm) {
+  for (const o of c.children) if (o.name === 'oreja') o.position.z = o.userData.lado * (5.5 + mm / 2);
+}
+
+// Notas §6: lo que se mueve cada pieza depende de su grosor y de dónde acaba la manga.
+export const grosor = (cent) => DISCOS.get(cent).t;
+export const largoManga = (id) => EQUIPOS[id].manga;
 
 // Notas §4.3: manga con bisel final, tope y agarre (recto o con los quiebros de la Z).
 const manga = (largo) => torno([[0, 0], [25, 0], [25, largo - 6], [23.5, largo], [0, largo]], mat().manga, 96);

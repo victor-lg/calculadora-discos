@@ -192,8 +192,9 @@ function ajustarPeso({ forzar = false } = {}) {
 // desplegada. Se conserva al repintar las tarjetas.
 const desplegadas = new Set();
 
-// Las series de la última vez que se pintaron las tarjetas.
+// Las series de la última vez que se pintaron las tarjetas, y sus porcentajes.
 let seriesPintadas = null;
+let porcentajesPintados = new Set();
 
 // FR-06: la marca se despliega y se pliega en su sitio, sin repintar la tarjeta.
 function alternarDiferencia(marca, valor) {
@@ -207,8 +208,9 @@ function alternarDiferencia(marca, valor) {
 // SPEC-CALC-003 FR-06 y FR-14: la tarjeta de una serie, solo con texto. Las
 // líneas van en la columna de texto y, debajo, a todo el ancho, la explicación
 // de la diferencia y el aviso de capacidad. FR-08: la tarjeta va sobre el fondo
-// de borrar y lleva el botón "Quitar la serie del P %".
-function pintarSerie(s) {
+// de borrar y lleva el botón "Quitar la serie del P %". `esperar` va al dibujo
+// (FR-11).
+function pintarSerie(s, esperar) {
   const item = crear('li', 'deslizable');
   const fondo = $('plantilla-borrar').content.firstElementChild.cloneNode(true);
   const li = crear('div', 'serie');
@@ -256,7 +258,7 @@ function pintarSerie(s) {
   const lienzo = motor && (lienzos.get(s.valor) ?? $('plantilla-dibujo').content.firstElementChild.cloneNode(true));
   if (lienzo) {
     columna.after(lienzo);
-    motor.dibujar(lienzo, s.dibujo);
+    motor.dibujar(lienzo, s.dibujo, { esperar });
     sinDibujo.delete(lienzo);
   }
   if (s.avisoCapacidad) {
@@ -285,6 +287,17 @@ const SALIDA_MS = 400;
 const CIERRE_MS = 450;
 
 const sinMovimiento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// FR-10 y FR-13: la tarjeta añadida o que vuelve con "Deshacer" entra con un
+// fundido y un pequeño desplazamiento (referencia visual §6), salvo con
+// "Reducir movimiento".
+function entrar(item) {
+  if (sinMovimiento()) return;
+  item.animate(
+    [{ opacity: 0, transform: 'translateY(-8px) scale(0.98)' }, { opacity: 1, transform: 'none' }],
+    { duration: 240, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+  );
+}
 
 // FR-08 y FR-13: la tarjeta que se borra con el gesto cierra su hueco
 // (altura, margen y opacidad, estilos.css .se-cierra; inerte mientras tanto)
@@ -533,7 +546,10 @@ function pintarArriba(v) {
   aviso('aviso-guardado', v.avisoGuardado);
 }
 
-function pintar() {
+// `esperar`: el cambio viene de teclear un peso, y el dibujo espera (FR-11).
+// `entra`: el cambio añade una serie o la devuelve con "Deshacer", y su tarjeta
+// entra como añadida (FR-10).
+function pintar({ esperar = false, entra = false } = {}) {
   const v = modeloVista(estado);
   pintarArriba(v);
 
@@ -566,7 +582,7 @@ function pintar() {
     // reaparecer. No se saca del documento, porque eso cortaría su transición:
     // las demás se colocan a su alrededor.
     const lista = $('series');
-    const nuevas = v.series.map((s) => saliendo.get(s.valor) ?? pintarSerie(s));
+    const nuevas = v.series.map((s) => saliendo.get(s.valor) ?? pintarSerie(s, esperar));
     lienzos = new Map();
     v.series.forEach((s, i) => {
       const lienzo = nuevas[i].querySelector('.dibujo');
@@ -578,18 +594,30 @@ function pintar() {
       if (el === siguiente) siguiente = siguiente.nextElementSibling;
       else lista.insertBefore(el, siguiente);
     }
+    // FR-10: las que aparecen por otra causa (al arrancar o al corregirse una
+    // regla) lo hacen sin entrada.
+    if (entra) v.series.forEach((s, i) => { if (!porcentajesPintados.has(s.valor)) entrar(nuevas[i]); });
+    porcentajesPintados = new Set(v.series.map((s) => s.valor));
   }
 }
 
 // FR-10: cualquier cambio recalcula al momento. FR-11 y SPEC-CALC-002 FR-08:
 // cada dato guardado se guarda cuando cambia, y los pesos, al terminar de
 // editarlos (SPEC-CALC-002 FR-09 si falla).
-function actualizar(nuevo) {
+// `opciones` va a pintar.
+function actualizar(nuevo, opciones) {
   estado = guardarCambios(almacen, estado, nuevo);
   // SPEC-CALC-003 FR-08: al cerrarse el aviso por cualquier causa, su plazo se
   // anula.
   if (estado.borrado === null) anularPlazo();
-  pintar();
+  pintar(opciones);
+}
+
+// SPEC-CALC-003 FR-11: cada tecla en un peso vuelve a empezar la espera del
+// dibujo, cambie o no la carga.
+function escribirPeso(nuevo) {
+  motor?.esperar();
+  actualizar(nuevo, { esperar: true });
 }
 
 // FR-11: termina la edición de un peso y lo guarda. Las series usan lo escrito,
@@ -638,15 +666,13 @@ function limitar(campo, maximo) {
 
 function enlazarCampos() {
   limitar($('trabajo'), MAX_TRABAJO);
-  $('trabajo').addEventListener('input', (e) => actualizar(escribirTrabajo(estado, e.target.value)));
-  $('peso-barra').addEventListener('input', (e) => {
-    actualizar(escribirPesoBarra(estado, e.target.value));
-  });
+  $('trabajo').addEventListener('input', (e) => escribirPeso(escribirTrabajo(estado, e.target.value)));
+  $('peso-barra').addEventListener('input', (e) => escribirPeso(escribirPesoBarra(estado, e.target.value)));
   // FR-11: salir del campo termina su edición, aunque no se haya tecleado nada.
   $('trabajo').addEventListener('blur', () => terminar('trabajo'));
   $('peso-barra').addEventListener('blur', () => terminar('barra'));
   $('collarines').addEventListener('change', (e) => actualizar(cambiarCollarines(estado, e.target.checked)));
-  $('deshacer').addEventListener('click', () => actualizar(deshacerBorrado(estado)));
+  $('deshacer').addEventListener('click', () => actualizar(deshacerBorrado(estado), { entra: true }));
   // FR-08: el botón "Quitar" que mostró la pulsación larga se oculta al tocar
   // fuera de él.
   document.addEventListener('pointerdown', (e) => {
@@ -662,7 +688,7 @@ const MAX_PORCENTAJE = 3;
 // confirmación añade una sola vez: con el campo cerrado no hay nada que confirmar.
 function confirmarAnadir() {
   if (!estado.anadiendo) return;
-  actualizar(anadirPorcentaje(estado));
+  actualizar(anadirPorcentaje(estado), { entra: true });
 }
 
 // FR-09: al cerrarse con Intro, "Añadir", Escape o "✕", el foco vuelve al
