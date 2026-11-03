@@ -228,14 +228,16 @@ const contexto = (page, accion) => page.evaluate((a) => new Promise((hecho) => {
 const perderContexto = (page) => contexto(page, 'loseContext');
 const recuperarContexto = (page) => contexto(page, 'restoreContext');
 
+// La app pasa a segundo plano (o vuelve a primer plano, con 'visible').
+const visibilidad = (page, estado) => page.evaluate((e) => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => e });
+  document.dispatchEvent(new Event('visibilitychange'));
+}, estado);
 // La app pasa a segundo plano y vuelve a primer plano.
-const segundoPlano = (page) => page.evaluate(() => {
-  for (const estado of ['hidden', 'visible']) {
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => estado });
-    document.dispatchEvent(new Event('visibilitychange'));
-  }
-  delete document.visibilityState;
-});
+async function segundoPlano(page) {
+  await visibilidad(page, 'hidden');
+  await visibilidad(page, 'visible');
+}
 
 const columnas = (t) => t.locator('.serie').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
 // Borra lo que tienen pintado los lienzos de las tarjetas, para ver si se repintan.
@@ -291,6 +293,17 @@ test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se oc
   await page.waitForTimeout(600);
   await expect(dibujo(page, 70)).toBeHidden();
   await expect(dibujo(page, 40)).toBeVisible();
+  // Si la carga vuelve a la que está pintada, su dibujo vuelve a verse
+  // (decisión de Víctor del 2026-11-03, PR #36).
+  await trabajo(page).fill('100');
+  for (const [p, etiqueta] of INICIALES) {
+    await expect(dibujo(page, p)).toBeVisible();
+    await expect(dibujo(page, p)).toHaveAttribute('aria-label', etiqueta);
+    expect(await columnas(tarjeta(page, p))).toBe(2);
+  }
+  await trabajo(page).fill('105');
+  await expect(dibujo(page, 70)).toBeHidden();
+  await expect(dibujo(page, 90)).toBeHidden();
 
   // Al recuperarlo, todas se repintan, también la que no cambió.
   await borrarLienzos(page);
@@ -348,6 +361,25 @@ test('SPEC-CALC-003 FR-15 si el contexto vuelve poco después de volver a primer
   await page.waitForTimeout(3500);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
   await esperarDibujos(page, INICIALES);
+});
+
+test('SPEC-CALC-003 FR-15 la espera del contexto se cancela al pasar a segundo plano y vuelve a empezar al volver', async ({ page }) => {
+  test.setTimeout(TIEMPO_CONTEXTO);
+  await esperarDibujos(page, INICIALES);
+  await perderContexto(page);
+  await visibilidad(page, 'hidden');
+  await visibilidad(page, 'visible');
+  await page.waitForTimeout(2000);
+  // A los 2 s de volver, otra vez a segundo plano: pasados los 3 s, sigue con dibujo.
+  await visibilidad(page, 'hidden');
+  await page.waitForTimeout(2000);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  await expect(dibujo(page, 40)).toBeVisible();
+  // Al volver, la espera empieza de nuevo: a los 2 s sigue, a los 3 s ya no.
+  await visibilidad(page, 'visible');
+  await page.waitForTimeout(2000);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', 'plano', { timeout: 3000 });
 });
 
 test('SPEC-CALC-003 FR-15 al volver a primer plano con contexto, todas las tarjetas se repintan', async ({ page }) => {

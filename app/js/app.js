@@ -778,12 +778,17 @@ function volver() {
   revisarPlazo();
   motor?.volver();
 }
+function pasarAlFondo() {
+  terminarAlSalir();
+  motor?.salir();
+}
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') terminarAlSalir();
+  if (document.visibilityState === 'hidden') pasarAlFondo();
   else volver();
 });
-window.addEventListener('pagehide', terminarAlSalir);
-window.addEventListener('pageshow', volver);
+window.addEventListener('pagehide', pasarAlFondo);
+// pageshow también llega al abrir la app, cuando no hay nada que repintar.
+window.addEventListener('pageshow', (e) => (e.persisted ? volver() : revisarPlazo()));
 
 // ADR-0001 §3.2: se pide almacenamiento persistente, sin depender del resultado.
 navigator.storage?.persist?.().catch(() => {});

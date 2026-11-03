@@ -430,19 +430,20 @@ export function crearMotor({ alPerder, alMostrar }) {
     for (const otra of tarjetas.values()) if (otra.grupo) otra.grupo.visible = otra === t;
     if (!t.grupo.parent) escena.add(t.grupo);
     usarEquipo(t.carga.equipo);
-    if (lienzo.width !== ancho || lienzo.height !== alto) {
-      lienzo.width = ancho;
-      lienzo.height = alto;
-    }
     medir(ancho, alto);
     encuadrar(ancho, alto);
     renderer.render(escena, camara);
     if (perdido) return false;
     // Si el contexto se ha perdido y aún no ha llegado su evento, no se borra
-    // lo pintado (FR-15).
+    // lo pintado (FR-15). Cambiar el tamaño del lienzo también lo borra, así
+    // que se hace después.
     if (renderer.getContext().isContextLost()) {
       quedarSinContexto();
       return false;
+    }
+    if (lienzo.width !== ancho || lienzo.height !== alto) {
+      lienzo.width = ancho;
+      lienzo.height = alto;
     }
     const ctx = lienzo.getContext('2d');
     ctx.clearRect(0, 0, ancho, alto);
@@ -600,7 +601,8 @@ export function crearMotor({ alPerder, alMostrar }) {
     },
     // FR-15: al volver a primer plano se repintan todas las tarjetas. Si el
     // sistema aún no ha devuelto el contexto, se le espera RECUPERAR_MS; si no
-    // lo devuelve, la app pasa a la vista de FR-14.
+    // lo devuelve, la app pasa a la vista de FR-14 (decisión de Víctor del
+    // 2026-11-03, PR #36).
     volver() {
       if (perdido) return;
       if (renderer.getContext().isContextLost()) quedarSinContexto();
@@ -610,6 +612,12 @@ export function crearMotor({ alPerder, alMostrar }) {
       }
       for (const t of tarjetas.values()) t.sucio = true;
       programar();
+    },
+    // Al pasar a segundo plano, la espera se cancela y vuelve a empezar en la
+    // siguiente vuelta (decisión de Víctor del 2026-11-03, PR #36).
+    salir() {
+      clearTimeout(espera);
+      espera = null;
     },
   };
 }
