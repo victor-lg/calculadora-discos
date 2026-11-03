@@ -297,12 +297,15 @@ export function crearMotor({ alPerder }) {
   }
 
   // Avanza los movimientos de una tarjeta hasta `ahora`. Al terminar el último,
-  // el dibujo muestra su carga (FR-16). Devuelve si hay que repintarla.
+  // el dibujo muestra su carga (FR-16). Devuelve si hay que repintarla: no,
+  // mientras espera su desfase sin que nada se mueva.
   function avanzar(t, ahora) {
     if (!t.movimientos.length) return false;
+    let mueve = false;
     t.movimientos = t.movimientos.filter((m) => {
       const k = (ahora - m.t0) / m.dur;
       if (k < 0) return true;
+      mueve = true;
       if (!m.empezado) {
         m.empezado = true;
         m.alEmpezar?.();
@@ -313,7 +316,7 @@ export function crearMotor({ alPerder }) {
       return false;
     });
     if (!t.movimientos.length) t.mostrada = t.carga;
-    return true;
+    return mueve;
   }
 
   // FR-11: empieza a dibujar las cargas de la cola, en el orden de las
@@ -328,7 +331,11 @@ export function crearMotor({ alPerder }) {
     lista.sort(([a], [b]) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
     let n = 0;
     for (const [lienzo, carga] of lista) {
-      if (cambiar(tarjetas.get(lienzo), carga, n * DESFASE_MS)) n += 1;
+      if (!cambiar(tarjetas.get(lienzo), carga, n * DESFASE_MS)) continue;
+      // FR-16: la animación está en curso desde ahora, aunque la tarjeta aún
+      // no se haya repintado; deja de estarlo al pintar su último fotograma.
+      lienzo.dataset.animando = 'true';
+      n += 1;
     }
     programar();
   }
