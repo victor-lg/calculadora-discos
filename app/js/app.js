@@ -38,24 +38,25 @@ const $ = (id) => document.getElementById(id);
 // SPEC-CALC-003 FR-07 y FR-14 (ADR-0003 §3.6): el dibujo 3D, o null si el
 // dispositivo no puede dibujar en 3D. El estado se expone a los tests en
 // <html data-dibujo>, sin cambiar lo que se ve.
-let motor = crearMotor({ alPerder: pasarAPlano });
+let motor = crearMotor({ alPerder: pasarAPlano, alMostrar: (lienzo, visible) => capacidades.get(lienzo)?.(visible) });
 document.documentElement.dataset.dibujo = motor ? '3d' : 'plano';
-// Lo que hay que cambiar en cada tarjeta para dejarla sin dibujo.
-const sinDibujo = new WeakMap();
+// SPEC-CALC-001 FR-16: el aviso de capacidad de cada tarjeta, que dice "Se
+// dibujan los que caben." solo mientras se ve su dibujo.
+const capacidades = new WeakMap();
 // El lienzo del dibujo de cada tarjeta pintada, por porcentaje. Al
 // reconstruirse la tarjeta pasa a la nueva, y solo se repinta si cambia su
 // carga (ADR-0003 §3.5).
 let lienzos = new Map();
 
-// FR-15, provisional hasta que se recupere el contexto: si el sistema lo
-// retira, la app pasa a la vista de FR-14 hasta el siguiente arranque. Así
-// nunca se ve un dibujo que no corresponde al texto.
+// FR-14 y FR-15: si pintar falla, o si al volver a primer plano el sistema no
+// ha devuelto el contexto gráfico, la app pasa a la vista de FR-14 hasta el
+// siguiente arranque.
 function pasarAPlano() {
   motor = null;
   lienzos = new Map();
   document.documentElement.dataset.dibujo = 'plano';
   for (const lienzo of document.querySelectorAll('.dibujo, .miniatura')) {
-    sinDibujo.get(lienzo)?.();
+    capacidades.get(lienzo)?.(false);
     lienzo.remove();
   }
 }
@@ -253,18 +254,19 @@ function pintarSerie(s, esperar) {
     columna.append(crear('p', 'etiqueta', s.etiquetaDiscos), discos);
   }
   if (s.collarin) columna.append(crear('p', 'collarin', s.collarin));
-  // FR-07: el dibujo va a la derecha del texto. Sin él (FR-14), el aviso de
-  // capacidad no dice "Se dibujan los que caben." (SPEC-CALC-001 FR-16).
+  // FR-07: el dibujo va a la derecha del texto. Sin él (FR-14), o mientras
+  // está oculto (FR-15), el aviso de capacidad no dice "Se dibujan los que
+  // caben." (SPEC-CALC-001 FR-16).
   const lienzo = motor && (lienzos.get(s.valor) ?? $('plantilla-dibujo').content.firstElementChild.cloneNode(true));
   if (lienzo) {
     columna.after(lienzo);
     motor.dibujar(lienzo, s.dibujo, { esperar });
-    sinDibujo.delete(lienzo);
+    capacidades.delete(lienzo);
   }
   if (s.avisoCapacidad) {
-    const capacidad = crear('p', 'capacidad', lienzo ? s.avisoCapacidadDibujo : s.avisoCapacidad);
+    const capacidad = crear('p', 'capacidad', lienzo && !lienzo.hidden ? s.avisoCapacidadDibujo : s.avisoCapacidad);
     li.append(capacidad);
-    if (lienzo) sinDibujo.set(lienzo, () => cambiarTexto(capacidad, s.avisoCapacidad));
+    if (lienzo) capacidades.set(lienzo, (visible) => cambiarTexto(capacidad, visible ? s.avisoCapacidadDibujo : s.avisoCapacidad));
   }
   const quitar = crear('button', 'quitar', s.quitar);
   quitar.type = 'button';
@@ -769,15 +771,19 @@ window.addEventListener('resize', () => ajustarPeso({ forzar: true }));
 // loadingdone de las fuentes que pide la CSS, así que también se espera a ready.
 document.fonts?.addEventListener('loadingdone', () => ajustarPeso({ forzar: true }));
 document.fonts?.ready.then(() => ajustarPeso({ forzar: true }));
+// SPEC-CALC-003 FR-08: al volver a la app, el aviso que ya venció desaparece y
+// el que no, desaparece cuando le toque. FR-15: los dibujos se repintan. En
+// iOS, volver a una PWA desde la caché de páginas solo avisa con pageshow.
+function volver() {
+  revisarPlazo();
+  motor?.volver();
+}
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') terminarAlSalir();
-  else revisarPlazo();
+  else volver();
 });
 window.addEventListener('pagehide', terminarAlSalir);
-// SPEC-CALC-003 FR-08: al volver a la app, el aviso que ya venció desaparece y
-// el que no, desaparece cuando le toque. En iOS, volver a una PWA desde la
-// caché de páginas solo avisa con pageshow.
-window.addEventListener('pageshow', revisarPlazo);
+window.addEventListener('pageshow', volver);
 
 // ADR-0001 §3.2: se pide almacenamiento persistente, sin depender del resultado.
 navigator.storage?.persist?.().catch(() => {});

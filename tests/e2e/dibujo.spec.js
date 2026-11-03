@@ -216,33 +216,186 @@ test('SPEC-CALC-003 FR-13 con "Reducir movimiento", el dibujo aparece sin transi
   expect(animaciones).toBe(0);
 });
 
-// Provisional, hasta que el PR 3 de VIC-12 implemente FR-15 (AC-19), que lo
-// sustituye: si el sistema retira el contexto gráfico, la app pasa a la vista
-// de FR-14 hasta el siguiente arranque, y nunca se ve un dibujo que no
-// corresponde al texto. No da FR-15 por cumplido.
-test('provisional: al perder el contexto, la app pasa a la vista sin dibujo hasta el siguiente arranque', async ({ page }) => {
+// SPEC-CALC-003 FR-15: el sistema retira el contexto gráfico y lo devuelve
+// (WEBGL_lose_context, que se pide antes de perderlo: sin contexto, no se
+// puede pedir). Cada función espera a que llegue su evento.
+const contexto = (page, accion) => page.evaluate((a) => new Promise((hecho) => {
+  const ctx = window.contextosWebGL[0];
+  window.extensionContexto ??= ctx.getExtension('WEBGL_lose_context');
+  ctx.canvas.addEventListener(a === 'loseContext' ? 'webglcontextlost' : 'webglcontextrestored', () => setTimeout(hecho), { once: true });
+  window.extensionContexto[a]();
+}), accion);
+const perderContexto = (page) => contexto(page, 'loseContext');
+const recuperarContexto = (page) => contexto(page, 'restoreContext');
+
+// La app pasa a segundo plano y vuelve a primer plano.
+const segundoPlano = (page) => page.evaluate(() => {
+  for (const estado of ['hidden', 'visible']) {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => estado });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+  delete document.visibilityState;
+});
+
+const columnas = (t) => t.locator('.serie').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+// Borra lo que tienen pintado los lienzos de las tarjetas, para ver si se repintan.
+const borrarLienzos = (page) => page.locator('#series .dibujo').evaluateAll((ls) => ls.forEach((l) => l.getContext('2d').clearRect(0, 0, l.width, l.height)));
+
+async function esperarDibujos(page, esperado) {
+  for (const [p, etiqueta] of esperado) {
+    await expect(dibujo(page, p)).toBeVisible();
+    await expect(dibujo(page, p)).toHaveAttribute('aria-label', etiqueta);
+    await expect(dibujo(page, p)).toHaveAttribute('data-animando', 'false');
+    await expect.poll(() => pintado(dibujo(page, p)), `${p} %`).toBe(true);
+    await expect.poll(() => columnas(tarjeta(page, p)), `${p} %`).toBe(2);
+  }
+}
+
+const INICIALES = [[40, 'Carga: 10 kg'], [70, 'Carga: 25 kg'], [90, 'Carga: 25 + 10 kg']];
+
+test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se ocultan y al recuperarlo todos se repintan', async ({ page }) => {
+  await esperarDibujos(page, INICIALES);
+  await perderContexto(page);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  for (const [p, etiqueta] of INICIALES) {
+    await expect(dibujo(page, p)).toBeVisible();
+    await expect(dibujo(page, p)).toHaveAttribute('aria-label', etiqueta);
+    expect(await pintado(dibujo(page, p))).toBe(true);
+    expect(await columnas(tarjeta(page, p))).toBe(2);
+  }
+
+  // De 100 a 105: en la misma tarea en que cambia el texto, el 70 y el 90 %
+  // ocultan su dibujo; el 40 %, que no cambia de carga, lo conserva.
+  const alCambiar = await page.evaluate(() => {
+    const campo = document.getElementById('trabajo');
+    campo.value = '105';
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+    return [...document.querySelectorAll('#series > li')].map((li) => [
+      li.querySelector('.porcentaje').textContent, li.querySelector('.total').textContent, li.querySelector('.dibujo').hidden,
+    ]);
+  });
+  expect(alCambiar).toEqual([['40 %', '40 kg', false], ['70 %', '72,5 kg', true], ['90 %', '92,5 kg', true]]);
+  for (const p of [70, 90]) {
+    await expect(dibujo(page, p)).toBeHidden();
+    await expect(page.getByRole('img', { name: 'Carga: 25 kg' })).toHaveCount(0);
+    expect(await columnas(tarjeta(page, p))).toBe(1);
+  }
+  await expect(dibujo(page, 40)).toBeVisible();
+  await expect(dibujo(page, 40)).toHaveAttribute('aria-label', 'Carga: 10 kg');
+  expect(await columnas(tarjeta(page, 40))).toBe(2);
+  // Pasada la espera de FR-11, sigue igual.
+  await page.waitForTimeout(600);
+  await expect(dibujo(page, 70)).toBeHidden();
+  await expect(dibujo(page, 40)).toBeVisible();
+
+  // Al recuperarlo, todas se repintan, también la que no cambió.
+  await borrarLienzos(page);
+  await recuperarContexto(page);
+  await esperarDibujos(page, [[40, 'Carga: 10 kg'], [70, 'Carga: 25 + 1,25 kg'], [90, 'Carga: 25 + 10 + 1,25 kg']]);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+});
+
+test('SPEC-CALC-003/AC-19 si al volver a primer plano el contexto no se recupera, la app pasa a la vista sin dibujo', async ({ page }) => {
   await desplegarPaneles(page);
   await page.getByLabel('Un punto').check();
   await anadirPorcentaje(page, '100');
   await trabajo(page).fill('500');
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm. Se dibujan los que caben.');
+  await expect(dibujo(page, 100)).toHaveAttribute('aria-label', 'Carga: 11 de 25 kg');
+  await expect(dibujo(page, 100)).toHaveAttribute('data-animando', 'false');
 
-  await page.evaluate(() => window.contextosWebGL[0].getExtension('WEBGL_lose_context').loseContext());
+  await perderContexto(page);
+  // Sin volver a primer plano, los dibujos siguen.
+  await page.waitForTimeout(3500);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  await expect(dibujo(page, 100)).toBeVisible();
+
+  await segundoPlano(page);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', 'plano');
   await expect(page.locator('.dibujo, .miniatura')).toHaveCount(0);
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
-  for (const t of await series(page).locator('.serie').all()) {
-    expect((await t.evaluate((el) => getComputedStyle(el).gridTemplateColumns)).split(' ')).toHaveLength(1);
-  }
-  // Los cambios siguientes se pintan sin dibujo.
+  for (const t of await series(page).all()) expect(await columnas(t)).toBe(1);
+  // Los cambios siguientes se pintan sin dibujo, y las fichas de barra vuelven
+  // a su dibujo plano.
   await trabajo(page).fill('105');
   await expect(tarjeta(page, 100).locator('.total')).toHaveText('105 kg');
-  await expect(page.locator('.dibujo')).toHaveCount(0);
-  // Las fichas de barra vuelven a su dibujo plano.
   await page.getByLabel('Barra', { exact: true }).check();
   await expect(series(page)).toHaveCount(4);
   await expect(page.locator('.dibujo')).toHaveCount(0);
   for (const svg of await page.locator('#lista-barras .ficha svg').all()) await expect(svg).toBeVisible();
+  // Aunque el sistema devuelva el contexto después, sigue sin dibujo hasta el
+  // siguiente arranque.
+  await recuperarContexto(page);
+  await page.waitForTimeout(500);
+  await expect(page.locator('.dibujo')).toHaveCount(0);
+  await page.reload();
+  await exigirDibujo3D(page);
+});
+
+test('SPEC-CALC-003 FR-15 si el contexto vuelve poco después de volver a primer plano, se sigue dibujando', async ({ page }) => {
+  await esperarDibujos(page, INICIALES);
+  await perderContexto(page);
+  await segundoPlano(page);
+  await page.waitForTimeout(500);
+  await borrarLienzos(page);
+  await recuperarContexto(page);
+  await page.waitForTimeout(3500);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  await esperarDibujos(page, INICIALES);
+});
+
+test('SPEC-CALC-003 FR-15 al volver a primer plano con contexto, todas las tarjetas se repintan', async ({ page }) => {
+  await esperarDibujos(page, INICIALES);
+  await borrarLienzos(page);
+  await segundoPlano(page);
+  await esperarDibujos(page, INICIALES);
+});
+
+test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda sin dibujo hasta que se pinta', async ({ page }) => {
+  await esperarDibujos(page, INICIALES);
+  // El peso tecleado espera 400 ms para dibujarse (FR-11); si en esa espera se
+  // pierde el contexto, el dibujo que ya no corresponde al texto se oculta.
+  await trabajo(page).fill('105');
+  await perderContexto(page);
+  await expect(dibujo(page, 70)).toBeHidden();
+  await expect(dibujo(page, 90)).toBeHidden();
+  await expect(dibujo(page, 40)).toBeVisible();
+
+  // Las miniaturas, sin pintar porque el panel Carga estaba plegado, dejan ver
+  // el dibujo plano de su ficha.
+  await desplegarPaneles(page);
+  for (const ficha of await page.locator('#lista-barras .ficha').all()) {
+    await expect(ficha.locator('svg')).toBeVisible();
+    await expect(ficha.locator('.miniatura')).toBeHidden();
+  }
+  // Una tarjeta nueva, y las que cambian de equipo, quedan solo con texto, y
+  // el aviso de capacidad no dice "Se dibujan los que caben.".
+  await page.getByLabel('Un punto').check();
+  await anadirPorcentaje(page, '100');
+  await expect(tarjeta(page, 100).locator('.total')).toHaveText('105 kg');
+  await expect(dibujo(page, 100)).toBeHidden();
+  expect(await columnas(tarjeta(page, 100))).toBe(1);
+  await trabajo(page).fill('500');
+  await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
+  for (const p of [40, 70, 90, 100]) {
+    await expect(dibujo(page, p)).toBeHidden();
+    expect(await columnas(tarjeta(page, p))).toBe(1);
+  }
+
+  await recuperarContexto(page);
+  for (const p of [40, 70, 90, 100]) {
+    await expect(dibujo(page, p)).toBeVisible();
+    await expect(dibujo(page, p)).toHaveAttribute('data-equipo', 'maquina');
+    await expect.poll(() => pintado(dibujo(page, p)), `${p} %`).toBe(true);
+  }
+  await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm. Se dibujan los que caben.');
+  // Las fichas de barra solo se ven en el modo Barra.
+  await page.getByLabel('Barra', { exact: true }).check();
+  for (const ficha of await page.locator('#lista-barras .ficha').all()) {
+    await expect(ficha.locator('.miniatura')).toBeVisible();
+    await expect.poll(() => pintado(ficha.locator('.miniatura'))).toBe(true);
+    await expect(ficha.locator('svg')).toBeHidden();
+  }
 });
 
 // SPEC-CALC-003 FR-11 a FR-13: la animación de la carga. Sus tiempos se prueban
