@@ -251,9 +251,13 @@ async function esperarDibujos(page, esperado) {
   }
 }
 
+// En la CI, con el dibujo por software, repintar todas las tarjetas al
+// recuperar el contexto tarda; como en la animación, 90 s.
+const TIEMPO_CONTEXTO = 90_000;
 const INICIALES = [[40, 'Carga: 10 kg'], [70, 'Carga: 25 kg'], [90, 'Carga: 25 + 10 kg']];
 
 test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se ocultan y al recuperarlo todos se repintan', async ({ page }) => {
+  test.setTimeout(TIEMPO_CONTEXTO);
   await esperarDibujos(page, INICIALES);
   await perderContexto(page);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
@@ -296,6 +300,7 @@ test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se oc
 });
 
 test('SPEC-CALC-003/AC-19 si al volver a primer plano el contexto no se recupera, la app pasa a la vista sin dibujo', async ({ page }) => {
+  test.setTimeout(TIEMPO_CONTEXTO);
   await desplegarPaneles(page);
   await page.getByLabel('Un punto').check();
   await anadirPorcentaje(page, '100');
@@ -333,6 +338,7 @@ test('SPEC-CALC-003/AC-19 si al volver a primer plano el contexto no se recupera
 });
 
 test('SPEC-CALC-003 FR-15 si el contexto vuelve poco después de volver a primer plano, se sigue dibujando', async ({ page }) => {
+  test.setTimeout(TIEMPO_CONTEXTO);
   await esperarDibujos(page, INICIALES);
   await perderContexto(page);
   await segundoPlano(page);
@@ -345,6 +351,7 @@ test('SPEC-CALC-003 FR-15 si el contexto vuelve poco después de volver a primer
 });
 
 test('SPEC-CALC-003 FR-15 al volver a primer plano con contexto, todas las tarjetas se repintan', async ({ page }) => {
+  test.setTimeout(TIEMPO_CONTEXTO);
   await esperarDibujos(page, INICIALES);
   await borrarLienzos(page);
   await segundoPlano(page);
@@ -352,6 +359,7 @@ test('SPEC-CALC-003 FR-15 al volver a primer plano con contexto, todas las tarje
 });
 
 test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda sin dibujo hasta que se pinta', async ({ page }) => {
+  test.setTimeout(TIEMPO_CONTEXTO);
   await esperarDibujos(page, INICIALES);
   // El peso tecleado espera 400 ms para dibujarse (FR-11); si en esa espera se
   // pierde el contexto, el dibujo que ya no corresponde al texto se oculta.
