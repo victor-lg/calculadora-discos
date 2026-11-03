@@ -835,6 +835,32 @@ test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
 });
 
+// FR-10: la entrada de las tarjetas no depende del dibujo. La añadida y la que
+// vuelve con "Deshacer" entran con un fundido; las que vuelven al corregirse una
+// regla, sin él; con "Reducir movimiento", ninguna (FR-13).
+test('SPEC-CALC-003 FR-10 sin dibujo, la tarjeta añadida y la que vuelve con "Deshacer" entran con un fundido; las demás, no', async ({ page }) => {
+  const entradas = (p) => tarjeta(page, p).evaluate((el) => el.getAnimations().map((a) => a.effect.getKeyframes().map((k) => k.opacity).join('→')));
+  for (const p of [40, 70, 90]) expect(await entradas(p)).toEqual([]);
+  await anadirPorcentaje(page, '50');
+  expect(await entradas(50)).toEqual(['0→1']);
+  for (const p of [40, 70, 90]) expect(await entradas(p)).toEqual([]);
+  await quitarSerie(page, 70);
+  await deshacer(page).click();
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
+  expect(await entradas(70)).toEqual(['0→1']);
+  // Ningún disco habilitado y, otra vez, todos: vuelven sin entrada.
+  await desplegarPaneles(page);
+  const discos = page.locator('#lista-discos input[name="disco"]');
+  for (const d of await discos.all()) await d.uncheck();
+  await expect(series(page)).toHaveCount(0);
+  for (const d of await discos.all()) await d.check();
+  await expect(series(page)).toHaveCount(4);
+  for (const p of [40, 50, 70, 90]) expect(await entradas(p)).toEqual([]);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await anadirPorcentaje(page, '60');
+  expect(await entradas(60)).toEqual([]);
+});
+
 test('SPEC-CALC-003/AC-11 con muchas series, el aviso de "Deshacer" no tapa "+ Añadir porcentaje"', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   for (const p of ['50', '55', '60', '65', '75', '80']) await anadirPorcentaje(page, p);
