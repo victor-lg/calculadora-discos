@@ -2,8 +2,12 @@
 // renderizador (ADR-0003). Estos E2E solo cuentan con el dibujo 3D activo: lo
 // comprueban antes y fallan si no lo está, para no pasar en falso por la vista
 // de FR-14 (SPEC-CALC-003 §11, ADR-0003 §4).
-import { test, expect } from '@playwright/test';
-import { trabajo, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries } from './pantalla.js';
+import { test, expect as esperar } from '@playwright/test';
+import { trabajo, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar } from './pantalla.js';
+
+// En la CI, sin GPU, cada dibujo se pinta por software, y con varios tests a la
+// vez puede tardar más de los 5 s de espera por defecto.
+const expect = esperar.configure({ timeout: 20_000 });
 
 const series = (page) => page.locator('#series > li');
 const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
@@ -113,6 +117,54 @@ test('SPEC-CALC-003 FR-16 cada dibujo expone la carga que muestra, collarín inc
   await expect(dibujo(page, 70)).toHaveAttribute('data-equipo', 'maquina');
   await expect(dibujo(page, 70)).toHaveAttribute('data-collarin', 'false');
   for (const l of await series(page).locator('.dibujo').all()) await expect(l).toHaveAttribute('data-animando', 'false');
+});
+
+// FR-16: lo que muestra cada dibujo, en el orden de las tarjetas. Cuando
+// coincide, también se comprueba que el lienzo está pintado.
+const estadoDibujos = (page) => series(page).evaluateAll((lis) => lis.map((li) => {
+  const d = li.querySelector('.dibujo');
+  return [li.querySelector('.porcentaje').textContent, d?.getAttribute('aria-label'), d?.dataset.discos, d?.dataset.collarin, d?.dataset.animando];
+}));
+async function comprobarDibujos(page, esperado) {
+  await expect.poll(() => estadoDibujos(page)).toEqual(esperado.map(([p, etiqueta, discos]) => [p, etiqueta, discos, 'false', 'false']));
+  for (const l of await series(page).locator('.dibujo').all()) expect(await pintado(l)).toBe(true);
+}
+
+test('SPEC-CALC-003 FR-07 FR-16 recorrido con el dibujo: cambiar el peso, borrar, deshacer y añadir', async ({ page }) => {
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['70 %', 'Carga: 25 kg', '2500'],
+    ['90 %', 'Carga: 25 + 10 kg', '2500,1000'],
+  ]);
+  // SPEC-CALC-001 AC-02: con 105 kg cambian el 70 y el 90 %; el 40 % no.
+  await trabajo(page).fill('105');
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+  // Borrar con el gesto, deslizando sobre el dibujo (FR-08).
+  await deslizar(page, tarjeta(page, 70), 0.5);
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+  // "Deshacer": la tarjeta vuelve con el dibujo ya cargado (FR-10).
+  await page.getByRole('button', { name: 'Deshacer' }).click();
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+  await anadirPorcentaje(page, '50');
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['50 %', 'Carga: 15 + 1,25 kg', '1500,125'],
+    ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
 });
 
 test('SPEC-CALC-003 FR-07 las fichas de barra muestran su miniatura en 3D', async ({ page }) => {

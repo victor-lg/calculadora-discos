@@ -189,7 +189,7 @@ async function recorrido(context, base, conDatos, sockets) {
   await new Promise((r) => setTimeout(r, MARGEN_TRAS_CERRAR_MS));
 }
 
-test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ context }) => {
+test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ browser, context }, testInfo) => {
   // Hace dos recorridos completos con el dibujo 3D activo (ADR-0003 §4), que en
   // la CI se pinta por software y pasa de 90 s: tiene 240 s (decisión de Víctor
   // del 2026-11-03, PR #33).
@@ -201,20 +201,29 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   const servidorReferencia = await arrancar((p) => llegadasReferencia.push(p));
   const origenReferencia = new URL(servidorReferencia.base).origin;
 
+  // El recorrido de referencia va en su propio contexto, con las mismas
+  // opciones, y se cierra antes de contar lo que le ha llegado: así termina lo
+  // que el navegador aún tuviera pendiente para ese origen (por ejemplo, la
+  // comprobación de actualización de sw.js, que bajo carga llegaba después del
+  // margen y se contaba en el recorrido con datos).
+  const contextoReferencia = await browser.newContext({ ...testInfo.project.use, serviceWorkers: 'allow' });
+
   // Lo que ve el navegador: sirve para detectar peticiones a otros orígenes,
   // que nunca llegarían a nuestro servidor.
   const vistas = [];
-  context.on('request', (r) => {
-    vistas.push({
-      url: r.url(),
-      metodo: r.method(),
-      cuerpo: r.postData(),
-      // headers() se lee al momento; las cabeceras completas, incluidas las de
-      // cookies, se comprueban en lo que llega al servidor.
-      cabeceras: Object.entries(r.headers()),
-      delServiceWorker: r.serviceWorker() !== null,
+  for (const c of [contextoReferencia, context]) {
+    c.on('request', (r) => {
+      vistas.push({
+        url: r.url(),
+        metodo: r.method(),
+        cuerpo: r.postData(),
+        // headers() se lee al momento; las cabeceras completas, incluidas las de
+        // cookies, se comprueban en lo que llega al servidor.
+        cabeceras: Object.entries(r.headers()),
+        delServiceWorker: r.serviceWorker() !== null,
+      });
     });
-  });
+  }
   const sockets = [];
 
   // Se separa por fase, no por origen: así una petición del recorrido con datos
@@ -223,13 +232,16 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   let vistasConDatos;
   let llegadasReferenciaTrasRecorrido;
   try {
-    await recorrido(context, servidorReferencia.base, false, sockets);
+    await recorrido(contextoReferencia, servidorReferencia.base, false, sockets);
+    expect(await contextoReferencia.cookies()).toEqual([]);
+    await contextoReferencia.close();
     vistasReferencia = vistas.slice();
     llegadasReferenciaTrasRecorrido = llegadasReferencia.length;
     await recorrido(context, servidor.base, true, sockets);
     vistasConDatos = vistas.slice(vistasReferencia.length);
     expect(await context.cookies()).toEqual([]);
   } finally {
+    await contextoReferencia.close();
     await context.close();
     await servidorReferencia.cerrar();
   }
