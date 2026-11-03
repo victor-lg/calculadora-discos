@@ -45,6 +45,8 @@ const MINIATURA = { ancho: 264, alto: 90, mitad: 410, centro: new Vector3(30, -2
 // después de la anterior. Las curvas, como en la referencia visual.
 const ESPERA_MS = 400;
 const DESFASE_MS = 90;
+// Lo que puede ocupar como mucho cada fotograma pintando tarjetas, salvo la primera.
+const PRESUPUESTO_MS = 12;
 const salida = (x) => x * x * x;
 const entrada = (x) => 1 - (1 - x) ** 3;
 const rebote = (x) => 1 + 2.9 * (x - 1) ** 3 + 1.9 * (x - 1) ** 2;
@@ -128,6 +130,8 @@ export function crearMotor({ alPerder }) {
   const cola = new Map();
   let reloj = null;
   let enCola = false;
+  // La tarjeta por la que empieza a pintar el siguiente fotograma.
+  let turno = 0;
   const observador = new ResizeObserver(() => pintarPendientes());
   // Un cambio de carga sin cambio de tamaño se pinta antes del siguiente fotograma.
   let programado = false;
@@ -397,18 +401,31 @@ export function crearMotor({ alPerder }) {
     }
     const resolucion = Math.min(window.devicePixelRatio || 1, RESOLUCION_MAXIMA);
     const ahora = performance.now();
+    // Si pintar es lento (por ejemplo, sin GPU), cada fotograma pinta hasta
+    // agotar su presupuesto y deja las demás tarjetas para el siguiente,
+    // empezando cada vez por otra: así la página sigue respondiendo. La
+    // animación va por tiempo, así que no se retrasa.
+    const lista = [...tarjetas];
+    let quedan = false;
     try {
-      for (const [lienzo, t] of tarjetas) {
+      for (let i = 0; i < lista.length; i++) {
+        const [lienzo, t] = lista[(turno + i) % lista.length];
         const ancho = Math.round(lienzo.clientWidth * resolucion);
         const alto = Math.round(lienzo.clientHeight * resolucion);
         const firma = `${ancho}×${alto}`;
         const mueve = avanzar(t, ahora);
         if (!ancho || !alto || (t.firma === firma && !t.sucio && !mueve)) continue;
+        if (performance.now() - ahora > PRESUPUESTO_MS) {
+          t.sucio = true;
+          if (!quedan) turno = (turno + i) % lista.length;
+          quedan = true;
+          continue;
+        }
         pintar(lienzo, t, ancho, alto);
         t.firma = firma;
         t.sucio = false;
       }
-      if ([...tarjetas.values()].some((t) => t.movimientos.length)) programar();
+      if (quedan || lista.some(([, t]) => t.movimientos.length)) programar();
     } catch {
       // SPEC-CALC-003 FR-14: un error al pintar se trata como un fallo al
       // prepararlo (decisión de Víctor del 2026-11-03, PR #33).
