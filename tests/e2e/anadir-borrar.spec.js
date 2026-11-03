@@ -4,7 +4,7 @@
 import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar, discosDeSeries,
-  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar,
+  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar, vigilarEntradas, entradas,
 } from './pantalla.js';
 
 const series = (page) => page.locator('#series > li');
@@ -839,15 +839,17 @@ test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta
 // vuelve con "Deshacer" entran con un fundido; las que vuelven al corregirse una
 // regla, sin él; con "Reducir movimiento", ninguna (FR-13).
 test('SPEC-CALC-003 FR-10 sin dibujo, la tarjeta añadida y la que vuelve con "Deshacer" entran con un fundido; las demás, no', async ({ page }) => {
-  const entradas = (p) => tarjeta(page, p).evaluate((el) => el.getAnimations().map((a) => a.effect.getKeyframes().map((k) => k.opacity).join('→')));
-  for (const p of [40, 70, 90]) expect(await entradas(p)).toEqual([]);
+  await vigilarEntradas(page);
+  await page.reload();
+  await expect(series(page)).toHaveCount(3);
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', 'plano');
+  expect(await entradas(page)).toEqual([]);
   await anadirPorcentaje(page, '50');
-  expect(await entradas(50)).toEqual(['0→1']);
-  for (const p of [40, 70, 90]) expect(await entradas(p)).toEqual([]);
+  expect(await entradas(page)).toEqual(['50 % 0→1']);
   await quitarSerie(page, 70);
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
-  expect(await entradas(70)).toEqual(['0→1']);
+  expect(await entradas(page)).toEqual(['70 % 0→1']);
   // Ningún disco habilitado y, otra vez, todos: vuelven sin entrada.
   await desplegarPaneles(page);
   const discos = page.locator('#lista-discos input[name="disco"]');
@@ -855,10 +857,11 @@ test('SPEC-CALC-003 FR-10 sin dibujo, la tarjeta añadida y la que vuelve con "D
   await expect(series(page)).toHaveCount(0);
   for (const d of await discos.all()) await d.check();
   await expect(series(page)).toHaveCount(4);
-  for (const p of [40, 50, 70, 90]) expect(await entradas(p)).toEqual([]);
+  expect(await entradas(page)).toEqual([]);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await anadirPorcentaje(page, '60');
-  expect(await entradas(60)).toEqual([]);
+  await expect(series(page)).toHaveCount(5);
+  expect(await entradas(page)).toEqual([]);
 });
 
 test('SPEC-CALC-003/AC-11 con muchas series, el aviso de "Deshacer" no tapa "+ Añadir porcentaje"', async ({ page }) => {

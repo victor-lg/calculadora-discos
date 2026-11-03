@@ -3,7 +3,7 @@
 // comprueban antes y fallan si no lo está, para no pasar en falso por la vista
 // de FR-14 (SPEC-CALC-003 §11, ADR-0003 §4).
 import { test, expect as esperar } from '@playwright/test';
-import { trabajo, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar } from './pantalla.js';
+import { trabajo, pesoBarra, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar, vigilarEntradas, entradas } from './pantalla.js';
 
 // En la CI, sin GPU, cada dibujo se pinta por software, y con varios tests a la
 // vez puede tardar más de los 5 s de espera por defecto.
@@ -41,6 +41,7 @@ const pintado = (lienzo) => lienzo.evaluate((c) => {
 
 test.beforeEach(async ({ page }) => {
   await vigilarContextos(page);
+  await vigilarEntradas(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await exigirDibujo3D(page);
@@ -423,9 +424,8 @@ test('SPEC-CALC-003 FR-11 al cambiar de equipo, las tarjetas se vacían y se car
 test('SPEC-CALC-003/AC-15 una tarjeta añadida entra con un fundido; las que vuelven al corregir el peso, sin él; el dibujo no se anima', async ({ page }) => {
   await pararReloj(page);
   await registrar(page);
-  const entradas = (li) => li.evaluate((el) => el.getAnimations().map((a) => a.effect.getKeyframes().map((k) => k.opacity).join('→')));
   await anadirPorcentaje(page, '50');
-  expect(await entradas(tarjeta(page, 50))).toEqual(['0→1']);
+  expect(await entradas(page)).toEqual(['50 % 0→1']);
   await page.clock.runFor(20);
   await expect(dibujo(page, 50)).toHaveAttribute('aria-label', 'Carga: 15 kg');
   await expect(dibujo(page, 50)).toHaveAttribute('data-animando', 'false');
@@ -436,7 +436,7 @@ test('SPEC-CALC-003/AC-15 una tarjeta añadida entra con un fundido; las que vue
   await expect(series(page)).toHaveCount(0);
   await trabajo(page).fill('100');
   await expect(series(page)).toHaveCount(4);
-  for (const p of [40, 50, 70, 90]) expect(await entradas(tarjeta(page, p))).toEqual([]);
+  expect(await entradas(page)).toEqual([]);
   await page.clock.runFor(1000);
   await comprobarDibujos(page, [
     ['40 %', 'Carga: 10 kg', '1000'],
@@ -452,8 +452,9 @@ test('SPEC-CALC-003/AC-15 una tarjeta añadida entra con un fundido; las que vue
     await page.clock.runFor(1000);
   }
   await expect(series(page)).toHaveCount(0);
+  await entradas(page);
   await anadirPorcentaje(page, '50');
-  expect(await entradas(tarjeta(page, 50))).toEqual(['0→1']);
+  expect(await entradas(page)).toEqual(['50 % 0→1']);
 });
 
 test('SPEC-CALC-003/AC-15 con "Reducir movimiento", nada se anima: añadir, borrar, deshacer, desplegar y cambiar el peso', async ({ page }) => {
@@ -492,4 +493,61 @@ test('SPEC-CALC-003/AC-15 con "Reducir movimiento", nada se anima: añadir, borr
   expect(await enCurso()).toBe(0);
   expect(await animados(page)).toEqual([]);
   expect((await registro(page))['70 %']).toEqual(['2500', '2500,125']);
+});
+
+test('SPEC-CALC-003 FR-11 mientras se escribe el peso de la barra, el dibujo también espera 400 ms', async ({ page }) => {
+  await pararReloj(page, [40, 90]);
+  await desplegarPaneles(page);
+  await barra(page, 'Recta').check();
+  await page.clock.runFor(20);
+  await hastaQuePare(page, 300);
+  const antes = await dibujo(page, 70).getAttribute('data-discos');
+  await pesoBarra(page).fill('12');
+  await page.clock.runFor(399);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-discos', antes);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'false');
+  await page.clock.runFor(20);
+  await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
+  await hastaQuePare(page, 300);
+  await expect(dibujo(page, 70)).not.toHaveAttribute('data-discos', antes);
+});
+
+// ADR-0003 §3.5: si pintar es lento, cada fotograma pinta una tarjeta y deja
+// las demás para el siguiente, y todas acaban mostrando su carga. Se hace lento
+// copiar cada dibujo (20 ms más) y se cuentan las copias de cada fotograma.
+test('ADR-0003 §3.5 si pintar es lento, cada fotograma pinta una sola tarjeta y todas acaban en su carga', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.addInitScript(() => {
+    window.lento = false;
+    window.porFotograma = [];
+    let copias = 0;
+    const contar = () => {
+      if (copias) window.porFotograma.push(copias);
+      copias = 0;
+      requestAnimationFrame(contar);
+    };
+    requestAnimationFrame(contar);
+    const copiar = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function drawImage(...args) {
+      if (window.lento && this.canvas.classList.contains('dibujo')) {
+        const fin = performance.now() + 20;
+        while (performance.now() < fin);
+        copias += 1;
+      }
+      return copiar.apply(this, args);
+    };
+  });
+  await page.reload();
+  await exigirDibujo3D(page);
+  await comprobarDibujos(page, INICIO);
+  await page.evaluate(() => { window.lento = true; });
+  await trabajo(page).fill('105');
+  await comprobarDibujos(page, [
+    ['40 %', 'Carga: 10 kg', '1000'],
+    ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
+    ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
+  ]);
+  const porFotograma = await page.evaluate(() => window.porFotograma);
+  expect(porFotograma.length).toBeGreaterThan(2);
+  expect(Math.max(...porFotograma)).toBe(1);
 });

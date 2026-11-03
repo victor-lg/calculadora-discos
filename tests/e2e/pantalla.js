@@ -109,3 +109,18 @@ export async function deslizar(page, tarjeta, fraccion) {
   for (let i = 1; i <= pasos; i++) await page.mouse.move(x - (caja.width * fraccion * i) / pasos, y);
   await page.mouse.up();
 }
+
+// SPEC-CALC-003 FR-10: anota cada animación que se pide a una tarjeta, con su
+// porcentaje y la opacidad de sus fotogramas clave ("50 % 0→1"). Se anota al
+// pedirla, así que no depende de que siga en curso al comprobarlo. Hay que
+// llamarla antes de cargar la página.
+export const vigilarEntradas = (page) => page.addInitScript(() => {
+  window.entradas = [];
+  const animar = Element.prototype.animate;
+  Element.prototype.animate = function animate(fotogramas, opciones) {
+    const p = this.querySelector?.('.porcentaje')?.textContent;
+    if (p) window.entradas.push(`${p} ${fotogramas.map((f) => f.opacity).join('→')}`);
+    return animar.call(this, fotogramas, opciones);
+  };
+});
+export const entradas = (page) => page.evaluate(() => window.entradas.splice(0));
