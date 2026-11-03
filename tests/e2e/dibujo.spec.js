@@ -257,6 +257,8 @@ const INICIO = [
 
 // `quitar`: las series que se borran antes, sin animación.
 async function pararReloj(page, quitar = []) {
+  // En la CI, con el dibujo por software, cada fotograma pasa de medio segundo.
+  test.setTimeout(90_000);
   if (quitar.length) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     for (const p of quitar) await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
@@ -347,7 +349,7 @@ test('SPEC-CALC-003/AC-17 si la carga cambia en plena animación, el dibujo acab
   await page.clock.fastForward(399);
   await expect(dibujo(page, 70)).toHaveAttribute('data-animando', 'true');
   await page.clock.fastForward(20);
-  await hastaQuePare(page);
+  await hastaQuePare(page, 300);
   await expect(dibujo(page, 70)).toHaveAttribute('aria-label', 'Carga: 25 + 1,25 kg');
   await expect(dibujo(page, 70)).toHaveAttribute('data-discos', '2500,125');
   await expect(dibujo(page, 70)).toHaveAttribute('data-collarin', 'false');
@@ -373,8 +375,8 @@ test('SPEC-CALC-003 FR-11 secuencia: sale el collarín, salen los discos de fuer
   // collarín (110 kg). El de 25 se queda.
   await trabajo(page).fill('110');
   await page.clock.runFor(400);
-  // Cada estado dura al menos 300 ms.
-  await hastaQuePare(page, 100);
+  // Cada estado dura al menos 375 ms.
+  await hastaQuePare(page, 200);
   // Con solo el de 25, la tarjeta está un instante: el de 10 empieza a entrar
   // cuando el de 5 termina de salir, y pueden caer en el mismo fotograma.
   const visto = (await registro(page))['90 %'];
