@@ -190,6 +190,10 @@ async function recorrido(context, base, conDatos, sockets) {
 }
 
 test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ context }) => {
+  // Hace dos recorridos completos con el dibujo 3D activo (ADR-0003 §5), que en
+  // la CI se pinta por software: triplica el tiempo (decisión de Víctor del
+  // 2026-11-03, PR #33).
+  test.slow();
   const origen = new URL(servidor.base).origin;
   // Recorrido de referencia, sin datos, en otro origen (otro puerto), así que
   // con su propio service worker y su propio almacenamiento.

@@ -6,10 +6,6 @@ const PUERTO = 4791;
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
-  // ADR-0003: en la CI, sin GPU, cada arranque dibuja en 3D por software y
-  // tarda varios segundos; los recorridos que recargan muchas veces pasan de
-  // los 30 s por defecto. Decisión de Víctor del 2026-11-03 (PR #33).
-  timeout: 60_000,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',

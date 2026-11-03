@@ -1,6 +1,6 @@
 // Recorridos de SPEC-CALC-002 que necesitan un navegador real: tocar los tipos,
 // arranque de cero, vuelta de segundo plano y fallo al guardar.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, pesoBarra, barra, desplegarPaneles, recargar, discosDeSeries,
   porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas,
