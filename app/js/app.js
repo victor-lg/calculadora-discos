@@ -20,6 +20,7 @@ import {
   modeloVista,
 } from './vista.js';
 import { leerPorcentajes, leerDiscos, leerAjustes, guardarCambios } from './almacenamiento.js';
+import { crearMotor } from './dibujo.js';
 
 function almacenLocal() {
   try {
@@ -33,6 +34,31 @@ const almacen = almacenLocal();
 let estado = estadoInicial(leerPorcentajes(almacen), leerDiscos(almacen), leerAjustes(almacen));
 
 const $ = (id) => document.getElementById(id);
+
+// SPEC-CALC-003 FR-07 y FR-14 (ADR-0003 §3.6): el dibujo 3D, o null si el
+// dispositivo no puede dibujar en 3D. El estado se expone a los tests en
+// <html data-dibujo>, sin cambiar lo que se ve.
+let motor = crearMotor({ alPerder: pasarAPlano });
+document.documentElement.dataset.dibujo = motor ? '3d' : 'plano';
+// Lo que hay que cambiar en cada tarjeta para dejarla sin dibujo.
+const sinDibujo = new WeakMap();
+// El lienzo del dibujo de cada tarjeta pintada, por porcentaje. Al
+// reconstruirse la tarjeta pasa a la nueva, y solo se repinta si cambia su
+// carga (ADR-0003 §3.5).
+let lienzos = new Map();
+
+// FR-15, provisional hasta que se recupere el contexto: si el sistema lo
+// retira, la app pasa a la vista de FR-14 hasta el siguiente arranque. Así
+// nunca se ve un dibujo que no corresponde al texto.
+function pasarAPlano() {
+  motor = null;
+  lienzos = new Map();
+  document.documentElement.dataset.dibujo = 'plano';
+  for (const lienzo of document.querySelectorAll('.dibujo, .miniatura')) {
+    sinDibujo.get(lienzo)?.();
+    lienzo.remove();
+  }
+}
 
 function crear(etiqueta, clase, texto) {
   const el = document.createElement(etiqueta);
@@ -78,6 +104,16 @@ function montarOpciones() {
     const punto = crear('i', null);
     punto.dataset.cent = String(d.cent);
     $('puntos-discos').append(punto);
+  }
+  // SPEC-CALC-003 FR-07: con el dibujo 3D, la miniatura de cada barra sustituye
+  // a su dibujo plano (estilos.css).
+  if (motor) {
+    for (const input of document.querySelectorAll('input[name="barra"]')) {
+      const miniatura = crear('canvas', 'miniatura');
+      miniatura.setAttribute('aria-hidden', 'true');
+      input.after(miniatura);
+      motor.miniatura(miniatura, input.value);
+    }
   }
 }
 
@@ -215,7 +251,19 @@ function pintarSerie(s) {
     columna.append(crear('p', 'etiqueta', s.etiquetaDiscos), discos);
   }
   if (s.collarin) columna.append(crear('p', 'collarin', s.collarin));
-  if (s.avisoCapacidad) li.append(crear('p', 'capacidad', s.avisoCapacidad));
+  // FR-07: el dibujo va a la derecha del texto. Sin él (FR-14), el aviso de
+  // capacidad no dice "Se dibujan los que caben." (SPEC-CALC-001 FR-16).
+  const lienzo = motor && (lienzos.get(s.valor) ?? $('plantilla-dibujo').content.firstElementChild.cloneNode(true));
+  if (lienzo) {
+    columna.after(lienzo);
+    motor.dibujar(lienzo, s.dibujo);
+    sinDibujo.delete(lienzo);
+  }
+  if (s.avisoCapacidad) {
+    const capacidad = crear('p', 'capacidad', lienzo ? s.avisoCapacidadDibujo : s.avisoCapacidad);
+    li.append(capacidad);
+    if (lienzo) sinDibujo.set(lienzo, () => cambiarTexto(capacidad, s.avisoCapacidad));
+  }
   const quitar = crear('button', 'quitar', s.quitar);
   quitar.type = 'button';
   // FR-08: el botón hace lo mismo que el gesto, salida de lado incluida.
@@ -519,6 +567,11 @@ function pintar() {
     // las demás se colocan a su alrededor.
     const lista = $('series');
     const nuevas = v.series.map((s) => saliendo.get(s.valor) ?? pintarSerie(s));
+    lienzos = new Map();
+    v.series.forEach((s, i) => {
+      const lienzo = nuevas[i].querySelector('.dibujo');
+      if (lienzo) lienzos.set(s.valor, lienzo);
+    });
     for (const el of [...lista.children]) if (!nuevas.includes(el)) el.remove();
     let siguiente = lista.firstElementChild;
     for (const el of nuevas) {

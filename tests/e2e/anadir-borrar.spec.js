@@ -1,7 +1,7 @@
 // Recorridos de SPEC-CALC-003: el orden de la pantalla (FR-01), añadir un
 // porcentaje (FR-09), borrar una serie con el gesto, la pulsación larga o el
 // botón, y "Deshacer" (FR-08), y todo ello sin dibujo 3D (FR-14).
-import { test, expect } from '@playwright/test';
+import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar, discosDeSeries,
   porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar,

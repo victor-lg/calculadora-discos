@@ -1,5 +1,5 @@
 // Recorridos de la interfaz que necesitan un navegador real.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, pesoBarra, barra, desplegarPaneles, recargar, copiar, pegar, discosDeSeries,
   porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas, deslizar,

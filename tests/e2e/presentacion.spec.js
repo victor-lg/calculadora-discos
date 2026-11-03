@@ -1,7 +1,7 @@
 // Recorridos de SPEC-CALC-003: peso de trabajo, paneles Carga y Mis discos,
 // avisos generales y tarjetas de las series en la vista de solo texto (FR-14);
 // y SPEC-CALC-001 AC-45.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar,
   porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, quitarTodas, deslizar,

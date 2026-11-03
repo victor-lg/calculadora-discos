@@ -26,12 +26,18 @@ test('el service worker no llama a skipWaiting() ni a clients.claim()', () => {
 const FICHEROS_DE_TEXTO = readdirSync(APP, { recursive: true })
   .filter((f) => /\.(js|html|css|webmanifest)$/.test(f));
 
+// ADR-0003 §3.3: la copia de three.js contiene una URL absoluta (el espacio de
+// nombres XHTML de createElementNS). Solo esa regla deja de aplicarse, y solo a
+// esta ruta exacta; las demás siguen aplicándose a la copia.
+const COPIA_THREE = 'vendor/three/three.module.min.js';
+
 test('la app no usa innerHTML ni recursos de terceros', () => {
+  assert.ok(FICHEROS_DE_TEXTO.includes(COPIA_THREE));
   for (const f of FICHEROS_DE_TEXTO) {
     const texto = readFileSync(`${APP}${f}`, 'utf8');
     assert.doesNotMatch(texto, /\.innerHTML\b|insertAdjacentHTML|outerHTML\s*=/, f);
     // Ninguna URL absoluta ni relativa al protocolo, en ningún contexto.
-    assert.doesNotMatch(texto, /[a-z][a-z0-9+.-]*:\/\/|["'(=\s]\/\/[a-z0-9]/i, f);
+    if (f !== COPIA_THREE) assert.doesNotMatch(texto, /[a-z][a-z0-9+.-]*:\/\/|["'(=\s]\/\/[a-z0-9]/i, f);
   }
 });
 

@@ -2,7 +2,7 @@
 // (docs/diseno/maqueta-interfaz.html y notas-diseno-interfaz.md §3.6 y §6),
 // tras la prueba en el iPhone de AC-24. Lo que solo fija la referencia visual
 // cita AC-24, que es donde se acepta; la prueba manual sigue haciendo falta.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './sin-dibujo.js';
 import { trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, deslizar, botonQuitar } from './pantalla.js';
 
 const GRIS = 'rgb(166, 171, 179)';

@@ -102,6 +102,11 @@
     <template id="plantilla-borrar">
       <div class="fondo-borrar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" focusable="false"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Borrar</div>
     </template>
+    <!-- SPEC-CALC-003 FR-07 y FR-16: el dibujo de cada tarjeta, una imagen
+         con la carga dibujada como etiqueta; no se anuncia hasta pintarse. -->
+    <template id="plantilla-dibujo">
+      <canvas class="dibujo" role="img" aria-hidden="true"></canvas>
+    </template>
     <section aria-labelledby="titulo-series">
       <h2 id="titulo-series" class="oculto">Series</h2>
       <ol id="series" class="series" aria-live="polite"></ol>
