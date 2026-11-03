@@ -430,21 +430,25 @@ test('SPEC-CALC-003/AC-15 una tarjeta añadida entra con un fundido; las que vue
   await expect(dibujo(page, 50)).toHaveAttribute('aria-label', 'Carga: 15 kg');
   await expect(dibujo(page, 50)).toHaveAttribute('data-animando', 'false');
 
-  // Al borrar el peso y escribir 100, las tarjetas vuelven sin entrada y con el
-  // dibujo ya cargado.
+  // Al borrar el peso y volver a escribir 100 tecla a tecla, las tarjetas
+  // vuelven con "1" sin entrada y con el dibujo ya cargado, sin animación en
+  // curso. Después, "100" se dibuja como cualquier peso tecleado (FR-11).
+  // Decisión de Víctor en el PR #35.
   await trabajo(page).fill('');
   await expect(series(page)).toHaveCount(0);
-  await trabajo(page).fill('100');
+  await trabajo(page).pressSequentially('100');
   await expect(series(page)).toHaveCount(4);
   expect(await entradas(page)).toEqual([]);
-  await page.clock.runFor(1000);
+  await comprobarDibujos(page, ['40 %', '50 %', '70 %', '90 %'].map((p) => [p, 'Sin discos', '']));
+  await page.clock.runFor(400);
+  await hastaQuePare(page, 300);
   await comprobarDibujos(page, [
     ['40 %', 'Carga: 10 kg', '1000'],
     ['50 %', 'Carga: 15 kg', '1500'],
     ['70 %', 'Carga: 25 kg', '2500'],
     ['90 %', 'Carga: 25 + 10 kg', '2500,1000'],
   ]);
-  expect(await animados(page)).toEqual([]);
+  expect(await entradas(page)).toEqual([]);
 
   // Con la lista vacía, la tarjeta añadida también entra con el fundido.
   for (const p of [40, 50, 70, 90]) {
