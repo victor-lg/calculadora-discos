@@ -61,7 +61,8 @@ ninguno. Es una aclaración de Víctor del 2026-10-31, sin reglas nuevas, en el 
 PR que SPEC-CALC-003 v0.3. Tras la ronda 1 de G4, AC-46 lo comprueba.
 La versión 0.9 (VIC-15) aclara en FR-16 cuándo una tarjeta muestra dibujo, como
 decidió Víctor en el PR #33 (VIC-12). Es una aclaración ya implementada, sin
-reglas nuevas, en el mismo PR que SPEC-CALC-003 v0.5.
+reglas nuevas, en el mismo PR que SPEC-CALC-003 v0.5. Tras la ronda 1 de G4,
+sin otra ronda, FR-16 habla del espacio de dibujo en lugar del lienzo.
 -->
 
 # SPEC-CALC-001 — Series de calentamiento con cálculo de discos
@@ -218,7 +219,7 @@ Víctor, único usuario, en su iPhone. Ningún otro sistema recibe datos: la app
 
   Cada equipo tiene una manga útil, que en las barras ya descuenta el espacio del collarín: la olímpica de 20 kg, 375 mm; la olímpica de 15 kg, 280 mm; la recta y la Z, 200 mm; y la máquina de los modos Dos lados y Un punto, 310 mm. La manga útil es la de cada lado en los modos Barra y Dos lados, y la del único punto en el modo Un punto.
 
-  Si la suma de los grosores de los discos de un lado (o del único punto) supera la manga útil, el cálculo no cambia y la serie muestra "No caben en la manga: faltan X cm. Se dibujan los que caben.". X es el exceso redondeado hacia arriba al milímetro y expresado en centímetros (FR-14). Qué discos se dibujan lo fija SPEC-CALC-003. Si la tarjeta no muestra dibujo (SPEC-CALC-003 FR-14 y FR-15), el aviso es solo "No caben en la manga: faltan X cm.". La tarjeta muestra dibujo cuando tiene su lienzo, aunque aún no esté pintado; un lienzo oculto por SPEC-CALC-003 FR-15 no cuenta como dibujo.
+  Si la suma de los grosores de los discos de un lado (o del único punto) supera la manga útil, el cálculo no cambia y la serie muestra "No caben en la manga: faltan X cm. Se dibujan los que caben.". X es el exceso redondeado hacia arriba al milímetro y expresado en centímetros (FR-14). Qué discos se dibujan lo fija SPEC-CALC-003. Si la tarjeta no muestra dibujo (SPEC-CALC-003 FR-14 y FR-15), el aviso es solo "No caben en la manga: faltan X cm.". La tarjeta muestra dibujo cuando tiene su espacio de dibujo en 3D, aunque aún no esté pintado; un dibujo oculto por SPEC-CALC-003 FR-15 no cuenta.
 
 ## 5. Criterios de aceptación
 

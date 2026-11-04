@@ -65,10 +65,17 @@ tiempos se cuentan desde que aparece el aviso y con un reloj controlado en los
 tests, AC-13 comprueba el segundo plano y §11 nombra a VoiceOver en la excepción.
 La versión 0.5 (VIC-15) pasa a la spec las lecturas que Víctor decidió durante
 VIC-12, ya implementadas en los PR #33, #35 y #36: FR-10, FR-11, FR-12, FR-13,
-FR-14, FR-15, FR-16 y AC-15. Son aclaraciones, sin reglas nuevas ni cambios de
-comportamiento. Las decidió el 2026-11-03 (en G4 de los PR #35 y #36, y en el #33
+FR-14, FR-15, FR-16 y AC-15. Son aclaraciones, sin cambios de comportamiento,
+pero algunas concretan lo que la spec dejaba abierto y conviene leerlas como
+reglas: el plazo de 3 s de FR-15 y su cancelación al pasar a segundo plano, que
+cada tecla reinicie la espera de FR-11, el repintado sin animación al volver el
+contexto (FR-15) y la animación en curso al activar "Reducir movimiento" (FR-13).
+Las decidió el 2026-11-03 (en G4 de los PR #35 y #36, y en el #33
 la del fallo al pintar) y el 2026-11-04 (las que quedaban por confirmar).
 En el mismo PR que SPEC-CALC-001 v0.9.
+Tras la ronda 1 de G4, sin otra ronda: la cabecera nombra lo que se concreta,
+FR-13 dice cómo se combina con el salto de FR-12, FR-10 ordena sus dos casos de
+añadir y FR-16 no repite la regla de la etiqueta.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -175,7 +182,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - perder el foco porque la app pasa a segundo plano o se bloquea el teléfono no confirma: al volver, el campo sigue abierto con lo escrito;
   - una misma confirmación añade el porcentaje una sola vez, aunque la persona pulse "Añadir" o Intro y eso haga además perder el foco al campo. Cerrar el campo no confirma otra vez;
   - cuando el campo se cierra con Intro, "Añadir", Escape o "✕", el foco vuelve al botón "+ Añadir porcentaje". Si se cierra porque la persona tocó otro elemento, el foco se queda en ese elemento.
-- **FR-10:** las tarjetas nuevas, las añadidas y las que vuelven con "Deshacer", entran con un fundido y un pequeño desplazamiento, y su dibujo aparece ya cargado, sin animación de discos. Cuando las series dejan de mostrarse por una regla de SPEC-CALC-001 o SPEC-CALC-002 (peso vacío o no válido, lista vacía, ningún disco habilitado), desaparecen sin animación; cuando vuelven por corregirse esa regla, aparecen como al arrancar: sin entrada y con el dibujo ya cargado. Un porcentaje que se añade mientras las series no se muestran (por ejemplo, con el peso vacío) aparece así, sin entrada, al corregirse la regla. Una tarjeta que aparece porque la persona añade un porcentaje o pulsa "Deshacer" entra siempre como añadida, aunque la lista estuviera vacía.
+- **FR-10:** las tarjetas nuevas, las añadidas y las que vuelven con "Deshacer", entran con un fundido y un pequeño desplazamiento, y su dibujo aparece ya cargado, sin animación de discos. Cuando las series dejan de mostrarse por una regla de SPEC-CALC-001 o SPEC-CALC-002 (peso vacío o no válido, lista vacía, ningún disco habilitado), desaparecen sin animación; cuando vuelven por corregirse esa regla, aparecen como al arrancar: sin entrada y con el dibujo ya cargado. Una tarjeta que aparece porque la persona añade un porcentaje o pulsa "Deshacer" entra siempre como añadida, aunque la lista estuviera vacía. En cambio, un porcentaje que se añade mientras las series no se muestran (por ejemplo, con el peso vacío) no tiene tarjeta hasta que se corrige la regla, y entonces aparece como las demás, sin entrada.
 - **FR-11:** el dibujo sigue los cambios de la carga:
   - las series y sus textos se actualizan al momento (SPEC-CALC-001 FR-10). Mientras se escribe el peso de trabajo o el de la barra, el dibujo espera 400 ms desde la última tecla: cada tecla en uno de esos campos vuelve a empezar la espera, aunque no cambie la carga (por ejemplo, la coma de "105,"). Los demás cambios (añadir, collarines, modo, barra, discos habilitados) se dibujan al momento, y con ellos, también al momento, lo que esperaba de un peso que se estaba escribiendo. Con "Reducir movimiento" la espera es la misma. Durante esa espera y la animación, el dibujo puede ir por detrás del texto;
   - al cambiar la carga de una tarjeta, se conservan los discos interiores que no cambian y solo se anima lo que cambia, en este orden: sale el collarín, salen los discos que sobran de fuera hacia dentro y de uno en uno, entran los nuevos del más pesado al más ligero y entra el collarín, que se cierra;
@@ -183,7 +190,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - al cambiar de equipo (de barra, o entre barra y máquina), todas las tarjetas se vacían de golpe, sin animar la salida, y se cargan de nuevo con la animación de este requisito;
   - al arrancar, los dibujos aparecen ya cargados, sin animación.
 - **FR-12:** si la carga cambia mientras su animación está en curso, el dibujo termina mostrando la carga actual de la serie, sin discos ni collarines de más o de menos. La animación en curso termina de golpe, en su posición final, y se anima la diferencia entre esa carga y la actual: el dibujo da un salto.
-- **FR-13:** con la preferencia del sistema "Reducir movimiento" activada, no hay ninguna animación: ni en los dibujos, ni al borrar (la tarjeta desaparece sin salir de lado y su hueco se cierra sin transición), ni al añadir o deshacer, ni al desplegar la explicación o los paneles. Durante el gesto de borrar, la tarjeta sigue al dedo. Si la preferencia se activa con una animación en curso, esa animación sigue hasta terminar; las siguientes ya no se animan.
+- **FR-13:** con la preferencia del sistema "Reducir movimiento" activada, no hay ninguna animación: ni en los dibujos, ni al borrar (la tarjeta desaparece sin salir de lado y su hueco se cierra sin transición), ni al añadir o deshacer, ni al desplegar la explicación o los paneles. Durante el gesto de borrar, la tarjeta sigue al dedo. Si la preferencia se activa con una animación en curso, esa animación sigue hasta terminar, y los cambios siguientes ya no se animan. Si la carga de ese dibujo cambia antes de que termine, la animación termina de golpe (FR-12) y la carga nueva se dibuja sin animar.
 - **FR-14:** si el dispositivo no puede dibujar en 3D (porque el navegador no lo admite, porque falla al prepararlo o porque, después, falla al pintar), la app funciona igual, con todas las reglas de SPEC-CALC-001 y SPEC-CALC-002: las tarjetas muestran solo el texto, en una columna, y las fichas de barra muestran un dibujo plano.
 - **FR-15:** si el sistema retira el contexto gráfico (por ejemplo, Safari con la app en segundo plano):
   - los dibujos ya pintados se siguen viendo mientras correspondan a la carga de su serie. Un dibujo a mitad de animación no corresponde: se oculta al perderse el contexto, aunque no cambie ningún texto. Si la carga cambia y vuelve a la que estaba pintada (por ejemplo, 100 → 105 → 100), su dibujo vuelve a verse;
@@ -196,7 +203,7 @@ Víctor, único usuario, en su iPhone, con el dedo, con el teclado del sistema o
   - la carga que muestra es la que se ve en cada fotograma, también a mitad de animación;
   - tiene una animación en curso desde que su carga empieza a cambiar (al terminar la espera de FR-11, si la hay), también durante su desfase de 90 ms, hasta que termina.
 
-  Su etiqueta accesible (FR-07) describe la carga dibujada al terminar de cambiar: cambia cuando el dibujo termina de cambiar.
+  Su etiqueta accesible (FR-07) describe la carga dibujada y cambia al terminar la animación o, si no la hay, al dibujarse la carga nueva.
 
 ## 5. Criterios de aceptación
 
