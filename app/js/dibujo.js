@@ -45,6 +45,9 @@ const MINIATURA = { ancho: 264, alto: 90, mitad: 410, centro: new Vector3(30, -2
 // después de la anterior. Las curvas, como en la referencia visual.
 const ESPERA_MS = 400;
 const DESFASE_MS = 90;
+// FR-15: lo que se espera a que el sistema devuelva el contexto gráfico al
+// volver a primer plano, antes de darlo por perdido.
+const RECUPERAR_MS = 3000;
 // Lo que puede ocupar como mucho cada fotograma pintando tarjetas, salvo la primera.
 const PRESUPUESTO_MS = 12;
 const salida = (x) => x * x * x;
@@ -82,10 +85,12 @@ function preparar() {
 }
 
 // Prepara el dibujo. Devuelve null si el dispositivo no puede dibujar en 3D o
-// falla al prepararlo (SPEC-CALC-003 FR-14). `alPerder` se llama una vez si el
-// sistema retira el contexto gráfico, o si pintar falla; desde entonces el
-// motor no pinta nada más.
-export function crearMotor({ alPerder }) {
+// falla al prepararlo (SPEC-CALC-003 FR-14). `alPerder` se llama una vez si
+// pintar falla, o si al volver a primer plano el sistema no ha devuelto el
+// contexto gráfico (FR-15); desde entonces el motor no pinta nada más.
+// `alMostrar(lienzo, visible)` se llama cuando un lienzo de tarjeta se oculta
+// o vuelve a verse (FR-15).
+export function crearMotor({ alPerder, alMostrar }) {
   let base;
   try {
     base = preparar();
@@ -102,11 +107,21 @@ export function crearMotor({ alPerder }) {
   const perder = () => {
     if (perdido) return;
     perdido = true;
+    clearTimeout(espera);
     observador.disconnect();
     renderer.dispose();
     alPerder();
   };
-  lienzo3d.addEventListener('webglcontextlost', perder);
+  // FR-15: mientras el sistema tiene retirado el contexto gráfico no se pinta
+  // nada; three.js lo vuelve a preparar cuando el sistema lo devuelve.
+  let sinContexto = false;
+  let espera = null;
+  lienzo3d.addEventListener('webglcontextlost', (e) => {
+    // Sin esto, el navegador no devuelve el contexto.
+    e.preventDefault();
+    quedarSinContexto();
+  });
+  lienzo3d.addEventListener('webglcontextrestored', recuperar);
   // Un sombreador que no compila no lanza ningún error en three.js: dejaría el
   // lienzo vacío con una etiqueta que describe la carga.
   renderer.debug.onShaderError = perder;
@@ -153,16 +168,67 @@ export function crearMotor({ alPerder }) {
   const miniaturas = new Map();
   Promise.all(FUENTES_ROTULO.map((f) => document.fonts?.load(f).catch(() => {})))
     .then(() => requestAnimationFrame(() => {
+      if (perdido) return;
       try {
-        escena.environment = entorno(renderer);
         escena.add(...luces());
       } catch {
         perder();
         return;
       }
       listo = true;
-      pintarPendientes();
+      // Sin contexto, el entorno se genera al recuperarlo.
+      if (!sinContexto && iluminar()) pintarPendientes();
     }));
+
+  // El entorno vive en la GPU: se genera de nuevo cada vez que vuelve el contexto.
+  function iluminar() {
+    try {
+      escena.environment?.dispose();
+      escena.environment = entorno(renderer);
+      return true;
+    } catch {
+      perder();
+      return false;
+    }
+  }
+
+  // FR-15: sin contexto, un lienzo de tarjeta solo se ve si lo último que
+  // pintó, sin animación en curso, es la carga de su serie. Un lienzo oculto
+  // vuelve a verse al repintarse (pintarPendientes).
+  function mostrarSi(lienzo, visible) {
+    if (lienzo.hidden !== visible) return;
+    lienzo.hidden = !visible;
+    alMostrar(lienzo, visible);
+  }
+  const revisar = (lienzo, t) => mostrarSi(lienzo, t.pintada !== null && igual(t.pintada, t.carga));
+
+  // FR-15: lo que esperaba su turno se aplica ya, sin animación, y las
+  // animaciones en curso terminan de golpe. Las miniaturas que aún no se han
+  // pintado dejan ver el dibujo plano de su ficha.
+  function quedarSinContexto() {
+    if (perdido || sinContexto) return;
+    sinContexto = true;
+    aplicarCola();
+    for (const [lienzo, t] of tarjetas) {
+      acabar(t);
+      t.mostrada = t.carga;
+      lienzo.dataset.animando = 'false';
+      revisar(lienzo, t);
+    }
+    for (const lienzo of miniaturas.keys()) lienzo.hidden = true;
+  }
+
+  // FR-15: al volver el contexto se repintan todas las tarjetas con su carga.
+  function recuperar() {
+    if (perdido || !sinContexto) return;
+    sinContexto = false;
+    clearTimeout(espera);
+    espera = null;
+    if (listo && !iluminar()) return;
+    for (const t of tarjetas.values()) t.sucio = true;
+    for (const lienzo of miniaturas.keys()) lienzo.hidden = false;
+    pintarPendientes();
+  }
 
   // FR-10 y FR-11: la tarjeta, ya cargada y sin animación.
   function montar(t) {
@@ -229,7 +295,7 @@ export function crearMotor({ alPerder }) {
       return false;
     }
     const sobran = t.piezas.splice(k).reverse();
-    if (sinMovimiento()) {
+    if (sinMovimiento() || sinContexto) {
       for (const { o } of sobran) t.grupo.remove(o);
       if (t.collar) t.grupo.remove(t.collar);
       t.collar = null;
@@ -364,17 +430,21 @@ export function crearMotor({ alPerder }) {
     for (const otra of tarjetas.values()) if (otra.grupo) otra.grupo.visible = otra === t;
     if (!t.grupo.parent) escena.add(t.grupo);
     usarEquipo(t.carga.equipo);
+    medir(ancho, alto);
+    encuadrar(ancho, alto);
+    renderer.render(escena, camara);
+    if (perdido) return false;
+    // Si el contexto se ha perdido y aún no ha llegado su evento, no se borra
+    // lo pintado (FR-15). Cambiar el tamaño del lienzo también lo borra, así
+    // que se hace después.
+    if (renderer.getContext().isContextLost()) {
+      quedarSinContexto();
+      return false;
+    }
     if (lienzo.width !== ancho || lienzo.height !== alto) {
       lienzo.width = ancho;
       lienzo.height = alto;
     }
-    medir(ancho, alto);
-    encuadrar(ancho, alto);
-    renderer.render(escena, camara);
-    if (perdido) return;
-    // Si el contexto se ha perdido y aún no ha llegado su evento, no se borra
-    // lo pintado: se sigue viendo hasta que la app pasa a la vista de FR-14.
-    if (renderer.getContext().isContextLost()) throw new Error('Contexto perdido');
     const ctx = lienzo.getContext('2d');
     ctx.clearRect(0, 0, ancho, alto);
     ctx.drawImage(lienzo3d, 0, 0);
@@ -387,6 +457,9 @@ export function crearMotor({ alPerder }) {
     lienzo.dataset.animando = String(t.movimientos.length > 0);
     lienzo.setAttribute('aria-label', t.mostrada.etiqueta);
     lienzo.removeAttribute('aria-hidden');
+    // FR-15: lo que muestra el lienzo si se pierde el contexto ahora.
+    t.pintada = t.movimientos.length ? null : t.carga;
+    return true;
   }
 
   // ADR-0003 §3.5: solo se repintan las tarjetas que lo necesitan: las que
@@ -399,12 +472,12 @@ export function crearMotor({ alPerder }) {
       if (t.grupo) escena.remove(t.grupo);
       tarjetas.delete(lienzo);
     }
-    if (!listo || perdido) return;
+    if (!listo || perdido || sinContexto) return;
     for (const [lienzo, id] of miniaturas) {
       if (!lienzo.clientWidth) continue;
+      if (!pintarMiniatura({ lienzo, id })) return;
       miniaturas.delete(lienzo);
       observador.unobserve(lienzo);
-      pintarMiniatura({ lienzo, id });
     }
     const resolucion = Math.min(window.devicePixelRatio || 1, RESOLUCION_MAXIMA);
     const ahora = performance.now();
@@ -417,18 +490,22 @@ export function crearMotor({ alPerder }) {
     try {
       for (let i = 0; i < lista.length; i++) {
         const [lienzo, t] = lista[(turno + i) % lista.length];
+        const mueve = avanzar(t, ahora);
+        const caro = performance.now() - ahora > PRESUPUESTO_MS;
+        // FR-15: un lienzo oculto no mide nada; vuelve a verse justo antes de
+        // repintarse, sin que llegue a verse lo que tenía.
+        if (lienzo.hidden && !caro) mostrarSi(lienzo, true);
         const ancho = Math.round(lienzo.clientWidth * resolucion);
         const alto = Math.round(lienzo.clientHeight * resolucion);
         const firma = `${ancho}×${alto}`;
-        const mueve = avanzar(t, ahora);
-        if (!ancho || !alto || (t.firma === firma && !t.sucio && !mueve)) continue;
-        if (performance.now() - ahora > PRESUPUESTO_MS) {
+        if (!lienzo.hidden && (!ancho || !alto || (t.firma === firma && !t.sucio && !mueve))) continue;
+        if (caro) {
           t.sucio = true;
           if (!quedan) turno = (turno + i) % lista.length;
           quedan = true;
           continue;
         }
-        pintar(lienzo, t, ancho, alto);
+        if (!pintar(lienzo, t, ancho, alto)) return;
         t.firma = firma;
         t.sucio = false;
       }
@@ -440,12 +517,13 @@ export function crearMotor({ alPerder }) {
     }
   }
 
+  // Devuelve si se ha pintado.
   function pintarMiniatura(m) {
-    if (perdido) return;
     try {
-      dibujarMiniatura(m);
+      return dibujarMiniatura(m);
     } catch {
       perder();
+      return false;
     }
   }
 
@@ -463,10 +541,14 @@ export function crearMotor({ alPerder }) {
     renderer.toneMappingExposure = 1.4;
     renderer.render(escenaMini, cam);
     renderer.toneMappingExposure = 1.05;
-    if (renderer.getContext().isContextLost()) throw new Error('Contexto perdido');
+    if (renderer.getContext().isContextLost()) {
+      quedarSinContexto();
+      return false;
+    }
     lienzo.width = ancho;
     lienzo.height = alto;
     lienzo.getContext('2d').drawImage(lienzo3d, 0, 0);
+    return true;
   }
 
   return {
@@ -479,11 +561,21 @@ export function crearMotor({ alPerder }) {
     dibujar(lienzo, carga, { esperar = false } = {}) {
       const t = tarjetas.get(lienzo);
       if (!t) {
-        tarjetas.set(lienzo, { carga, mostrada: carga, grupo: null, piezas: [], collar: null, movimientos: [], firma: null, sucio: false });
+        const nueva = { carga, mostrada: carga, pintada: null, grupo: null, piezas: [], collar: null, movimientos: [], firma: null, sucio: false };
+        tarjetas.set(lienzo, nueva);
         observador.observe(lienzo);
+        // FR-15: sin contexto, queda sin dibujo hasta que se pinta.
+        if (sinContexto) revisar(lienzo, nueva);
         return;
       }
       if (igual(cola.get(lienzo) ?? t.carga, carga)) return;
+      // FR-15: sin contexto no hay nada que esperar ni que animar, y una
+      // tarjeta cuya carga cambia se oculta a la vez que cambia su texto.
+      if (sinContexto) {
+        cambiar(t, carga, 0);
+        revisar(lienzo, t);
+        return;
+      }
       cola.set(lienzo, carga);
       if (esperar) {
         this.esperar();
@@ -504,7 +596,28 @@ export function crearMotor({ alPerder }) {
     // SPEC-CALC-003 FR-07: la miniatura de una ficha de barra.
     miniatura(lienzo, id) {
       miniaturas.set(lienzo, id);
+      lienzo.hidden = sinContexto;
       observador.observe(lienzo);
+    },
+    // FR-15: al volver a primer plano se repintan todas las tarjetas. Si el
+    // sistema aún no ha devuelto el contexto, se le espera RECUPERAR_MS; si no
+    // lo devuelve, la app pasa a la vista de FR-14 (decisión de Víctor del
+    // 2026-11-03, PR #36).
+    volver() {
+      if (perdido) return;
+      if (renderer.getContext().isContextLost()) quedarSinContexto();
+      if (sinContexto) {
+        espera ??= setTimeout(perder, RECUPERAR_MS);
+        return;
+      }
+      for (const t of tarjetas.values()) t.sucio = true;
+      programar();
+    },
+    // Al pasar a segundo plano, la espera se cancela y vuelve a empezar en la
+    // siguiente vuelta (decisión de Víctor del 2026-11-03, PR #36).
+    salir() {
+      clearTimeout(espera);
+      espera = null;
     },
   };
 }

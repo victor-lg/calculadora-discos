@@ -273,7 +273,9 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   -webkit-mask-image: linear-gradient(to right, transparent, #000 22%);
   mask-image: linear-gradient(to right, transparent, #000 22%);
 }
-:root[data-dibujo="3d"] .ficha svg { display: none; }
+/* FR-15: una miniatura que no llegó a pintarse antes de perder el contexto
+   deja ver el dibujo plano. */
+:root[data-dibujo="3d"] .ficha:has(.miniatura:not([hidden])) svg { display: none; }
 .ficha .nombre { font-size: 14px; font-weight: 600; line-height: 1.1; }
 .ficha .peso-ficha { font-family: var(--fuente-num); font-size: 15px; color: var(--texto-2); font-variant-numeric: tabular-nums; }
 .ficha:has(input:checked) { background: var(--superficie-2); box-shadow: inset 0 0 0 1.5px var(--acento); }
@@ -474,11 +476,13 @@ input[aria-invalid="true"], .peso-barra input[aria-invalid="true"] { border-colo
   gap: 6px 10px;
   align-items: center;
 }
-.serie:has(> .dibujo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+.serie:has(> .dibujo:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
 /* FR-07: el lienzo de la tarjeta (proporción 1,25, notas §4.1). No recibe los
    toques: el gesto de borrar y la pulsación larga son de la tarjeta. La
-   máquina se funde arriba y abajo. */
+   máquina se funde arriba y abajo. FR-15: oculto, la tarjeta queda solo con el
+   texto, como en FR-14. */
 .dibujo { display: block; width: 100%; height: auto; aspect-ratio: 1.25; pointer-events: none; }
+.dibujo[hidden], .miniatura[hidden] { display: none; }
 .dibujo[data-equipo="maquina"] {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 89%, transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 89%, transparent);
@@ -682,7 +686,7 @@ input[aria-invalid="true"], .peso-barra input[aria-invalid="true"] { border-colo
 
 @media (max-width: 360px) {
   #trabajo-auto { font-size: 52px; }
-  .serie:has(> .dibujo) { grid-template-columns: minmax(0, 1fr); }
+  .serie:has(> .dibujo:not([hidden])) { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* NFR-03: con el zoom al 200 % (195 px) el número, "✕" y "Añadir" no caben en
