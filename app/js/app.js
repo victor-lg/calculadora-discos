@@ -797,3 +797,5 @@ navigator.storage?.persist?.().catch(() => {});
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
+
+// prueba C18: no fusionar
