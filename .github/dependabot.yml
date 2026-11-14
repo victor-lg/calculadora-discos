@@ -30,9 +30,12 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+    # three va aparte: ADR-0003 §3.2 hace de cada cambio de versión un PR R2 propio, y su
+    # PR falla en tests/unit/three.test.js hasta que se copia la versión nueva a app/vendor.
     groups:
       npm:
         patterns: ["*"]
+        exclude-patterns: ["three"]
     commit-message:
       prefix: chore
       prefix-development: chore
