@@ -75,11 +75,14 @@ CI usa el de `main`.
 
 ### `app/vendor/three/**`
 
-- **Qué es:** three.js 0.170.0, copiado tal cual del paquete npm (minificado, con su
-  `LICENSE`), según ADR-0003.
+- **Qué es:** three.js 0.170.0 (la versión de `package.json`), copiado tal cual del
+  paquete npm (minificado, con su `LICENSE`), según ADR-0003 §3.2.
 - **Por qué se excluye:** es código de terceros que no se edita aquí. Un hallazgo en él no
   se corregiría en este repo, sino actualizando la versión.
-- **Qué lo cubre:** la versión la fija ADR-0003, y una actualización es un PR propio.
+- **Qué lo cubre:** la versión exacta está en `package.json`; ADR-0003 §3.2 hace de
+  cada cambio de versión un PR R2 propio, y el test de identidad de
+  `tests/unit/three.test.js` comprueba que la copia es la del paquete (§3.3). Dependabot
+  propone `three` en un PR aparte (`.github/dependabot.yml`).
 
 ### `tests/e2e/pantalla.js`
 
