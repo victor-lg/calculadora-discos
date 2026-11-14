@@ -1,0 +1,8 @@
+# Exclusiones de Semgrep. El motivo de cada una está en docs/baseline-controles.md
+# ("Exclusiones de los escáneres"). Con este fichero, Semgrep ya no aplica su lista por
+# defecto (tests/, vendor/…): solo excluye lo que hay aquí. Un cambio aquí es R2 y vale
+# tras el merge, porque la CI toma el de `main`.
+
+app/vendor/three/**
+tests/e2e/pantalla.js
+tests/unit/fuentes.test.js

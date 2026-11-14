@@ -66,6 +66,40 @@ otra issue.
 
 ## Exclusiones de los escáneres
 
-Ninguna. No hay `osv-scanner.toml` ni `.semgrepignore`: no se ha visto ningún hallazgo
-que excluir. Si osv-scanner o Semgrep dan hallazgos en `app/vendor/three/**` (three.js
-0.170.0 copiado del paquete npm, ADR-0003), la exclusión se añade aquí con su motivo.
+osv-scanner: ninguna (no hay `osv-scanner.toml`).
+
+Semgrep: tres entradas en `.semgrepignore`, cada una con su motivo. Excluir un fichero
+entero lo deja fuera de **todas** las reglas, no solo de la que dio el hallazgo: si uno
+de estos ficheros crece o cambia de uso, la exclusión se revisa. El fichero es R2 y la
+CI usa el de `main`.
+
+### `app/vendor/three/**`
+
+- **Qué es:** three.js 0.170.0, copiado tal cual del paquete npm (minificado, con su
+  `LICENSE`), según ADR-0003.
+- **Por qué se excluye:** es código de terceros que no se edita aquí. Un hallazgo en él no
+  se corregiría en este repo, sino actualizando la versión.
+- **Qué lo cubre:** la versión la fija ADR-0003, y una actualización es un PR propio.
+
+### `tests/e2e/pantalla.js`
+
+- **Hallazgo:** `detect-non-literal-regexp`, en la línea 7: `new RegExp(`^${nombre}( |$)`)`,
+  dentro de `barra()`.
+- **Origen:** job `semgrep` de calculadora-discos#40, run 43593585195.
+- **Por qué no es un riesgo:** es código de test. Los argumentos son literales del propio
+  repositorio: los nombres de barra que pasan los tests (`'Recta'`, `'Z'`,
+  `'Olímpica 20 kg'`…), directamente o desde un array literal en `interfaz.spec.js`. No
+  hay entrada de usuario ni datos externos, así que no cabe una expresión regular
+  maliciosa (ReDoS).
+
+### `tests/unit/fuentes.test.js`
+
+- **Hallazgo:** `detect-non-literal-regexp`, en la línea 49:
+  `new RegExp(`${p}:\\s*([^;]+);`)`, dentro de `caras()`.
+- **Origen:** job `semgrep` de calculadora-discos#40, run 43593585195.
+- **Por qué no es un riesgo:** es código de test. `p` solo toma los literales
+  `'font-family'`, `'font-weight'`, `'font-style'` y `'src'`, y la expresión se aplica al
+  `app/css/estilos.css` del propio repositorio. No hay entrada de usuario ni datos
+  externos.
+
+Los tests no se cambian para esquivar la regla.
