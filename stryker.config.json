@@ -12,6 +12,7 @@
       "tests/unit/!(sw).test.js"
     ]
   },
+  "concurrency": 4,
   "disableTypeChecks": false,
   "reporters": [
     "clear-text"
