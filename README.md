@@ -25,7 +25,7 @@ Se publica en GitHub Pages, con subdominio propio, mediante un workflow que solo
 
 ## Desarrollo
 
-Requisitos: Node.js ≥ 22 (la versión exacta está en `.nvmrc`). Playwright es la única dependencia de desarrollo.
+Requisitos: Node.js ≥ 22 (la versión exacta está en `.nvmrc`). Las dependencias de desarrollo admitidas son las de [ADR-0006](docs/adr/ADR-0006-herramientas-de-calidad.md) (§3.1).
 
 ```bash
 # Instalar dependencias (versiones exactas del lockfile, sin scripts de instalación)
