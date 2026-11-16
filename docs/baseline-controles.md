@@ -73,7 +73,8 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
 ### `mutaciones` (Stryker)
 
 - **Configuración** (`stryker.config.json`): runner `tap` de Stryker, que solo lanza los
-  ficheros de test que pasan por cada mutante, y 4 procesos (`concurrency`). Con el runner
+  ficheros de test que pasan por cada mutante, y 3 procesos (`concurrency`), con la espera
+  por mutante por defecto (`timeoutMS` 5000, `timeoutFactor` 1,5). Con el runner
   `command` cada mutante lanzaba todos los unitarios y el job se canceló a los 30 minutos
   (`timeout-minutes`), con 2 procesos y 6,4 s por ejecución (run 43879302616). Umbral
   `break` 90: la menor puntuación medida (92,68, en local) menos 2, redondeado hacia abajo.
@@ -96,18 +97,27 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   | --- | --- | --- | --- | --- | --- | --- | --- |
   | Local | 2 | 5 min 55 s | 728 | 6 | 58 | 50 | 92,68 |
   | Local | 4 | 3 min 5 s | 728 | 6 | 58 | 50 | 92,68 |
+  | Local, `timeoutMS` 15000 | 4 | 3 min 50 s | 728 | 6 | 58 | 50 | 92,68 |
   | CI (run 43890811680) | 2 | 20 min 29 s | 711 | 41 | 40 | 50 | 94,95 |
   | CI (run 43896837699) | 4 | 11 min 47 s | 643 | 135 | 14 | 50 | 98,23 |
+  | CI (run 43905675262), `timeoutMS` 15000 | 4 | 17 min 40 s | 644 | 130 | 18 | 50 | 97,73 |
+  | CI (run 43909150386) | 3 | 13 min 14 s | 647 | 122 | 23 | 50 | 97,10 |
 
   En local, los 58 supervivientes: 21 en `vista.js`, 19 en `calculo.js`, 13 en
   `almacenamiento.js` y 5 en `entrada.js`.
 - **La puntuación varía con el runner, por los mutantes por tiempo.** Stryker da por
-  detectado un mutante que agota su tiempo. En el runner de la CI cada ejecución de los
-  tests es más lenta que en local (el dry run tarda 8–9 s frente a 4 s) y, con 4 procesos
-  en 4 vCPU, más aún: 129 mutantes más acaban por tiempo que en local, y 44 de los que en
-  local sobreviven cuentan en la CI como detectados. Por eso la puntuación de la CI es más
-  alta que la real y el umbral se fija sobre la de local. La consecuencia: en la CI, un
-  test debilitado puede no notarse si sus mutantes acaban por tiempo.
+  detectado un mutante que agota su tiempo. En local acaban así 6, con 2 o con 4
+  procesos; en el runner de la CI, entre 41 y 135 según la configuración, y con ellos
+  hasta 44 de los 58 que en local sobreviven cuentan como detectados. Por eso la
+  puntuación de la CI es más alta que la real y el umbral se fija sobre la de local. La
+  consecuencia: en la CI el check está casi ciego, porque un test debilitado puede no
+  notarse si sus mutantes acaban por tiempo.
+- **Lo que se probó para acercar la CI a local, sin conseguirlo** (VIC-27): subir la
+  espera por mutante de 5 a 15 s apenas cambia nada (de 135 a 130 por tiempo) y alarga el
+  job casi 6 minutos; bajar a 3 procesos deja 122. Solo con 2 procesos bajan a 41, pero
+  el job tarda más de 20 minutos. Que más espera no los recupere apunta a que no son
+  ejecuciones algo más lentas, sino procesos que en el runner no terminan: la causa está
+  sin averiguar.
 - **Los 50 con error:** el proceso de `tests/unit/series.test.js` sale con el código 7 en
   lugar de fallar un test. Con el runner `command` esos mismos mutantes contaban como
   detectados y la puntuación local era 93,11. Con el error no cuentan en la puntuación.
