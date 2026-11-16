@@ -6,9 +6,11 @@
     "app/js/formato.js",
     "app/js/vista.js"
   ],
-  "testRunner": "command",
-  "commandRunner": {
-    "command": "node --test \"tests/unit/!(sw).test.js\""
+  "testRunner": "tap",
+  "tap": {
+    "testFiles": [
+      "tests/unit/!(sw).test.js"
+    ]
   },
   "disableTypeChecks": false,
   "reporters": [
