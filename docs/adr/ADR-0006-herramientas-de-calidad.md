@@ -1,7 +1,7 @@
 ---
 id: ADR-0006
 titulo: Las herramientas de calidad de la CI, dependencias de desarrollo admitidas
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-16
 sustituye: null
 sustituido_por: null
@@ -16,6 +16,8 @@ añade tres. Víctor pidió un ADR nuevo, con las tres admitidas y sus condicion
 solo los puntos de la cabecera (`modifica`); el resto de ADR-0001 y ADR-0003 sigue
 vigente y no se edita. Datos del lockfile y de la CI tomados de la rama del PR #48 y de
 `docs/herramientas.md` del workflow (main de sdd-workflow, 189d914) el 2026-11-16.
+Revisado en G4 en el PR #51 (dos revisores, dos rondas; la segunda, sin nada que deba
+corregirse, y sus importantes, aplicados en 2176a3b). Aceptado con el merge del PR #51.
 -->
 
 # ADR-0006 — Las herramientas de calidad de la CI, dependencias de desarrollo admitidas
