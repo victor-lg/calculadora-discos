@@ -73,9 +73,10 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
 ### `mutaciones` (Stryker)
 
 - **Configuración** (`stryker.config.json`): runner `tap` de Stryker, que solo lanza los
-  ficheros de test que pasan por cada mutante; con el runner `command` cada mutante lanzaba
-  todos los unitarios y el job se canceló a los 30 minutos (`timeout-minutes`), con 2
-  procesos y 6,4 s por ejecución (run 43879302616). Umbral `break` 92.
+  ficheros de test que pasan por cada mutante, y 4 procesos (`concurrency`). Con el runner
+  `command` cada mutante lanzaba todos los unitarios y el job se canceló a los 30 minutos
+  (`timeout-minutes`), con 2 procesos y 6,4 s por ejecución (run 43879302616). Umbral
+  `break` 90: la menor puntuación medida (92,68, en local) menos 2, redondeado hacia abajo.
 - **Qué muta:** los cinco módulos que importan los tests unitarios: `almacenamiento.js`,
   `calculo.js`, `entrada.js`, `formato.js` y `vista.js`.
 - **Qué queda fuera, como hallazgo:** `app/js/app.js`, `app/js/dibujo.js` y
@@ -89,21 +90,34 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
 - **`disableTypeChecks: false`:** sin él, Stryker añade `// @ts-nocheck` a todos los `.js`
   de su copia de trabajo, también a `app/vendor/three/`, y falla el test que comprueba que
   la copia de three.js es idéntica a la del paquete (ADR-0003 §3.3).
-- **Puntuación** (local, runner `tap`): 92,68. De 842 mutantes, 728 muertos, 6 por tiempo,
-  58 supervivientes y 50 con error, que no cuentan. Los 58 supervivientes: 21 en
-  `vista.js`, 19 en `calculo.js`, 13 en `almacenamiento.js` y 5 en `entrada.js`.
+- **Mediciones** (runner `tap`, los 842 mutantes; cada fila, una ejecución):
+
+  | Dónde | Procesos | Job | Muertos | Por tiempo | Supervivientes | Con error | Puntuación |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Local | 2 | 5 min 55 s | 728 | 6 | 58 | 50 | 92,68 |
+  | Local | 4 | 3 min 5 s | 728 | 6 | 58 | 50 | 92,68 |
+  | CI (run 43890811680) | 2 | 20 min 29 s | 711 | 41 | 40 | 50 | 94,95 |
+  | CI (run 43896837699) | 4 | 11 min 47 s | 643 | 135 | 14 | 50 | 98,23 |
+
+  En local, los 58 supervivientes: 21 en `vista.js`, 19 en `calculo.js`, 13 en
+  `almacenamiento.js` y 5 en `entrada.js`.
+- **La puntuación varía con el runner, por los mutantes por tiempo.** Stryker da por
+  detectado un mutante que agota su tiempo. En el runner de la CI cada ejecución de los
+  tests es más lenta que en local (el dry run tarda 8–9 s frente a 4 s) y, con 4 procesos
+  en 4 vCPU, más aún: 129 mutantes más acaban por tiempo que en local, y 44 de los que en
+  local sobreviven cuentan en la CI como detectados. Por eso la puntuación de la CI es más
+  alta que la real y el umbral se fija sobre la de local. La consecuencia: en la CI, un
+  test debilitado puede no notarse si sus mutantes acaban por tiempo.
 - **Los 50 con error:** el proceso de `tests/unit/series.test.js` sale con el código 7 en
   lugar de fallar un test. Con el runner `command` esos mismos mutantes contaban como
-  detectados y la puntuación era 93,11. Con el umbral en 92, el margen es de 0,7 puntos.
-- **Tiempo:** en local, 5 min 55 s con 2 procesos (con el runner `command`, 20 min con
-  3). En la CI: PENDIENTE.
+  detectados y la puntuación local era 93,11. Con el error no cuentan en la puntuación.
 
 ### `codigo-sobrante` (knip)
 
 - **Configuración** (`knip.json`): la de la plantilla, con los 18 tipos en `"warn"`, más
   `entry` (`app/js/app.js`, que carga `app/index.html`, y `app/sw.js`, que `app.js`
-  registra como service worker) e `ignore` de `app/vendor/**`. Sin `entry`, knip daba por sobrante casi toda la
-  app; sin `ignore`, unos 390 exports de three.js.
+  registra como service worker) e `ignore` de `app/vendor/**`. Sin `entry`, knip daba por
+  sobrante casi toda la app; sin `ignore`, unos 390 exports de three.js.
 - **Resultado:** salida 0 (todo en `"warn"`); job de 12 a 14 s.
 - **Avisos** (5, con el runner `tap`; en local sobre los ficheros de Git, igual que el
   run 43879302616 salvo el aviso de `@stryker-mutator/command-runner`, que el plugin de
