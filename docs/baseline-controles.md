@@ -98,6 +98,7 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   | Local | 2 | 5 min 55 s | 728 | 6 | 58 | 50 | 92,68 |
   | Local | 4 | 3 min 5 s | 728 | 6 | 58 | 50 | 92,68 |
   | Local, `timeoutMS` 15000 | 4 | 3 min 50 s | 728 | 6 | 58 | 50 | 92,68 |
+  | Local, configuración final | 3 | 4 min 19 s | 728 | 6 | 58 | 50 | 92,68 |
   | CI (run 43890811680) | 2 | 20 min 29 s | 711 | 41 | 40 | 50 | 94,95 |
   | CI (run 43896837699) | 4 | 11 min 47 s | 643 | 135 | 14 | 50 | 98,23 |
   | CI (run 43905675262), `timeoutMS` 15000 | 4 | 17 min 40 s | 644 | 130 | 18 | 50 | 97,73 |
@@ -107,7 +108,7 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   En local, los 58 supervivientes: 21 en `vista.js`, 19 en `calculo.js`, 13 en
   `almacenamiento.js` y 5 en `entrada.js`.
 - **La puntuación varía con el runner, por los mutantes por tiempo.** Stryker da por
-  detectado un mutante que agota su tiempo. En local acaban así 6, con 2 o con 4
+  detectado un mutante que agota su tiempo. En local acaban así 6, con 2, 3 o 4
   procesos; en el runner de la CI, entre 41 y 135 según la configuración (con la misma, 122
   y 129 en dos ejecuciones), y con ellos
   hasta 44 de los 58 que en local sobreviven cuentan como detectados. Por eso la
@@ -119,13 +120,20 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   job casi 6 minutos; bajar a 3 procesos deja 122. Solo con 2 procesos bajan a 41, pero
   el job tarda más de 20 minutos. Que más espera no los recupere apunta a que no son
   ejecuciones algo más lentas, sino procesos que en el runner no terminan: la causa está
-  sin averiguar y la investiga VIC-29.
+  sin averiguar y la investiga VIC-29. Una pista para VIC-29 (G4 del #48, sin medir): el
+  repo es privado, y en los repos privados el runner `ubuntu-latest` tiene 2 vCPU, no 4;
+  con 3 o 4 procesos de Stryker más el principal, la CPU va sobrecargada.
 - **Decisión** (Víctor, 2026-11-16): se queda con 3 procesos, la espera por defecto y
   `break` 90, sabiendo que en la CI el check está casi ciego. `mutaciones` corre en cada PR
   pero **no pasa a check requerido** en la regla de `main` hasta cerrar VIC-29. Mientras,
   sus fallos se miran, pero su verde no prueba que los tests detecten los mutantes.
+  La cabecera de `calidad.yml` dice que el nombre de cada job es el check que se marca
+  como requerido: en la calculadora, para `mutaciones`, todavía no.
+- **Ficheros de test:** Stryker lanza `tests/unit/**/!(sw).test.js`, los mismos que
+  `npm test` salvo `sw.test.js`, también en subcarpetas.
 - **Los 50 con error:** el proceso de `tests/unit/series.test.js` sale con el código 7 en
-  lugar de fallar un test. Con el runner `command` esos mismos mutantes contaban como
+  lugar de fallar un test, y el runner `tap` da por error cualquier salida distinta de 0 sin
+  ningún test fallido (`tap-helper.js` de `@stryker-mutator/tap-runner`). Con el runner `command` esos mismos mutantes contaban como
   detectados y la puntuación local era 93,11. Con el error no cuentan en la puntuación.
 
 ### `codigo-sobrante` (knip)
@@ -142,7 +150,15 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
     es código que sobre.
   - Cuatro exports que nadie importa: `PORCENTAJES_INICIALES` (`almacenamiento.js`) y
     `PESO_MAXIMO_CENT`, `BARRA_MINIMA_CENT` y `BARRA_MAXIMA_CENT` (`entrada.js`).
-- **Pasar a `"error"`:** cuando estén resueltos (otra issue).
+- **Pasar a `"error"`:** cuando estén resueltos (otra issue). Antes, dos límites que hoy no
+  importan porque todo está en `"warn"` (G4 del #48; los dos figuran como límites aceptados
+  en `docs/herramientas.md` del workflow):
+  - knip carga y ejecuta `playwright.config.js` de la rama (su plugin de Playwright se activa
+    con `@playwright/test`), y ese fichero no es R2: con una regla en `"error"`, una rama
+    podría decidir el resultado del job. Se cierra desactivando ese plugin en `knip.json`
+    (`"playwright": false`) o haciendo R2 su configuración;
+  - las etiquetas JSDoc `@public`, `@beta` y `@alias` sacan un export del informe, y nada
+    las detecta en la CI, a diferencia de los silenciadores de Stryker y jscpd.
 
 ### `duplicados` (jscpd)
 

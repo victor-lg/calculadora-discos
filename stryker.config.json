@@ -9,7 +9,7 @@
   "testRunner": "tap",
   "tap": {
     "testFiles": [
-      "tests/unit/!(sw).test.js"
+      "tests/unit/**/!(sw).test.js"
     ]
   },
   "concurrency": 3,

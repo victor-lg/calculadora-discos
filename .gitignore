@@ -34,5 +34,5 @@ test-results/
 playwright-report/
 
 # Copia de trabajo e informes de Stryker (job `mutaciones` de calidad.yml)
-.stryker-tmp/
-reports/
+/.stryker-tmp/
+/reports/mutation/
