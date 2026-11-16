@@ -5,7 +5,7 @@ estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-16
 sustituye: null
 sustituido_por: null
-modifica: ["ADR-0001 (§3.7, punto de Playwright; §4, beneficios)", "ADR-0003 (§3.2, última frase del segundo punto)"]
+modifica: ["ADR-0001 (§3.7, punto de Playwright; §4, beneficios)", "ADR-0003 (§3.2, última frase de la segunda viñeta)"]
 referencias: ["ADR-0001", "ADR-0003", "VIC-27", "VIC-29", "PR #48", "osv-scanner.toml"]
 ---
 
@@ -58,23 +58,23 @@ Sin esta decisión, el PR #48 no se puede fusionar sin contradecir dos ADR acept
 
 ## 3. Decisión
 
-**Opción A.**
+**Opción A.** Es la única que mantiene los dos controles con `calidad.yml` tal como viene de la plantilla y deja los paquetes bajo la misma vigilancia que Playwright.
 
-1. **Dependencias de desarrollo admitidas.** Las de `devDependencies` son estas cuatro, y ninguna más:
+1. **Dependencias de desarrollo admitidas.** Las de `devDependencies` son estas cuatro, y ninguna más. Las tres de calidad, sujetas a las condiciones de §3.2:
    - `@playwright/test`, para los E2E, como hasta ahora (ADR-0001 §3.7);
    - `@stryker-mutator/core` y `@stryker-mutator/tap-runner`, para el job `mutaciones`;
    - `knip`, para el job `codigo-sobrante`.
 
    Añadir otra exige un ADR nuevo. Las dependencias en tiempo de ejecución no cambian: solo three.js (ADR-0003 §3.1).
 2. **Condiciones de los tres paquetes de calidad** (`@stryker-mutator/core`, `@stryker-mutator/tap-runner` y `knip`). Cada uno, en cada versión:
-   - **Fijado en el lockfile:** versión exacta en `package.json`, sin rangos, y fijada en `package-lock.json` con su `integrity` y descargada de `registry.npmjs.org`; nunca `file:`, Git, URL ni alias `npm:`. Lo mismo para todos los paquetes que trae.
+   - **Fijado en el lockfile:** versión exacta en `package.json`, sin rangos; nunca `file:`, Git, URL ni alias `npm:`. En `package-lock.json`, él y cada paquete que trae, con su `integrity` y descargados de `registry.npmjs.org`.
    - **Sin scripts de instalación:** ningún paquete de su árbol en el lockfile tiene `hasInstallScript`. Una versión que traiga uno no se admite, aunque la CI instale con `--ignore-scripts`.
-   - **Aprobado en `docs/herramientas.md` del workflow:** el paquete tiene su entrada aprobada en `main` de sdd-workflow.
+   - **Aprobado en `docs/herramientas.md` del workflow:** el paquete tiene su entrada aprobada en `main` de sdd-workflow. La aprobación es por paquete; las subidas siguen lo que diga su entrada. El PR que lo da de alta enlaza esa entrada con el commit de sdd-workflow, y lo comprueba su revisión.
    - **Solo para desarrollo:** ningún fichero de `app/` lo importa, y no se publica ni entra en la caché del service worker.
 
    **Un paquete que no cumple estas condiciones no entra en `main`.** Cada alta o subida de versión es un PR R2 (cambia los manifiestos) cuya revisión las comprueba y mira los avisos de seguridad del árbol (osv-scanner).
-3. **Qué cambia de ADR-0001 §3.7.** Su punto de Playwright, "Playwright, como **única dependencia de desarrollo**, para lo que necesita un navegador", pasa a: "Playwright para lo que necesita un navegador; las dependencias de desarrollo admitidas son las de ADR-0006 §3.1". Lo demás de §3.7 (`node --test` sin dependencias, Chromium y WebKit en la CI, el service worker en Chromium) sigue igual. En sus beneficios (§4), "una de desarrollo" pasa a ser "las de desarrollo de ADR-0006".
-4. **Qué cambia de ADR-0003 §3.2.** La última frase de su segundo punto, "Playwright sigue siendo la única dependencia de desarrollo (ADR-0001 §3.7)", pasa a: "Las dependencias de desarrollo admitidas son las de ADR-0006 §3.1". El resto de §3.2 (versión exacta de three.js, su procedencia y su revisión R2) sigue igual.
+3. **Qué cambia de ADR-0001 §3.7.** Su punto de Playwright, "Playwright, como **única dependencia de desarrollo**, para lo que necesita un navegador", pasa a: "Playwright para lo que necesita un navegador; las dependencias de desarrollo admitidas son las de ADR-0006 §3.1". Lo demás de §3.7 (`node --test` sin dependencias, Chromium y WebKit en la CI, el service worker en Chromium) sigue igual. En sus beneficios (§4), "cero dependencias en tiempo de ejecución y una de desarrollo": la primera mitad ya la dejó sin efecto ADR-0003 §3.1; la segunda, "una de desarrollo", pasa a ser "las de desarrollo de ADR-0006".
+4. **Qué cambia de ADR-0003 §3.2.** La última frase de la segunda viñeta de su punto 2 ("Versión y procedencia"), "Playwright sigue siendo la única dependencia de desarrollo (ADR-0001 §3.7)", pasa a: "Las dependencias de desarrollo admitidas son las de ADR-0006 §3.1". El resto de §3.2 (versión exacta de three.js, su procedencia y su revisión R2) sigue igual.
 
 ## 4. Consecuencias
 
@@ -84,13 +84,13 @@ Sin esta decisión, el PR #48 no se puede fusionar sin contradecir dos ADR acept
 - **Costes aceptados:**
   - 246 paquetes más en el lockfile, que Dependabot sube una vez al mes, cada subida como R2;
   - el job `mutaciones` tarda de 10 a 20 minutos por PR (§1);
-  - seis avisos de osv-scanner en dependencias de Stryker, exceptuados en `osv-scanner.toml` hasta el 2027-02-16 porque Stryker 10.1.1 no admite las versiones corregidas. La excepción va por ID de aviso: hasta que caduque, esos avisos quedan silenciados en todo el repo, también si los trae una dependencia de producción, y un PR que añada una tiene que mirar a mano si trae `qs`, `minimatch` o `glob` (`osv-scanner.toml`).
+  - seis avisos de osv-scanner en dependencias de Stryker, exceptuados en `osv-scanner.toml` hasta el 2027-02-16 porque Stryker 10.1.1 no admite las versiones corregidas. La excepción va por ID de aviso: hasta que caduque, esos avisos quedan silenciados en todo el repo, también si los trae una dependencia de producción y también en la tarea mensual (`osv-mensual.yml`). Un PR que añada una dependencia de producción tiene que mirar a mano si trae `qs`, `minimatch` o `glob` (`osv-scanner.toml`).
 - **Riesgos y mitigaciones:**
 
   | Riesgo | Mitigación |
   | --- | --- |
   | Un paquete comprometido en una versión nueva | Versión exacta e `integrity` en el lockfile, sin scripts de instalación (§3.2); Dependabot espera 7 días tras cada publicación; cada subida es R2. |
-  | Código de terceros que se ejecuta en la CI | Stryker ejecuta `npm test` y sus plugins; knip carga la configuración `.js` de las herramientas que reconoce, como `playwright.config.js` de la rama. Los jobs corren con `contents: read`, sin secretos y con la configuración de `main` (`docs/herramientas.md` del workflow). |
+  | Código de terceros que se ejecuta en la CI | Stryker ejecuta `npm test` y sus plugins; knip carga la configuración `.js` de las herramientas que reconoce, como `playwright.config.js` de la rama. Ese código de la rama se ejecuta; lo que fija `main` es la configuración de Stryker y knip. Los jobs corren con `contents: read` y sin secretos (`docs/herramientas.md` del workflow). |
   | Las mismas herramientas en local | Ejecutan código de terceros y del repo en el PC de quien las lance, como ya hace Playwright. |
   | Un aviso de seguridad sin corregir en su árbol | osv-scanner en cada PR; las excepciones caducan y, si no hay versión corregida para entonces, el check vuelve a fallar y se decide de nuevo. |
   | Una herramienta acaba en la app | `app/` se publica sola, sin `node_modules`; la CSP (`script-src 'self'`, ADR-0001 §3.4) y la revisión lo cubren. |
@@ -111,9 +111,19 @@ Sin esta decisión, el PR #48 no se puede fusionar sin contradecir dos ADR acept
 
 - **Pendiente:**
   - la entrada de `@stryker-mutator/tap-runner` en `docs/herramientas.md` del workflow, en un PR de sdd-workflow. Hasta que se fusione, tap-runner no cumple §3.2 y el PR #48 no entra en `main`;
-  - que `mutaciones` pase a check requerido, tras VIC-29.
+  - que `mutaciones` pase a check requerido, tras VIC-29;
+  - corregir "Playwright es la única dependencia de desarrollo" en `README.md`.
 - **Revisar este ADR si:**
   - una versión necesaria de alguna herramienta trae scripts de instalación;
   - las excepciones de osv-scanner caducan sin versión corregida;
-  - el tiempo o los hallazgos de los jobs dejan de compensar;
+  - `mutaciones` se cancela por su límite de 30 minutos o pasa de 25 minutos de forma habitual;
   - hace falta otra dependencia de desarrollo.
+
+## 7. Fuentes
+
+Consultadas el 2026-11-16.
+
+- [F1] Rama `ci/vic-27-calidad` del PR #48, commit `884472b`: `package.json` y `package-lock.json` (250 paquetes, todos de `registry.npmjs.org`, con `integrity` y sin `hasInstallScript`), `stryker.config.json` (runner `tap`) y `.github/workflows/calidad.yml` (`permissions: contents: read`, `npm ci --ignore-scripts`).
+- [F2] CI del PR #48: run 43879302616 (runner `command`, cancelado a los 30 minutos); con la configuración final, de 9 min 55 s a 18 min 31 s, la más lenta en el run 43921105974.
+- [F3] `docs/herramientas.md` de sdd-workflow, `main` en `189d914`: entradas "Stryker (JS/TS)" y "knip (JS/TS)", con la versión y la `integrity` de `@stryker-mutator/core` 10.1.1 y `knip` 6.45.1. Sin entrada de `@stryker-mutator/tap-runner`.
+- [F4] `osv-scanner.toml` y `.github/dependabot.yml` de `main` de este repositorio.
