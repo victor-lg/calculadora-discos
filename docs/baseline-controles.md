@@ -104,13 +104,14 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   | CI (run 43905675262), `timeoutMS` 15000 | 4 | 17 min 40 s | 644 | 130 | 18 | 50 | 97,73 |
   | CI (run 43909150386) | 3 | 13 min 14 s | 647 | 122 | 23 | 50 | 97,10 |
   | CI (run 43913962175), configuración final | 3 | 12 min 45 s | 644 | 129 | 19 | 50 | 97,60 |
+  | CI (run 43919204327), configuración final | 3 | 9 min 55 s | 658 | 109 | 25 | 50 | 96,84 |
 
   En local, los 58 supervivientes: 21 en `vista.js`, 19 en `calculo.js`, 13 en
   `almacenamiento.js` y 5 en `entrada.js`.
 - **La puntuación varía con el runner, por los mutantes por tiempo.** Stryker da por
   detectado un mutante que agota su tiempo. En local acaban así 6, con 2, 3 o 4
-  procesos; en el runner de la CI, entre 41 y 135 según la configuración (con la misma, 122
-  y 129 en dos ejecuciones), y con ellos
+  procesos; en el runner de la CI, entre 41 y 135 según la configuración (con la final,
+  entre 109 y 129 en tres ejecuciones), y con ellos
   hasta 44 de los 58 que en local sobreviven cuentan como detectados. Por eso la
   puntuación de la CI es más alta que la real y el umbral se fija sobre la de local. La
   consecuencia: en la CI el check está casi ciego, porque un test debilitado puede no
