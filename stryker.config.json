@@ -1,0 +1,22 @@
+{
+  "mutate": [
+    "app/js/almacenamiento.js",
+    "app/js/calculo.js",
+    "app/js/entrada.js",
+    "app/js/formato.js",
+    "app/js/vista.js"
+  ],
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "node --test \"tests/unit/!(sw).test.js\""
+  },
+  "disableTypeChecks": false,
+  "reporters": [
+    "clear-text"
+  ],
+  "thresholds": {
+    "high": 95,
+    "low": 93,
+    "break": 92
+  }
+}
