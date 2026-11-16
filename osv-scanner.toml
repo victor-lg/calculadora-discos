@@ -1,44 +1,57 @@
 # Excepciones de osv-scanner (job `osv-scanner` de seguridad.yml). La CI usa el
 # fichero de `main`: un cambio aquí es R2 y vale después del merge. Cada
-# excepción caduca con `ignoreUntil` y lleva su motivo.
+# excepción caduca con `effectiveUntil` y lleva su motivo.
 
-# minimatch 10.2.6 y qs 6.15.1 los trae @stryker-mutator/core 10.1.1, la última
-# versión de Stryker (VIC-27): fija minimatch en ~10.2.4 (también lo pide glob
-# 13.0.7, otra dependencia suya, con ^10.2.2) y, a través de typed-rest-client
-# 2.3.1, qs en 6.15.1, así que las versiones corregidas no caben en sus rangos.
+# minimatch 10.2.6, qs 6.15.1 y glob 13.0.7 los traen dos paquetes de Stryker
+# 10.1.1, la última versión (VIC-27), y las versiones corregidas no caben en sus
+# rangos:
+# - @stryker-mutator/core fija minimatch en ~10.2.4 y, a través de
+#   typed-rest-client 2.3.1, qs en 6.15.1;
+# - @stryker-mutator/tap-runner fija glob en ~13.0.0 (la corregida es la 14.0.2),
+#   y glob pide a su vez minimatch ^10.2.2.
 # Son dependencias de desarrollo que solo corren en la CI (job `mutaciones`) sobre
 # el código del repo, sin entrada externa: la única entrada es el código de la
 # rama, que ese job ya ejecuta. qs solo lo usan el reporter `dashboard` y
-# `stryker init`, que la CI no lanza.
+# `stryker init`, que la CI no lanza. glob solo lo llama tap-runner, con el patrón
+# `tap.testFiles` del stryker.config.json de `main`, sobre el árbol de la rama.
+#
+# `effectiveUntil` sustituye a `ignoreUntil` (obsoleto en osv-scanner 2.7.1, que
+# usa uno u otro igual: internal/config/config.go). Una clave mal escrita deja la
+# fecha vacía, y osv-scanner trata una fecha vacía como excepción sin caducidad.
 #
 # Alcance real: IgnoredVulns filtra solo por ID de aviso, no por paquete, versión,
-# ruta ni ámbito. Hasta la caducidad, estos cinco avisos quedan silenciados en
-# cualquier lockfile del repo y en cualquier versión afectada de qs o minimatch,
-# también si los trae una dependencia de producción, y también en la tarea
+# ruta ni ámbito. Hasta la caducidad, estos seis avisos quedan silenciados en
+# cualquier lockfile del repo y en cualquier versión afectada de qs, minimatch o
+# glob, también si los trae una dependencia de producción, y también en la tarea
 # mensual (osv-mensual.yml). Un PR que añada dependencias de producción mira a
-# mano si trae qs o minimatch mientras dure la excepción.
+# mano si trae qs, minimatch o glob mientras dure la excepción.
 
 [[IgnoredVulns]]
 id = "GHSA-g3hv-75wg-m249"
-ignoreUntil = 2027-02-16
+effectiveUntil = 2027-02-16
 reason = "minimatch 10.2.6, dependencia de desarrollo de @stryker-mutator/core 10.1.1 (la última); solo corre en la CI sobre código del repo, sin entrada externa (VIC-27)"
 
 [[IgnoredVulns]]
 id = "GHSA-4mjr-xmp4-gh2g"
-ignoreUntil = 2027-02-16
+effectiveUntil = 2027-02-16
 reason = "qs 6.15.1, dependencia de desarrollo de @stryker-mutator/core 10.1.1 (la última), vía typed-rest-client; solo corre en la CI sobre código del repo, sin entrada externa (VIC-27)"
 
 [[IgnoredVulns]]
 id = "GHSA-6pq8-jhm2-2vcw"
-ignoreUntil = 2027-02-16
+effectiveUntil = 2027-02-16
 reason = "qs 6.15.1, dependencia de desarrollo de @stryker-mutator/core 10.1.1 (la última), vía typed-rest-client; solo corre en la CI sobre código del repo, sin entrada externa (VIC-27)"
 
 [[IgnoredVulns]]
 id = "GHSA-q8mj-m7cp-5q26"
-ignoreUntil = 2027-02-16
+effectiveUntil = 2027-02-16
 reason = "qs 6.15.1, dependencia de desarrollo de @stryker-mutator/core 10.1.1 (la última), vía typed-rest-client; solo corre en la CI sobre código del repo, sin entrada externa (VIC-27)"
 
 [[IgnoredVulns]]
 id = "GHSA-x5fp-wj9c-mxmx"
-ignoreUntil = 2027-02-16
+effectiveUntil = 2027-02-16
 reason = "qs 6.15.1, dependencia de desarrollo de @stryker-mutator/core 10.1.1 (la última), vía typed-rest-client; solo corre en la CI sobre código del repo, sin entrada externa (VIC-27)"
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+effectiveUntil = 2027-02-16
+reason = "glob 13.0.7, dependencia de desarrollo de @stryker-mutator/tap-runner 10.1.1 (la última); solo corre en la CI sobre código del repo, sin entrada externa (VIC-27)"
