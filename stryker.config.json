@@ -12,8 +12,7 @@
       "tests/unit/!(sw).test.js"
     ]
   },
-  "concurrency": 4,
-  "timeoutMS": 15000,
+  "concurrency": 3,
   "disableTypeChecks": false,
   "reporters": [
     "clear-text"
