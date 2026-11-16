@@ -32,7 +32,7 @@ Los PR de Dependabot (M38) no siguen las convenciones de nombres ni declaran AC:
 
 Uso local:
   PR_BODY="$(cat cuerpo.md)" PR_TITLE="feat(calculo): …" PR_BRANCH="feat/vic-12-calculo" \
-    python3 .github/sdd/checks.py --base origin/main
+    python3 .github/sdd/checks.py --base refs/remotes/origin/main
 Sin PR_TITLE ni PR_BRANCH, el check de convenciones no se ejecuta.
 
 Como hook `commit-msg` de lefthook, solo el formato del mensaje:
@@ -76,10 +76,25 @@ R2_CONTROLES = ["lefthook.json", ".lefthook/*", ".lefthook-local/*",
                 ".semgrepignore", "*/.semgrepignore",
                 "osv-scanner.toml", "*/osv-scanner.toml",
                 "eslint.config.*", "*/eslint.config.*",
+                # Todos los nombres que Stryker carga solo; los .js, .mjs y .cjs ejecutan código.
+                "stryker.conf.*", "*/stryker.conf.*", "stryker.config.*", "*/stryker.config.*",
+                ".stryker.conf.*", "*/.stryker.conf.*", ".stryker.config.*", "*/.stryker.config.*",
+                # Los que knip carga solo (KNIP_CONFIG_LOCATIONS); los .ts y .js ejecutan código.
+                "knip.json", "*/knip.json", "knip.jsonc", "*/knip.jsonc",
+                ".knip.json", "*/.knip.json", ".knip.jsonc", "*/.knip.jsonc",
+                "knip.[jt]s", "*/knip.[jt]s", "knip.config.[jt]s", "*/knip.config.[jt]s",
+                # Los que jscpd busca solo (`*/.jscpd.json` cubre `.config/.jscpd.json`) y el
+                # baseline que lee con --baseline.
+                ".jscpd.json", "*/.jscpd.json", ".config/jscpd.json", "*/.config/jscpd.json",
+                ".jscpd-baseline.json", "*/.jscpd-baseline.json",
+                # npm lo lee en `npm ci` y en `npm test` (script-shell, node-options), también dentro de Stryker.
+                ".npmrc", "*/.npmrc",
                 # Un submódulo trae código que no ve ningún escáner (también sus gitlinks, ver main).
                 ".gitmodules"]
 MANIFIESTOS = {
     "package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lockb",
+    # npm ci lo usa antes que package-lock.json (G4 del PR 2 de VIC-21).
+    "npm-shrinkwrap.json",
     "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "Pipfile", "Pipfile.lock",
     "go.mod", "go.sum", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock",
     "composer.json", "composer.lock", "pom.xml", "build.gradle", "build.gradle.kts",
@@ -805,7 +820,8 @@ def ficheros_versionados() -> dict[str, str] | None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--base", default="origin/main", help="referencia de la rama base")
+    # La ref completa: `origin/main` resolvería antes una etiqueta llamada así.
+    ap.add_argument("--base", default="refs/remotes/origin/main", help="referencia de la rama base")
     ap.add_argument("--mensaje", metavar="FICHERO", help="solo comprueba el mensaje de commit de FICHERO (hook commit-msg)")
     args = ap.parse_args()
     if args.mensaje:
