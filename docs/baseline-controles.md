@@ -117,7 +117,11 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   job casi 6 minutos; bajar a 3 procesos deja 122. Solo con 2 procesos bajan a 41, pero
   el job tarda más de 20 minutos. Que más espera no los recupere apunta a que no son
   ejecuciones algo más lentas, sino procesos que en el runner no terminan: la causa está
-  sin averiguar.
+  sin averiguar y la investiga VIC-29.
+- **Decisión** (Víctor, 2026-11-16): se queda con 3 procesos, la espera por defecto y
+  `break` 90, sabiendo que en la CI el check está casi ciego. `mutaciones` corre en cada PR
+  pero **no pasa a check requerido** en la regla de `main` hasta cerrar VIC-29. Mientras,
+  sus fallos se miran, pero su verde no prueba que los tests detecten los mutantes.
 - **Los 50 con error:** el proceso de `tests/unit/series.test.js` sale con el código 7 en
   lugar de fallar un test. Con el runner `command` esos mismos mutantes contaban como
   detectados y la puntuación local era 93,11. Con el error no cuentan en la puntuación.
@@ -155,17 +159,24 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
 
 ## Exclusiones de los escáneres
 
-osv-scanner: cinco avisos medios en `osv-scanner.toml` (#49, VIC-27), todos de
-dependencias de desarrollo que trae `@stryker-mutator/core` 10.1.1, la última versión:
-GHSA-g3hv-75wg-m249 (`minimatch` 10.2.6, corregido en la 11.0.1, fuera de su rango
-`~10.2.4`) y GHSA-4mjr-xmp4-gh2g, GHSA-6pq8-jhm2-2vcw, GHSA-q8mj-m7cp-5q26 y
-GHSA-x5fp-wj9c-mxmx (`qs` 6.15.1, que `typed-rest-client` 2.3.1 fija exacto). Solo corren
-en la CI, en el job `mutaciones`, sobre el código del repo y sin entrada externa. Caducan
-el 2027-02-16: si para entonces Stryker no ha subido esas dependencias, el check vuelve a
-fallar y se decide de nuevo. La excepción es por ID de aviso en todo el repo: silencia
-esos cinco avisos en cualquier versión afectada de `qs` o `minimatch`, también si los
-trae una dependencia de producción y también en la tarea mensual. Mientras dure, un PR
-que añada dependencias de producción mira a mano si trae alguno de los dos.
+osv-scanner: seis avisos medios en `osv-scanner.toml` (#49 y #50, VIC-27), todos de
+dependencias de desarrollo que traen dos paquetes de Stryker 10.1.1, la última versión, con
+rangos que no admiten las versiones corregidas:
+
+- `@stryker-mutator/core`: GHSA-g3hv-75wg-m249 (`minimatch` 10.2.6, corregido en la
+  11.0.1, fuera de su rango `~10.2.4`) y GHSA-4mjr-xmp4-gh2g, GHSA-6pq8-jhm2-2vcw,
+  GHSA-q8mj-m7cp-5q26 y GHSA-x5fp-wj9c-mxmx (`qs` 6.15.1, que `typed-rest-client` 2.3.1
+  fija exacto);
+- `@stryker-mutator/tap-runner`: GHSA-3g3m-2fjr-6pw4 (`glob` 13.0.7, corregido en la
+  14.0.2, fuera de su rango `~13.0.0`).
+
+Solo corren en la CI, en el job `mutaciones`, sobre el código del repo y sin entrada
+externa. Caducan el 2027-02-16 (`effectiveUntil`): si para entonces Stryker no ha subido
+esas dependencias, el check vuelve a fallar y se decide de nuevo. La excepción es por ID de
+aviso en todo el repo: silencia esos seis avisos en cualquier versión afectada de `qs`,
+`minimatch` o `glob`, también si los trae una dependencia de producción y también en la
+tarea mensual. Mientras dure, un PR que añada dependencias de producción mira a mano si
+trae alguno de los tres.
 
 Semgrep: tres entradas en `.semgrepignore`, cada una con su motivo. Excluir un fichero
 entero lo deja fuera de **todas** las reglas, no solo de la que dio el hallazgo: si uno
