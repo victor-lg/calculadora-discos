@@ -55,3 +55,21 @@ reason = "qs 6.15.1, dependencia de desarrollo de @stryker-mutator/core 10.1.1 (
 id = "GHSA-3g3m-2fjr-6pw4"
 effectiveUntil = 2027-02-16
 reason = "glob 13.0.7, dependencia de desarrollo de @stryker-mutator/tap-runner 10.1.1 (la última); solo corre en la CI sobre código del repo, sin entrada externa (VIC-27)"
+
+# picomatch 4.0.7 (GHSA-fc5q-39xc-vjpf, alto: ReDoS con extglobs repetidos) lo trae
+# knip 6.45.1, la última versión, directamente y a través de fdir y tinyglobby
+# (VIC-31). No hay versión corregida publicada: la 4.0.7 es la última. Es
+# dependencia de desarrollo y solo corre en la CI, en el job `codigo-sobrante`
+# (calidad.yml), sobre los patrones de la configuración de knip de `main`.
+# Caduca antes que las de Stryker por ser alto. Cuando salga una versión
+# corregida, Dependabot sube knip y esta excepción se quita.
+#
+# Alcance real, como arriba: silencia este aviso por ID en cualquier lockfile del
+# repo y en cualquier versión afectada de picomatch, también si lo trae una
+# dependencia de producción y en la tarea mensual. Mientras dure, un PR que añada
+# dependencias de producción mira a mano si trae picomatch.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+effectiveUntil = 2027-01-17
+reason = "picomatch 4.0.7, dependencia de desarrollo de knip 6.45.1 (la última), sin versión corregida; solo corre en la CI, en codigo-sobrante, sobre los patrones de la configuración de main (VIC-31)"
