@@ -60,9 +60,15 @@ reason = "glob 13.0.7, dependencia de desarrollo de @stryker-mutator/tap-runner 
 # knip 6.45.1, la última versión, directamente y a través de fdir y tinyglobby
 # (VIC-31). No hay versión corregida publicada: la 4.0.7 es la última. Es
 # dependencia de desarrollo y solo corre en la CI, en el job `codigo-sobrante`
-# (calidad.yml), sobre los patrones de la configuración de knip de `main`.
-# Caduca antes que las de Stryker por ser alto. Cuando salga una versión
-# corregida, Dependabot sube knip y esta excepción se quita.
+# (calidad.yml). knip.json sale de `main`, pero no todos los patrones: los
+# plugins de knip los sacan también de la rama (los scripts de package.json y
+# testDir/testMatch de playwright.config.js, que knip carga y ejecuta), y los
+# nombres de fichero que se comparan son los del árbol de la rama. La rama ya
+# ejecuta código en ese job, así que un ReDoS solo añade colgarlo hasta su
+# timeout de 15 minutos, en un runner con `contents: read` y sin secretos.
+# Caduca antes que las de Stryker por ser alto. Una versión corregida cabría en
+# los rangos de knip (^4.0.7) y tinyglobby (^4.0.4): al subirla en el lockfile,
+# esta excepción se quita a mano, en ese PR o en uno R2 aparte.
 #
 # Alcance real, como arriba: silencia este aviso por ID en cualquier lockfile del
 # repo y en cualquier versión afectada de picomatch, también si lo trae una
