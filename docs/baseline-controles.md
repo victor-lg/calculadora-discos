@@ -217,30 +217,51 @@ el paquete sin la imagen.
   No se pudo leer cuántos tests salta cada trozo en la CI: el sandbox del agente no llega
   al almacén de los logs de Actions.
 
-## M27: axe en los E2E (ADR-0007)
+## M27: axe en los E2E (ADR-0007 y ADR-0008)
 
 Llegó con VIC-31 (#56): `@axe-core/playwright` 4.14.0, con `axe-core` 4.14.0 y
-`playwright-core` 1.65.0 en `overrides`, y la función auxiliar `tests/e2e/axe.js`, sin
-excepciones. La llaman todos los `*.spec.js` de `tests/e2e/`, en los dos proyectos: al
-llegar y tras cada estado que el test comprueba después de una acción que cambia lo que
-se ve (325 llamadas).
+`playwright-core` 1.65.0 en `overrides`, la función auxiliar `tests/e2e/axe.js` y el
+módulo de excepciones `tests/e2e/excepciones-axe.js`, con la lista vacía. La función la
+llaman todos los `*.spec.js` de `tests/e2e/`, en los dos proyectos: al llegar y tras cada
+estado que el test comprueba después de una acción que cambia lo que se ve (327 llamadas
+en el código).
 
 - **Violaciones previas:** una, y no queda en la app. `color-contrast` en la tarjeta
   recién añadida mientras dura su fundido de entrada (SPEC-CALC-003 FR-10, 240 ms): axe
   medía el texto a media opacidad (contraste de 1,14 a 2,06). Salió con el dibujo 3D, en
   Chromium y en WebKit (`dibujo.spec.js` AC-09 y `accesibilidad.spec.js` AC-22). Fuera del
-  fundido no hay violación. **Decisión de Víctor:** la función auxiliar espera a que la
-  página no tenga animaciones en curso (`document.getAnimations()`) antes de analizar. No
-  cambia la página; va más allá de la forma literal de ADR-0007 §3.3.
-- **Reloj parado:** con `page.clock.pauseAt`, `analyze()` se cuelga hasta el timeout en
-  los dos navegadores (axe usa los temporizadores de la página). **Decisión de Víctor:** en
-  los tests con el reloj parado (11 de `anadir-borrar.spec.js` y 8 de `dibujo.spec.js`)
-  solo se analiza antes de pararlo: en el `beforeEach` y en `pararReloj`, tras la recarga
-  con el reloj ya instalado (así axe sí funciona). Los dos `pararReloj` lo citan. Lo que
-  se ve con el reloj parado (el aviso de "Deshacer", las tarjetas que salen, el dibujo
-  animándose) se analiza en los tests con tiempo real.
-- **Plazos reales:** donde el aviso de "Deshacer" (5 s) tiene que seguir visible para el
-  paso siguiente, el análisis va después de ese paso, para no alargar el plazo.
+  fundido no hay violación. Por ADR-0008 §3.1, la función auxiliar espera, solo leyendo y
+  como mucho 2 s (`ESPERA_MAXIMA_MS`), a que `document.getAnimations()` esté vacío antes de
+  analizar. Si se agota, el test falla con un mensaje que cita «ADR-0008 de la
+  calculadora» y muestra las animaciones en curso.
+- **Reloj parado (ADR-0008 §3.2):** con `page.clock.pauseAt`, `analyze()` se cuelga hasta
+  el timeout en los dos navegadores (axe usa los temporizadores de la página). En los tests
+  con el reloj parado (11 de `anadir-borrar.spec.js` y 8 de `dibujo.spec.js`) se analiza
+  hasta pararlo: en el `beforeEach`, tras cada serie que quita el `pararReloj` de
+  `dibujo.spec.js` y en los dos `pararReloj`, tras la recarga con el reloj ya instalado (así
+  axe sí funciona). Los dos `pararReloj` citan el ADR y nombran los tests con tiempo real
+  que analizan lo que se ve con el reloj parado: el aviso de "Deshacer", el foco, el campo
+  de añadir con su error, los paneles y el dibujo. Para el dibujo animándose, el recorrido
+  con el dibujo de `dibujo.spec.js` analiza en cuanto empieza la animación (con
+  `data-animando`). Las tarjetas que salen no se analizan, ni con tiempo real (la espera
+  llega cuando ya no están) ni con el reloj parado: es el hueco de ADR-0008 §3.1. Su
+  contenido se analiza antes de quitarlas.
+- **Plazos reales (ADR-0008 §3.1):** donde el aviso de "Deshacer" (5 s) tiene que seguir
+  visible para el paso siguiente, el análisis va después de ese paso. Donde se analiza con
+  el aviso comprobado, el test lo vuelve a comprobar después del análisis, para fallar si
+  caducó durante la espera o el análisis.
+- **Excepciones (ADR-0008 §3.3):** la lista y la comparación están en
+  `excepciones-axe.js`, sin Playwright ni axe. Un nodo está cubierto si su regla y su
+  `target`, de un solo elemento, son los de una excepción; una violación sin nodos no pasa.
+  Una excepción "ya no aparece" si su regla pasa en su elemento (`passes`). Con la lista
+  vacía no hay test unitario: llega con la primera excepción.
+- **Espera más larga (ADR-0008 §5):** cada proceso de Playwright escribe en la salida del
+  test, como `::notice::`, cada espera que supera en 100 ms su máxima anterior, con los
+  sondeos que vieron alguna animación; la CI la recoge como anotación del job. En local,
+  con el Chromium de 1.64, la más larga fue de 1110 ms en `dibujo.spec.js` (AC-19, al pasar a la vista
+  sin dibujo), y no por las animaciones: el primer sondeo ya las encontraba vacías, pero
+  `page.evaluate` tardaba en volver con la página ocupada. La medición en la CI va con la
+  ronda 2 de G4.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
   AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js`: su AC-13 abre
