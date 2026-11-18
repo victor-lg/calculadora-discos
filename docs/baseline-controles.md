@@ -223,7 +223,7 @@ Llegó con VIC-31 (#56): `@axe-core/playwright` 4.14.0, con `axe-core` 4.14.0 y
 `playwright-core` 1.65.0 en `overrides`, y la función auxiliar `tests/e2e/axe.js`, sin
 excepciones. La llaman todos los `*.spec.js` de `tests/e2e/`, en los dos proyectos: al
 llegar y tras cada estado que el test comprueba después de una acción que cambia lo que
-se ve (323 llamadas).
+se ve (325 llamadas).
 
 - **Violaciones previas:** una, y no queda en la app. `color-contrast` en la tarjeta
   recién añadida mientras dura su fundido de entrada (SPEC-CALC-003 FR-10, 240 ms): axe
@@ -235,15 +235,21 @@ se ve (323 llamadas).
 - **Reloj parado:** con `page.clock.pauseAt`, `analyze()` se cuelga hasta el timeout en
   los dos navegadores (axe usa los temporizadores de la página). **Decisión de Víctor:** en
   los tests con el reloj parado (11 de `anadir-borrar.spec.js` y 8 de `dibujo.spec.js`)
-  solo se analiza antes de pararlo, en el `beforeEach`. Lo que se ve con el reloj parado
-  (el aviso de "Deshacer", las tarjetas que salen, el dibujo animándose) se analiza en los
-  tests con tiempo real.
+  solo se analiza antes de pararlo: en el `beforeEach` y en `pararReloj`, tras la recarga
+  con el reloj ya instalado (así axe sí funciona). Los dos `pararReloj` lo citan. Lo que
+  se ve con el reloj parado (el aviso de "Deshacer", las tarjetas que salen, el dibujo
+  animándose) se analiza en los tests con tiempo real.
 - **Plazos reales:** donde el aviso de "Deshacer" (5 s) tiene que seguir visible para el
   paso siguiente, el análisis va después de ese paso, para no alargar el plazo.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
-  (`sin-dibujo.js`). `sin-conexion.spec.js` se queda con el 3D: AC-13 abre un segundo
-  contexto con `browser.newContext`, que no hereda `sin-dibujo.js`, así que no basta con
-  cambiar el import.
+  (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
+  AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js`: su AC-13 abre
+  un segundo contexto con `browser.newContext`, que no hereda `sin-dibujo.js`, así que no
+  basta con cambiar el import.
+- **Lo que hace la librería:** `analyze()` deja `window.axe` en la página analizada y, al
+  terminar, abre una página `about:blank` en el mismo contexto, la analiza y la cierra
+  (`@axe-core/playwright` 4.14.0, `finishRun`). No genera peticiones de red: los tests que
+  vigilan el tráfico (`sin-conexion.spec.js`, AC-12 y AC-13) pasan con ella.
 - **Tiempos** (job entero; run 44288720687 frente a los del #53):
 
   | Trozo | 1.65.0 sin axe (44162310687 / 44164892525) | Con axe (44288720687) |

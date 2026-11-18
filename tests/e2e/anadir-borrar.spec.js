@@ -349,6 +349,10 @@ const ANIMACION_MS = 400 + 450;
 async function pararReloj(page) {
   await page.clock.install();
   await page.reload();
+  // ADR-0007 §3.3: con el reloj parado, axe se cuelga (usa los temporizadores
+  // de la página), así que se analiza aquí, antes de pararlo, y no después de
+  // las acciones del test. Decisión de Víctor en el PR #56.
+  await analizarConAxe(page);
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   await page.evaluate(() => {
     const avisoBorrado = document.getElementById('aviso-borrado');
@@ -884,7 +888,7 @@ test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta
   // Vuelve sin transición: en el mismo instante ya está en su sitio.
   expect(await t.locator('.serie').evaluate((el) => [el.className, el.style.transform, el.getAnimations().length]))
     .toEqual(['serie', '', 0]);
-    await analizarConAxe(page);
+  await analizarConAxe(page);
 
   await page.evaluate(() => {
     window.borradaAlSoltar = null;

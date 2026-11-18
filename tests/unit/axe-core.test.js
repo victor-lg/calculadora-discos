@@ -66,3 +66,17 @@ test('los overrides son axe-core y playwright-core, exactos y alineados con el l
   assert.match(paquete.devDependencies['@axe-core/playwright'], EXACTA);
   assert.equal(paquete.overrides['playwright-core'], paquete.devDependencies['@playwright/test']);
 });
+
+test('axe-core entra solo por su override, y los dos paquetes vienen del registro con su integridad', () => {
+  const paquete = leer('package.json');
+  const paquetes = leer('package-lock.json').packages;
+  assert.equal(paquete.devDependencies['axe-core'], undefined);
+  assert.equal(paquete.dependencies?.['axe-core'], undefined);
+  for (const nombre of ['@axe-core/playwright', 'axe-core']) {
+    const entrada = paquetes[`node_modules/${nombre}`];
+    assert.equal(entrada.resolved, `https://registry.npmjs.org/${nombre}/-/${nombre.split('/').at(-1)}-${entrada.version}.tgz`);
+    assert.match(entrada.integrity, /^sha512-/);
+    assert.equal(entrada.dev, true, nombre);
+    assert.equal(entrada.hasInstallScript, undefined, nombre);
+  }
+});

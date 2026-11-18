@@ -503,6 +503,10 @@ async function pararReloj(page, quitar = []) {
   await exigirDibujo3D(page);
   // AC-16: al abrir la app, ningún dibujo tiene una animación en curso.
   await comprobarDibujos(page, INICIO.filter(([p]) => !quitar.includes(parseInt(p, 10))));
+  // ADR-0007 §3.3: con el reloj parado, axe se cuelga (usa los temporizadores
+  // de la página), así que se analiza aquí, antes de pararlo, y no después de
+  // las acciones del test. Decisión de Víctor en el PR #56.
+  await analizarConAxe(page);
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
 }
 
