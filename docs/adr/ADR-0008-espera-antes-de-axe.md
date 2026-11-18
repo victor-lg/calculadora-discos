@@ -1,7 +1,7 @@
 ---
 id: ADR-0008
 titulo: axe analiza sin animaciones en curso, y cómo se comprueba que una excepción ya no aparece
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-18
 sustituye: null
 sustituido_por: null
@@ -16,6 +16,8 @@ formalizarlo en un ADR propio, fusionado antes que el #56, y aclarar a la vez la
 ronda 1 de G4 del #56 (comentario de VIC-31, 2026-11-18). Recoge también el hueco del reloj
 parado (hallazgo A de esa ronda), que Víctor decidió en el #56. Cambia solo los puntos de la
 cabecera (`modifica`); el resto de ADR-0007 sigue vigente y no se edita. Fuentes en §7.
+Revisado en G4 en el PR #57: dos revisores por ronda, tres rondas. Lo que quedaba tras la
+tercera lo decidió Víctor y se aplicó sin otra ronda. Aceptado con el merge del PR #57.
 -->
 
 # ADR-0008 — axe analiza sin animaciones en curso, y cómo se comprueba que una excepción ya no aparece
