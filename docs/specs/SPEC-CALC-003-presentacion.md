@@ -1,8 +1,8 @@
 ---
 id: SPEC-CALC-003
 titulo: Presentación de la calculadora
-estado: aprobada
-version: 0.5
+estado: en-revision
+version: 0.6
 riesgo: R1
 sustituye: null
 adr: [ADR-0001, ADR-0003, ADR-0005]
@@ -76,6 +76,11 @@ En el mismo PR que SPEC-CALC-001 v0.9.
 Tras la ronda 1 de G4, sin otra ronda: la cabecera nombra lo que se concreta,
 FR-13 dice cómo se combina con el salto de FR-12, FR-10 ordena sus dos casos de
 añadir y FR-16 no repite la regla de la etiqueta.
+La versión 0.6 (VIC-31) aclara que NFR-02 se aplica al estado estable: mientras
+dura un fundido de entrada o de salida, como el de FR-10 (240 ms), el contraste
+no cuenta. Lo decidió Víctor el 2026-11-18, al llevar axe a los E2E, que medía
+el texto a media opacidad durante ese fundido (ADR-0008 §6). Es una aclaración,
+sin cambios de comportamiento ni de AC.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -299,7 +304,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 ## 10. Requisitos no funcionales
 
 - **NFR-01:** todo lo que se puede pulsar mide al menos 44 × 44 px CSS (44 × 44 pt en el iPhone).
-- **NFR-02:** contraste según WCAG 2.2 AA: 4,5:1 en el texto, 3:1 en el texto grande y 3:1 en los componentes y estados que no son texto (bordes de campos, indicador de foco, interruptores y estado de los tipos de Mis discos). Los puntos de color de los discos son decorativos, porque el peso siempre va escrito, y el dibujo 3D tampoco cuenta. Donde la referencia visual de §11 no llegue a estos umbrales, manda este requisito.
+- **NFR-02:** contraste según WCAG 2.2 AA: 4,5:1 en el texto, 3:1 en el texto grande y 3:1 en los componentes y estados que no son texto (bordes de campos, indicador de foco, interruptores y estado de los tipos de Mis discos). Los puntos de color de los discos son decorativos, porque el peso siempre va escrito, y el dibujo 3D tampoco cuenta. Se aplica al estado estable de la interfaz: mientras dura un fundido de entrada o de salida (por ejemplo, el de FR-10, de 240 ms), el contraste no cuenta. Donde la referencia visual de §11 no llegue a estos umbrales, manda este requisito.
 - **NFR-03:** con el zoom de página de Safari al 200 %, la interfaz se puede usar entera: no necesita desplazamiento horizontal y ningún texto se corta ni se solapa. No se exige adaptar la app al tamaño de texto del sistema, que Safari no aplica a una web. El zoom de página solo existe en Safari, no en la app instalada en la pantalla de inicio, así que se prueba allí.
 - **NFR-04:** en el iPhone 15 Pro Max, con 6 series y la animación activa, la animación y el gesto de borrar se ven fluidos a juicio de Víctor, que lo anota en el PR.
 
