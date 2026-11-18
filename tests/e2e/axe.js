@@ -33,7 +33,8 @@ let esperaMasLarga = 0;
 export async function analizarConAxe(page) {
   // ADR-0008 §3.1: se analiza sin animaciones en curso. La espera solo lee: a
   // media animación (por ejemplo, el fundido de entrada de una tarjeta,
-  // SPEC-CALC-003 FR-10), axe mediría el texto a media opacidad.
+  // SPEC-CALC-003 FR-10), axe mediría el texto a media opacidad, y el contraste
+  // se exige en el estado estable (SPEC-CALC-003 v0.6, NFR-02).
   const inicio = Date.now();
   let conAnimaciones = 0;
   await expect.poll(async () => {
