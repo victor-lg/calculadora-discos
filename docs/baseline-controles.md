@@ -175,6 +175,60 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   Le pasará a cualquier proyecto que adopte `calidad.yml`; se corrige en la plantilla
   (VIC-28).
 
+## M6: contenedor de Playwright por digest y job `versiones` (`tests.yml`)
+
+Llegó con VIC-31 (#53): el `tests.yml` del ejemplo del workflow (sdd-workflow#47), con
+Playwright 1.65.0 y su imagen `mcr.microsoft.com/playwright:v1.65.0-noble` fijada por el
+digest de su índice (`sha256:9beb5460…4e73dbe`). Sustituye al #42 de Dependabot, que subía
+el paquete sin la imagen.
+
+- **La imagen arranca** (pendiente desde sdd-workflow#47): los tres trozos pasan dentro de
+  ella con Chromium y WebKit (runs 44162310687 y 44164892525). Con el paquete subido y la
+  imagen aún en 1.64.1, los tres fallaron (run 44152968157), como se esperaba.
+- **El digest:** lo leyó Víctor del registro el 2026-11-17 (sdd-workflow#47). `versiones`
+  compara la etiqueta escrita junto al digest, no lo que el digest contiene. Lo que confirma
+  que el digest es de 1.65.0 son los E2E en verde: Playwright 1.65.0 no encuentra sus
+  navegadores en una imagen de otra versión, como se vio con la 1.64.1.
+- **La imagen ya no está escrita en `container.image`:** la lee de la salida de
+  `versiones`, para que esté escrita en un solo sitio. Un escáner de workflows que busque
+  imágenes sin digest ya no la ve; el formato con digest lo exige el script de
+  `versiones`. Se acepta ese coste.
+- **`versiones`:** de 6 a 7 s. En local, su script da salida 0 con el lockfile de 1.65.0 y
+  salida 1 con el de 1.64.1, con el mensaje que pide subir la imagen.
+- **Tiempos** (el job entero y, entre paréntesis, su paso "Initialize containers", que
+  descarga la imagen):
+
+  | Trozo | 1.64.1 (run 43938296852) | 1.65.0 (run 44162310687) | 1.65.0 (run 44164892525) |
+  | --- | --- | --- | --- |
+  | 1/3 | 549 s (imagen 29 s) | 523 s (imagen 45 s) | 626 s |
+  | 2/3 | 324 s (imagen 25 s) | 331 s (imagen 30 s) | 252 s |
+  | 3/3 | 267 s (imagen 42 s) | 291 s (imagen 43 s) | 325 s |
+
+  El trozo 1 tarda de 9 a 10,5 minutos, unos dos tercios de su límite de 15.
+- **`test.skip()` en 1.65:** sus notas dicen que ahora solo acepta una descripción. Las dos
+  formas con condición del repo siguen saltando lo mismo:
+  - en local, con 1.65.0, un fichero de prueba con la forma de `sin-conexion.spec.js` (a
+    nivel de fichero, con una función) y otro con la de `referencia-visual.spec.js`
+    (dentro del test, con una condición): cada uno se salta en el navegador que debe y
+    corre en el otro (2 passed, 2 skipped);
+  - `npx playwright test --list` da 141 tests por proyecto (Chromium y WebKit), con 1.64.1
+    y con 1.65.0.
+
+  No se pudo leer cuántos tests salta cada trozo en la CI: el sandbox del agente no llega
+  al almacén de los logs de Actions.
+
+## osv-scanner: `picomatch` 4.0.7 (GHSA-fc5q-39xc-vjpf), pendiente
+
+- **Hallazgo:** ReDoS con extglobs repetidos de una sola rama, alto (8,7), en `picomatch`
+  hasta la 4.0.7, que es la última publicada: no hay versión corregida.
+- **Origen:** job `osv-scanner` del #53 (run 44162310702). No lo trae ese PR, que no toca
+  `picomatch`: es dependencia de desarrollo de `knip` 6.45.1 (la última), directa y a
+  través de `fdir` y `tinyglobby`. El #42, con el mismo `picomatch` 4.0.7, pasó el job el
+  2026-11-16; el aviso es del 2026-10-19, así que lo que cambió es la base de datos de
+  osv-scanner. Falla igual en cualquier PR desde ahora.
+- **Decisión pendiente** (la persona): exceptuarlo en `osv-scanner.toml`, como los de
+  Stryker, u otra salida. `osv-scanner.toml` es R2 y no está entre los ficheros de VIC-31.
+
 ## Exclusiones de los escáneres
 
 osv-scanner: seis avisos medios en `osv-scanner.toml` (#49 y #50, VIC-27), todos de
