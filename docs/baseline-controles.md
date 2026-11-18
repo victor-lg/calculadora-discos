@@ -230,7 +230,7 @@ en el código).
   recién añadida mientras dura su fundido de entrada (SPEC-CALC-003 FR-10, 240 ms): axe
   medía el texto a media opacidad (contraste de 1,14 a 2,06). Salió con el dibujo 3D, en
   Chromium y en WebKit (`dibujo.spec.js` AC-09 y `accesibilidad.spec.js` AC-22). Fuera del
-  fundido no hay violación. Por ADR-0008 §3.1, la función auxiliar espera, solo leyendo y
+  fundido no hay violación, y NFR-02 se aplica al estado estable (SPEC-CALC-003 v0.6). Por ADR-0008 §3.1, la función auxiliar espera, solo leyendo y
   como mucho 2 s (`ESPERA_MAXIMA_MS`), a que `document.getAnimations()` esté vacío antes de
   analizar. Si se agota, el test falla con un mensaje que cita «ADR-0008 de la
   calculadora» y muestra las animaciones en curso.
@@ -260,13 +260,22 @@ en el código).
   sondeos que vieron alguna animación; la CI la recoge como anotación del job. En local,
   con el Chromium de 1.64, la más larga fue de 1110 ms en `dibujo.spec.js` (AC-19, al pasar a la vista
   sin dibujo), y no por las animaciones: el primer sondeo ya las encontraba vacías, pero
-  `page.evaluate` tardaba en volver con la página ocupada. La medición en la CI va con la
-  ronda 2 de G4.
+  `page.evaluate` tardaba en volver con la página ocupada. En la CI de `336851d`, con AC-13
+  de `sin-conexion.spec.js` aún con el 3D: la más larga con animaciones, 495 ms (Chromium,
+  6 sondeos con alguna; en WebKit, 298 ms); sin ninguna, 1223 ms (Chromium, AC-19 de
+  `dibujo.spec.js`). En AC-13, Chromium, la primera lectura no volvió en 2 s y el test
+  falló (`Timeout 2000ms exceeded while waiting on the predicate`, sin animaciones que
+  mostrar): no había margen. **Decisión de Víctor:** AC-13 a la vista sin dibujo; si
+  entonces todas las esperas sin animaciones quedan por debajo de 1,5 s, se sigue; si no,
+  un ADR-0009 que cuente los 2 s desde la primera lectura que ve animaciones. La medición
+  siguiente se anota con las correcciones de la ronda 2 de G4.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
-  AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js`: su AC-13 abre
-  un segundo contexto con `browser.newContext`, que no hereda `sin-dibujo.js`, así que no
-  basta con cambiar el import.
+  AC-22 miden la pantalla entera, dibujo incluido) y AC-12 de `sin-conexion.spec.js`. AC-13
+  de `sin-conexion.spec.js` pasa a la vista sin dibujo, en sus dos contextos (el segundo,
+  abierto con `browser.newContext`, no hereda el `test` de `sin-dibujo.js`, así que
+  `sinDibujo` se le aplica a mano), por la medición de la espera (abajo). Decisión de
+  Víctor del 2026-11-18. No cambia lo que comprueba AC-13.
 - **Lo que hace la librería:** `analyze()` deja `window.axe` en la página analizada y, al
   terminar, abre una página `about:blank` en el mismo contexto, la analiza y la cierra
   (`@axe-core/playwright` 4.14.0, `finishRun`). No genera peticiones de red: los tests que
