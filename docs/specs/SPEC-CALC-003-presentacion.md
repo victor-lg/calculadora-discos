@@ -76,11 +76,13 @@ En el mismo PR que SPEC-CALC-001 v0.9.
 Tras la ronda 1 de G4, sin otra ronda: la cabecera nombra lo que se concreta,
 FR-13 dice cómo se combina con el salto de FR-12, FR-10 ordena sus dos casos de
 añadir y FR-16 no repite la regla de la etiqueta.
-La versión 0.6 (VIC-31) aclara que NFR-02 se aplica al estado estable: mientras
-dura un fundido de entrada o de salida, como el de FR-10 (240 ms), el contraste
-no cuenta. Lo decidió Víctor el 2026-11-18, al llevar axe a los E2E, que medía
-el texto a media opacidad durante ese fundido (ADR-0008 §6). Es una aclaración,
-sin cambios de comportamiento ni de AC.
+La versión 0.6 (VIC-31) acota NFR-02 al estado estable: mientras dura un
+fundido de entrada o de salida, como el de FR-10, el contraste no cuenta. AC-21
+mide con las animaciones y transiciones terminadas. Lo decidió Víctor el
+2026-11-18, al llevar axe a los E2E, que medía el texto a media opacidad durante
+ese fundido (ADR-0008 §6). No cambia el comportamiento de la app. Tras la única
+ronda de G4, sin otra: NFR-02 define el fundido y el estado estable, y nombra los
+dos fundidos de hoy; AC-21 dice en qué momento se mide.
 -->
 
 # SPEC-CALC-003 — Presentación de la calculadora
@@ -265,7 +267,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 - **AC-18 → FR-14:** sin poder dibujar en 3D, la app muestra las series de SPEC-CALC-001 AC-01 solo con texto y en una columna, sin dibujos, las fichas de barra con su dibujo plano y, en el modo Un punto con 500 kg y el 100 %, el aviso "No caben en la manga: faltan 23 cm.", y añadir, borrar, deshacer, cambiar de modo y de barra y habilitar discos funcionan igual que con el dibujo 3D.
 - **AC-19 → FR-15:** al perderse el contexto gráfico, los dibujos siguen visibles. Si entonces el peso de trabajo pasa de 100 a 105, las tarjetas del 70 y del 90 %, cuya carga cambia, ocultan su dibujo en ese momento y muestran solo el texto, en una columna; la del 40 %, que no cambia, conserva el suyo. Al recuperar el contexto, todas las tarjetas se repintan y sus etiquetas coinciden con su carga. Si al volver a primer plano el contexto no se recupera, la app muestra la vista de FR-14.
 - **AC-20 → NFR-01:** a 390 px de ancho, con los paneles plegados y desplegados, el campo de añadir abierto y el aviso de "Deshacer" visible, los botones, campos, interruptores, fichas de barra, marcas de diferencia y tipos de Mis discos, incluido el botón "Quitar la serie del P %" con el foco, miden al menos 44 × 44 px.
-- **AC-21 → NFR-02:** cada pareja de texto y fondo, incluidos "Borrar" sobre su fondo y el peso de un tipo deshabilitado, cumple 4,5:1, y el texto grande 3:1. Los bordes de los campos, el indicador de foco y el estado de los interruptores y de los tipos de Mis discos cumplen 3:1 frente a su fondo. Los puntos de color y el dibujo 3D no se miden. Se mide sobre los estilos calculados de los textos y controles visibles en los estados de AC-20 y además en estos: el fondo de borrar antes y después del 35 %, un campo con error (borde y mensaje), la marca de diferencia plegada y desplegada, la explicación desplegada, "+ collarín de 2,5 kg", un tipo deshabilitado y el peso de trabajo con el foco; es texto grande el de 24 px o más, o de 18,66 px o más en negrita.
+- **AC-21 → NFR-02:** cada pareja de texto y fondo, incluidos "Borrar" sobre su fondo y el peso de un tipo deshabilitado, cumple 4,5:1, y el texto grande 3:1. Los bordes de los campos, el indicador de foco y el estado de los interruptores y de los tipos de Mis discos cumplen 3:1 frente a su fondo. Los puntos de color y el dibujo 3D no se miden. Se mide con las animaciones y transiciones terminadas, sobre los estilos calculados de los textos y controles visibles en los estados de AC-20 y además en estos: el fondo de borrar antes y después del 35 %, un campo con error (borde y mensaje), la marca de diferencia plegada y desplegada, la explicación desplegada, "+ collarín de 2,5 kg", un tipo deshabilitado y el peso de trabajo con el foco; es texto grande el de 24 px o más, o de 18,66 px o más en negrita.
 - **AC-22 → NFR-03:** con el zoom de página al 200 % sobre una pantalla de 390 px de ancho (equivale a 195 px CSS), no hay desplazamiento horizontal, ningún texto se corta ni se solapa, y se pueden añadir, borrar y deshacer series y abrir los paneles Carga y Mis discos. La prueba en el iPhone está en AC-24.
 - **AC-23 → NFR-04:** en el iPhone 15 Pro Max, con 6 series y la animación activa, Víctor anota en el PR que la animación y el gesto de borrar son fluidos.
 - **AC-24 → FR-01, FR-02, FR-06, FR-07, FR-08, FR-10, FR-11, FR-13, FR-15, NFR-03:** en el iPhone, registrado en el PR con la versión de iOS:
@@ -304,7 +306,7 @@ Salvo que se diga otra cosa, los AC parten de la primera vez que se abre la app 
 ## 10. Requisitos no funcionales
 
 - **NFR-01:** todo lo que se puede pulsar mide al menos 44 × 44 px CSS (44 × 44 pt en el iPhone).
-- **NFR-02:** contraste según WCAG 2.2 AA: 4,5:1 en el texto, 3:1 en el texto grande y 3:1 en los componentes y estados que no son texto (bordes de campos, indicador de foco, interruptores y estado de los tipos de Mis discos). Los puntos de color de los discos son decorativos, porque el peso siempre va escrito, y el dibujo 3D tampoco cuenta. Se aplica al estado estable de la interfaz: mientras dura un fundido de entrada o de salida (por ejemplo, el de FR-10, de 240 ms), el contraste no cuenta. Donde la referencia visual de §11 no llegue a estos umbrales, manda este requisito.
+- **NFR-02:** contraste según WCAG 2.2 AA: 4,5:1 en el texto, 3:1 en el texto grande y 3:1 en los componentes y estados que no son texto (bordes de campos, indicador de foco, interruptores y estado de los tipos de Mis discos). Los puntos de color de los discos son decorativos, porque el peso siempre va escrito, y el dibujo 3D tampoco cuenta. Se aplica al estado estable, sin animaciones ni transiciones en curso: mientras dura un fundido (un cambio de opacidad con el que un elemento entra o sale), el contraste de ese elemento no cuenta. Hoy son fundidos la entrada de las tarjetas (FR-10) y la opacidad con la que se cierra el hueco de una tarjeta borrada (FR-08). Donde la referencia visual de §11 no llegue a estos umbrales, manda este requisito.
 - **NFR-03:** con el zoom de página de Safari al 200 %, la interfaz se puede usar entera: no necesita desplazamiento horizontal y ningún texto se corta ni se solapa. No se exige adaptar la app al tamaño de texto del sistema, que Safari no aplica a una web. El zoom de página solo existe en Safari, no en la app instalada en la pantalla de inicio, así que se prueba allí.
 - **NFR-04:** en el iPhone 15 Pro Max, con 6 series y la animación activa, la animación y el gesto de borrar se ven fluidos a juicio de Víctor, que lo anota en el PR.
 
