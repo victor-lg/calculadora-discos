@@ -4,6 +4,7 @@
 // cita AC-24, que es donde se acepta; la prueba manual sigue haciendo falta.
 import { test, expect } from './sin-dibujo.js';
 import { trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, deslizar, botonQuitar } from './pantalla.js';
+import { analizarConAxe } from './axe.js';
 
 const GRIS = 'rgb(166, 171, 179)';
 const ROJO = 'rgb(229, 72, 77)';
@@ -40,6 +41,7 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
       numero: ['64px', '600', 'Barlow Semi Condensed'],
       unidad: ['24px', GRIS],
     });
+    await analizarConAxe(page);
   });
 
   test('a 360 px, 52 px', async ({ page }) => {
@@ -47,6 +49,7 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
     await page.goto('./');
     await cargarFuentes(page);
     await expect.poll(async () => (await medirPeso(page)).numero[0]).toBe('52px');
+    await analizarConAxe(page);
   });
 
   // FR-02: el número solo se reduce si no cabe. A 195 px (el zoom al 200 % de
@@ -65,6 +68,7 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
     expect(parseFloat((await medirPeso(page)).numero[0])).toBeLessThan(52);
     await cargarFuentes(page);
     await expect.poll(async () => (await medirPeso(page)).numero[0]).toBe('52px');
+    await analizarConAxe(page);
   });
 
   // En el iPhone, el campo de texto desborda unos píxeles aunque el número
@@ -85,6 +89,7 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
     expect((await medirPeso(page)).numero[0]).toBe('64px');
     await trabajo(page).fill('102,55');
     expect((await medirPeso(page)).numero[0]).toBe('64px');
+    await analizarConAxe(page);
   });
 
   test('si no cabe, se reduce hasta caber junto a "kg"', async ({ page }) => {
@@ -101,6 +106,7 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
     expect(m.tamano).toBeLessThan(64);
     expect(m.tamano).toBeGreaterThan(24);
     expect(m).toMatchObject({ dentro: true, pegado: true });
+    await analizarConAxe(page);
   });
 });
 
@@ -108,6 +114,7 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('./');
+    await analizarConAxe(page);
   });
 
   test('(FR-06) el "kg" del total de cada tarjeta, a 16 px, peso 500 y en gris', async ({ page }) => {
@@ -139,6 +146,7 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
     for (const activado of [false, true]) {
       if (activado) await page.locator('label.interruptor').click();
       await expect(page.getByRole('switch', { name: 'Collarines de competición' })).toBeChecked({ checked: activado });
+      await analizarConAxe(page);
       const c = await centros();
       expect(Math.abs(c.circulo - c.pista), JSON.stringify(c)).toBeLessThan(0.5);
       expect(Math.abs(c.pista - c.alto / 2), JSON.stringify(c)).toBeLessThan(0.5);
@@ -167,8 +175,10 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
     });
     const apagado = await margenes();
     expect(apagado).toMatchObject({ pista: [46, 28], circulo: 22, izquierda: 3, vertical: 3 });
+    await analizarConAxe(page);
     await page.locator('label.interruptor').click();
     await expect(page.getByRole('switch', { name: 'Collarines de competición' })).toBeChecked();
+    await analizarConAxe(page);
     const encendido = await margenes();
     expect(encendido).toMatchObject({ pista: [46, 28], circulo: 22, derecha: 3, vertical: 3 });
   });
@@ -177,10 +187,12 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
   test('(FR-02) el peso de trabajo vacío mide al menos 44 px de ancho y se puede volver a tocar', async ({ page }) => {
     await trabajo(page).fill('');
     await trabajo(page).blur();
+    await analizarConAxe(page);
     const caja = await trabajo(page).boundingBox();
     expect(caja.width).toBeGreaterThanOrEqual(44);
     await page.mouse.click(caja.x + caja.width / 2, caja.y + caja.height / 2);
     await expect(trabajo(page)).toBeFocused();
+    await analizarConAxe(page);
   });
 
   test('(FR-03) un peso de barra no válido tiene el borde rojo también con el foco', async ({ page }) => {
@@ -190,11 +202,14 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
     await campo.fill('8');
     await expect(campo).toBeFocused();
     await expect(campo).not.toHaveCSS('border-top-color', ROJO);
+    await analizarConAxe(page);
     await campo.fill('0,5');
     await expect(campo).toBeFocused();
     await expect(campo).toHaveCSS('border-top-color', ROJO);
+    await analizarConAxe(page);
     await campo.blur();
     await expect(campo).toHaveCSS('border-top-color', ROJO);
+    await analizarConAxe(page);
   });
 
   test('(FR-04) el título de Mis discos como el de la referencia y los pesos sin "kg"', async ({ page }) => {
@@ -219,6 +234,7 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
     expect(visibles).toEqual(['25', '20', '15', '10', '5', '2,5', '1,25']);
     await expect(page.getByLabel('25 kg', { exact: true })).toBeChecked();
     await expect(page.getByLabel('1,25 kg', { exact: true })).toBeChecked();
+    await analizarConAxe(page);
   });
 
   test('(FR-05) los avisos generales llevan el icono de aviso de la referencia', async ({ page }) => {
@@ -231,6 +247,7 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
     await expect(icono).toHaveCSS('color', GRIS);
     // El triángulo con su exclamación (ICON_INFO de la maqueta).
     await expect(icono.locator('path')).toHaveCount(2);
+    await analizarConAxe(page);
   });
 });
 
@@ -240,6 +257,7 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('./');
+    await analizarConAxe(page);
   });
 
   test('la tarjeta sale de lado y su hueco se cierra con transición, sin saltos', async ({ page }) => {
@@ -312,6 +330,7 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
     // intermedias que cuentan son las de 52, 104 y 156 ms.
     for (let i = 1; i < muestras.length; i++) expect(muestras[i]).toBeLessThanOrEqual(muestras[i - 1]);
     expect(muestras.slice(1, 4).every((y) => y < inicio90 - 1 && y > inicio70 + 1), JSON.stringify({ inicio90, inicio70, muestras })).toBe(true);
+    await analizarConAxe(page);
   });
 
   test('con "Reducir movimiento", sin salida de lado ni cierre del hueco', async ({ page }) => {
@@ -322,10 +341,12 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
     });
     await deslizar(page, tarjeta(page, 70), 0.5);
     await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '90 %']);
+    await analizarConAxe(page);
     // Con el botón "Quitar", lo mismo.
     await botonQuitar(page, 40).press('Enter');
     await expect(page.locator('#series .porcentaje')).toHaveText(['90 %']);
     expect(await page.evaluate(() => window.transiciones)).toBe(0);
+    await analizarConAxe(page);
   });
 
   // FR-08: el botón "Quitar la serie del P %" hace lo mismo que el gesto: la
@@ -357,5 +378,6 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
       'deslizable arrastra listo se-cierra margin-bottom 260 cubic-bezier(0.2, 0.8, 0.2, 1)',
     ]));
     await expect(page.locator('#aviso-borrado')).toContainText('Serie del 70 % borrada');
+    await analizarConAxe(page);
   });
 });
