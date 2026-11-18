@@ -217,6 +217,54 @@ el paquete sin la imagen.
   No se pudo leer cuántos tests salta cada trozo en la CI: el sandbox del agente no llega
   al almacén de los logs de Actions.
 
+## M27: axe en los E2E (ADR-0007)
+
+Llegó con VIC-31 (#56): `@axe-core/playwright` 4.14.0, con `axe-core` 4.14.0 y
+`playwright-core` 1.65.0 en `overrides`, y la función auxiliar `tests/e2e/axe.js`, sin
+excepciones. La llaman todos los `*.spec.js` de `tests/e2e/`, en los dos proyectos: al
+llegar y tras cada estado que el test comprueba después de una acción que cambia lo que
+se ve (323 llamadas).
+
+- **Violaciones previas:** una, y no queda en la app. `color-contrast` en la tarjeta
+  recién añadida mientras dura su fundido de entrada (SPEC-CALC-003 FR-10, 240 ms): axe
+  medía el texto a media opacidad (contraste de 1,14 a 2,06). Salió con el dibujo 3D, en
+  Chromium y en WebKit (`dibujo.spec.js` AC-09 y `accesibilidad.spec.js` AC-22). Fuera del
+  fundido no hay violación. **Decisión de Víctor:** la función auxiliar espera a que la
+  página no tenga animaciones en curso (`document.getAnimations()`) antes de analizar. No
+  cambia la página; va más allá de la forma literal de ADR-0007 §3.3.
+- **Reloj parado:** con `page.clock.pauseAt`, `analyze()` se cuelga hasta el timeout en
+  los dos navegadores (axe usa los temporizadores de la página). **Decisión de Víctor:** en
+  los tests con el reloj parado (11 de `anadir-borrar.spec.js` y 8 de `dibujo.spec.js`)
+  solo se analiza antes de pararlo, en el `beforeEach`. Lo que se ve con el reloj parado
+  (el aviso de "Deshacer", las tarjetas que salen, el dibujo animándose) se analiza en los
+  tests con tiempo real.
+- **Plazos reales:** donde el aviso de "Deshacer" (5 s) tiene que seguir visible para el
+  paso siguiente, el análisis va después de ese paso, para no alargar el plazo.
+- **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
+  (`sin-dibujo.js`). `sin-conexion.spec.js` se queda con el 3D: AC-13 abre un segundo
+  contexto con `browser.newContext`, que no hereda `sin-dibujo.js`, así que no basta con
+  cambiar el import.
+- **Tiempos** (job entero; run 44288720687 frente a los del #53):
+
+  | Trozo | 1.65.0 sin axe (44162310687 / 44164892525) | Con axe (44288720687) |
+  | --- | --- | --- |
+  | 1/3 | 523 s / 626 s | 677 s |
+  | 2/3 | 331 s / 252 s | 519 s |
+  | 3/3 | 291 s / 325 s | 543 s |
+
+  El más lento, 11 min 17 s: cabe en los 15, pero roza los 12 min en que ADR-0007 §6 pide
+  revisarlo si pasa de forma habitual. Una sola ejecución.
+- **`duplicados` (jscpd) en rojo, por decisión de Víctor:** 16 clones nuevos, todos en
+  tests. 15 son bloques de los E2E que ya se parecían (el `beforeEach` con `goto` y
+  `localStorage`, `segundoPlano`, `romperAlmacen`, los eventos de ciclo de vida, tests de
+  añadir y borrar casi iguales) y que, con la línea de axe en los dos lados, pasan del
+  mínimo de tokens. El otro es la cabecera de `tests/unit/axe-core.test.js`, igual que la de
+  `three.test.js`. No es un check obligatorio. Sacar a `pantalla.js` lo repetido de los E2E
+  va a otra issue.
+- **En local** no se pudieron usar los navegadores de 1.65 (el sandbox no llega a
+  `cdn.playwright.dev`): los E2E se ejecutaron con los de 1.64 que había en la caché, con
+  una configuración fuera del repo.
+
 ## osv-scanner: `picomatch` 4.0.7 (GHSA-fc5q-39xc-vjpf), pendiente
 
 - **Hallazgo:** ReDoS con extglobs repetidos de una sola rama, alto (8,7), en `picomatch`
