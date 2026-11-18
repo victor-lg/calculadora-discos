@@ -83,6 +83,8 @@ async function recorrerEstados(page, medir) {
   await expect(aviso(page)).toBeVisible();
   await medir('aviso de "Deshacer"');
   await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(aviso(page)).toBeVisible();
 
   await botonQuitar(page, 70).focus();
   await medir('"Quitar la serie del 70 %" con el foco');
@@ -330,6 +332,8 @@ test('SPEC-CALC-003/AC-21 el indicador de foco de cada control cumple 3:1', asyn
   expect(enDeshacer.nombre).toBe('Deshacer');
   expect(enDeshacer.r, 'Deshacer').toBeGreaterThanOrEqual(3);
   await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(deshacer(page)).toBeFocused();
 });
 
 // AC-22: lo que se corta o se solapa. Se miden las cajas de cada línea de

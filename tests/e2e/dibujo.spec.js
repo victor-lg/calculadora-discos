@@ -13,6 +13,7 @@ const expect = esperar.configure({ timeout: 20_000 });
 const series = (page) => page.locator('#series > li');
 const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 const dibujo = (page, porcentaje) => tarjeta(page, porcentaje).locator('.dibujo');
+const aviso = (page) => page.locator('#aviso-borrado');
 
 // Cuenta los contextos WebGL que crea la página, y los guarda para poder
 // retirarlos (WEBGL_lose_context).
@@ -149,6 +150,10 @@ test('SPEC-CALC-003 FR-07 FR-16 recorrido con el dibujo: cambiar el peso, borrar
   ]);
   // SPEC-CALC-001 AC-02: con 105 kg cambian el 70 y el 90 %; el 40 % no.
   await trabajo(page).fill('105');
+  // El dibujo animándose, que los tests con el reloj parado no analizan
+  // (ADR-0008 §3.2): en cuanto empieza la animación.
+  await page.waitForFunction(() => document.querySelector('#series .dibujo[data-animando="true"]'), null, { polling: 'raf' });
+  await analizarConAxe(page);
   await comprobarDibujos(page, [
     ['40 %', 'Carga: 10 kg', '1000'],
     ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
@@ -494,8 +499,14 @@ async function pararReloj(page, quitar = []) {
   test.setTimeout(90_000);
   if (quitar.length) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const p of quitar) await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
-    await expect(series(page)).toHaveCount(3 - quitar.length);
+    for (const [i, p] of quitar.entries()) {
+      await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
+      await expect(series(page)).toHaveCount(3 - i - 1);
+      await expect(aviso(page)).toContainText(`Serie del ${p} % borrada`);
+      await analizarConAxe(page);
+      // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+      await expect(aviso(page)).toContainText(`Serie del ${p} % borrada`);
+    }
     await page.emulateMedia({ reducedMotion: 'no-preference' });
   }
   await page.clock.install();
@@ -503,9 +514,22 @@ async function pararReloj(page, quitar = []) {
   await exigirDibujo3D(page);
   // AC-16: al abrir la app, ningún dibujo tiene una animación en curso.
   await comprobarDibujos(page, INICIO.filter(([p]) => !quitar.includes(parseInt(p, 10))));
-  // ADR-0007 §3.3: con el reloj parado, axe se cuelga (usa los temporizadores
-  // de la página), así que se analiza aquí, antes de pararlo, y no después de
-  // las acciones del test. Decisión de Víctor en el PR #56.
+  // ADR-0008 §3.2: con el reloj parado, analyze() no funciona. Se analiza hasta
+  // pararlo (en el beforeEach, tras cada serie que se quita y aquí, tras la
+  // recarga con el reloj instalado) y no después. Lo que estos 8 tests ven con
+  // el reloj parado lo analizan tests con tiempo real:
+  // - el dibujo animándose: "FR-07 FR-16 recorrido con el dibujo…", al cambiar
+  //   el peso;
+  // - el dibujo quieto con cualquier carga, también mientras espera los 400 ms,
+  //   y la tarjeta añadida tras su fundido: el mismo recorrido y los demás tests
+  //   con tiempo real de este fichero;
+  // - los paneles desplegados, los collarines, otra barra y el peso de la
+  //   barra: "FR-16 cada dibujo expone la carga…" y, en accesibilidad.spec.js,
+  //   AC-20 y AC-21;
+  // - la marca de diferencia desplegada (aquí, con "Reducir movimiento"): en
+  //   accesibilidad.spec.js, "AC-21 contraste con campos con error, marcas…";
+  // - el aviso de "Deshacer" y la lista sin series: los que nombra pararReloj
+  //   de anadir-borrar.spec.js y su "SPEC-CALC-001/AC-46…".
   await analizarConAxe(page);
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
 }

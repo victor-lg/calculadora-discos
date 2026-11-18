@@ -379,5 +379,7 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
     ]));
     await expect(page.locator('#aviso-borrado')).toContainText('Serie del 70 % borrada');
     await analizarConAxe(page);
+    // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+    await expect(page.locator('#aviso-borrado')).toContainText('Serie del 70 % borrada');
   });
 });

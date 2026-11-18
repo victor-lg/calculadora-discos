@@ -147,6 +147,8 @@ test('SPEC-CALC-003/AC-11 la pulsación larga muestra "Quitar la serie del 70 %"
   await expect(aviso(page)).toContainText('Serie del 70 % borrada');
   await expect(deshacer(page)).toBeFocused();
   await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
 });
 
 test('SPEC-CALC-003/AC-11 tras la pulsación larga, tocar fuera oculta "Quitar" y la lista no cambia', async ({ page }) => {
@@ -349,9 +351,23 @@ const ANIMACION_MS = 400 + 450;
 async function pararReloj(page) {
   await page.clock.install();
   await page.reload();
-  // ADR-0007 §3.3: con el reloj parado, axe se cuelga (usa los temporizadores
-  // de la página), así que se analiza aquí, antes de pararlo, y no después de
-  // las acciones del test. Decisión de Víctor en el PR #56.
+  // ADR-0008 §3.2: con el reloj parado, analyze() no funciona. Se analiza hasta
+  // pararlo (en el beforeEach y aquí, tras la recarga con el reloj instalado) y
+  // no después. Lo que estos 11 tests ven con el reloj parado lo analizan tests
+  // con tiempo real:
+  // - el aviso de "Deshacer" con el foco en él: "AC-11 la pulsación larga
+  //   muestra «Quitar la serie del 70 %», que la borra", "NFR-02 contraste de
+  //   añadir…" y, en accesibilidad.spec.js, AC-20 y AC-21 (recorrerEstados);
+  // - el foco en "+ Añadir porcentaje" o en el peso de trabajo, sin el aviso:
+  //   "AC-12 con el teclado…";
+  // - el campo de añadir abierto con su error, con el foco en él: "AC-12 con el
+  //   campo de añadir abierto, «Deshacer» deja el foco en el campo" y "NFR-02
+  //   contraste de añadir…";
+  // - la lista tras borrar, añadir o deshacer: "AC-11 deslizar un 20 %…" y los
+  //   de AC-13 de este fichero.
+  // La tarjeta que sale, también quieta esperando sus temporizadores con el
+  // reloj parado, no se analiza (ADR-0008 §3.1): su contenido se analiza antes
+  // de quitarla.
   await analizarConAxe(page);
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   await page.evaluate(() => {
@@ -771,6 +787,8 @@ test('SPEC-CALC-003 NFR-01 añadir, "Quitar" con el foco y "Deshacer" miden al m
   const cajaBoton = await abrir(page).boundingBox();
   expect(cajaAviso.y >= cajaBoton.y + cajaBoton.height || cajaAviso.y + cajaAviso.height <= cajaBoton.y).toBe(true);
   await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(aviso(page)).toBeVisible();
 });
 
 // Contraste de los textos visibles dentro de `raices` frente a su fondo, con el
@@ -868,6 +886,8 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
   expect(r.fallos).toEqual([]);
   expect(r.medidos).toBe(2);
   await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(aviso(page)).toBeVisible();
 });
 
 // FR-08 y FR-13: con "Reducir movimiento", la tarjeta sigue al dedo, pero al
@@ -956,4 +976,6 @@ test('SPEC-CALC-003/AC-11 con muchas series, el aviso de "Deshacer" no tapa "+ A
     expect(solapan, `botón a ${margen} px del borde`).toBe(false);
   }
   await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(aviso(page)).toBeVisible();
 });
