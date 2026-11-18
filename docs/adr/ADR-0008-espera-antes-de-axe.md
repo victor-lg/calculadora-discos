@@ -71,8 +71,8 @@ Ninguna es infinita ni tiene `fill`. Con "Reducir movimiento" no hay ninguna (FR
 
 #### Opción E: corregir la app
 
-- **Ventajas:** quita de raíz la violación del fundido, si es una violación.
-- **Inconvenientes:** que el texto a media opacidad durante 240 ms incumpla o no NFR-02 de SPEC-CALC-003 es una pregunta de la spec (§6). Aunque se corrigiera, cualquier animación futura volvería a dar resultados que dependen del momento.
+- **Ventajas:** sin el fundido, axe no lo mediría a media opacidad.
+- **Inconvenientes:** el texto a media opacidad durante el fundido no incumple NFR-02 de SPEC-CALC-003, que se aplica al estado estable (§6). Aunque se cambiara, cualquier animación futura volvería a dar resultados que dependen del momento.
 
 ### Tests con el reloj parado
 
@@ -163,7 +163,7 @@ Ninguna es infinita ni tiene `fill`. Con "Reducir movimiento" no hay ninguna (FR
 
 ## 6. Seguimiento
 
-- **Pendiente de la persona:** si NFR-02 de SPEC-CALC-003 se aplica a estados transitorios, como el texto a media opacidad durante el fundido de FR-10. Se decide en otra issue; este ADR no lo cierra.
+- **Decidido por Víctor (2026-11-18):** NFR-02 de SPEC-CALC-003 se aplica al estado estable. Un fundido de entrada o salida, como el de FR-10 (240 ms), no cuenta. La aclaración en la spec va en un PR de spec aparte, después de este ADR.
 - Se revisa este ADR si:
   - la app pasa a tener una animación infinita, con `fill` que la deje en la lista, más larga que el tiempo máximo, o un estado con contenido o controles que vive solo dentro de animaciones;
   - una animación o una cadena de animaciones de la app se acerca al tiempo máximo o a un plazo de la app que los tests analizan;
