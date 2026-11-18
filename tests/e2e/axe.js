@@ -15,6 +15,10 @@ const coincide = (excepcion, violacion) => violacion.id === excepcion.regla
   && violacion.nodes.every((nodo) => nodo.target.length === 1 && nodo.target[0] === excepcion.selector);
 
 export async function analizarConAxe(page) {
+  // Se analiza el estado estable: a media animación (por ejemplo, el fundido
+  // de entrada de una tarjeta, SPEC-CALC-003 FR-10), axe mide el texto a media
+  // opacidad. Decisión de Víctor en el PR #56.
+  await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
   const resultado = await new AxeBuilder({ page }).analyze();
   if (EXCEPCIONES.length === 0) {
     expect(resultado.violations).toEqual([]);
