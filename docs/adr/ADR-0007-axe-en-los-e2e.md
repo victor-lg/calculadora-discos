@@ -1,7 +1,7 @@
 ---
 id: ADR-0007
 titulo: axe en los E2E, quinta dependencia de desarrollo admitida
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-18
 sustituye: null
 sustituido_por: null
