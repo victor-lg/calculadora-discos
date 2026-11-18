@@ -6,6 +6,7 @@ import {
   trabajo, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar, discosDeSeries,
   porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar, vigilarEntradas, entradas,
 } from './pantalla.js';
+import { analizarConAxe } from './axe.js';
 
 const series = (page) => page.locator('#series > li');
 const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
@@ -46,6 +47,7 @@ async function segundoPlano(page) {
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-01 de arriba abajo: peso, Carga y Mis discos plegados, las tarjetas y "+ Añadir porcentaje"', async ({ page }) => {
@@ -66,6 +68,7 @@ test('SPEC-CALC-003/AC-01 de arriba abajo: peso, Carga y Mis discos plegados, la
   // No queda la lista de porcentajes anterior: los porcentajes son las tarjetas.
   await expect(page.locator('#porcentajes')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Porcentajes' })).toHaveCount(0);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 deslizar un 20 % devuelve la tarjeta; un 50 % la borra y "Deshacer" la recupera', async ({ page }) => {
@@ -73,6 +76,7 @@ test('SPEC-CALC-003/AC-11 deslizar un 20 % devuelve la tarjeta; un 50 % la borra
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(tarjeta(page, 70).locator('.serie')).toHaveCSS('transform', 'none');
   await expect(aviso(page)).toBeHidden();
+  await analizarConAxe(page);
 
   await deslizar(page, tarjeta(page, 70), 0.5);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
@@ -81,6 +85,7 @@ test('SPEC-CALC-003/AC-11 deslizar un 20 % devuelve la tarjeta; un 50 % la borra
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(aviso(page)).toBeHidden();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 el fondo "Borrar" aparece al arrastrar y cambia pasado el 35 %', async ({ page }) => {
@@ -97,17 +102,20 @@ test('SPEC-CALC-003/AC-11 el fondo "Borrar" aparece al arrastrar y cambia pasado
   await expect(fondo).toBeVisible();
   await expect(fondo).toHaveText('Borrar');
   await expect(fondo).toHaveCSS('background-color', 'rgb(59, 28, 30)');
+  await analizarConAxe(page);
   // La tarjeta sigue al dedo.
   expect((await t.locator('.serie').boundingBox()).x).toBeLessThan(caja.x);
   await page.mouse.move(x - caja.width * 0.4, y, { steps: 5 });
   await expect(fondo).toHaveCSS('background-color', 'rgb(209, 52, 56)');
   await expect(fondo).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await analizarConAxe(page);
   // Vuelve por debajo del umbral antes de soltar: no se borra.
   await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
   await expect(fondo).toHaveCSS('background-color', 'rgb(59, 28, 30)');
   await page.mouse.up();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(fondo).toBeHidden();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 deslizar en vertical no borra', async ({ page }) => {
@@ -123,12 +131,14 @@ test('SPEC-CALC-003/AC-11 deslizar en vertical no borra', async ({ page }) => {
   await page.mouse.up();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(t.locator('.serie')).toHaveCSS('transform', 'none');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 la pulsación larga muestra "Quitar la serie del 70 %", que la borra', async ({ page }) => {
   const quitar = botonQuitar(page, 70);
   await pulsacionLarga(page, tarjeta(page, 70).locator('.total'));
   await expect(quitar).toHaveText('Quitar la serie del 70 %');
+  await analizarConAxe(page);
   const caja = await quitar.boundingBox();
   expect(caja.width).toBeGreaterThanOrEqual(44);
   expect(caja.height).toBeGreaterThanOrEqual(44);
@@ -136,16 +146,19 @@ test('SPEC-CALC-003/AC-11 la pulsación larga muestra "Quitar la serie del 70 %"
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
   await expect(aviso(page)).toContainText('Serie del 70 % borrada');
   await expect(deshacer(page)).toBeFocused();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 tras la pulsación larga, tocar fuera oculta "Quitar" y la lista no cambia', async ({ page }) => {
   await pulsacionLarga(page, tarjeta(page, 70).locator('.total'));
   const quitar = botonQuitar(page, 70);
   expect((await quitar.boundingBox()).width).toBeGreaterThanOrEqual(44);
+  await analizarConAxe(page);
   await tarjeta(page, 40).locator('.total').click();
   expect((await quitar.boundingBox()).width).toBeLessThan(44);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(aviso(page)).toBeHidden();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 al soltar tras la pulsación larga no se activa la marca de diferencia', async ({ page }) => {
@@ -154,8 +167,10 @@ test('SPEC-CALC-003/AC-11 al soltar tras la pulsación larga no se activa la mar
   await pulsacionLarga(page, marca);
   await expect(botonQuitar(page, 70)).toHaveText('Quitar la serie del 70 %');
   await expect(marca).toHaveAttribute('aria-expanded', 'false');
+  await analizarConAxe(page);
   await tarjeta(page, 40).locator('.total').click();
   expect((await botonQuitar(page, 70).boundingBox()).width).toBeLessThan(44);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 la tarjeta no deja seleccionar texto ni abre el menú del sistema', async ({ page }) => {
@@ -174,6 +189,7 @@ test('SPEC-CALC-003/AC-12 con el teclado: "Quitar" se ve con el foco, borra y el
   expect(caja.width).toBeGreaterThanOrEqual(44);
   expect(caja.height).toBeGreaterThanOrEqual(44);
   await expect(quitar).toHaveText('Quitar la serie del 70 %');
+  await analizarConAxe(page);
   await page.keyboard.press('Enter');
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
   await expect(aviso(page)).toContainText('Serie del 70 % borrada');
@@ -182,6 +198,7 @@ test('SPEC-CALC-003/AC-12 con el teclado: "Quitar" se ve con el foco, borra y el
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(aviso(page)).toBeHidden();
   await expect(abrir(page)).toBeFocused();
+  await analizarConAxe(page);
 
   // Tras borrar, la persona lleva el foco al peso de trabajo y escribe 105.
   await quitarSerie(page, 70);
@@ -193,6 +210,7 @@ test('SPEC-CALC-003/AC-12 con el teclado: "Quitar" se ve con el foco, borra y el
   await expect(trabajo(page)).toHaveValue('105');
   await expect(aviso(page)).toBeHidden();
   await expect(trabajo(page)).toBeFocused();
+  await analizarConAxe(page);
 });
 
 // FR-08: con el campo de añadir abierto, el foco que estaba en el aviso pasa al
@@ -206,6 +224,7 @@ test('SPEC-CALC-003/AC-12 con el campo de añadir abierto, "Deshacer" deja el fo
   await page.keyboard.press('Enter');
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(campo(page)).toBeFocused();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-13 borrar el 70, añadir 70 y "Deshacer" deja un solo 70', async ({ page }) => {
@@ -217,6 +236,7 @@ test('SPEC-CALC-003/AC-13 borrar el 70, añadir 70 y "Deshacer" deja un solo 70'
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(aviso(page)).toBeHidden();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-13 borrar el 70 y añadir 50 deja el aviso, y "Deshacer" recupera el 70', async ({ page }) => {
@@ -227,14 +247,17 @@ test('SPEC-CALC-003/AC-13 borrar el 70 y añadir 50 deja el aviso, y "Deshacer" 
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
   await expect(aviso(page)).toBeHidden();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-001/AC-46 con el peso de trabajo vacío no hay series ni forma de quitar un porcentaje', async ({ page }) => {
   await trabajo(page).fill('');
   await expect(series(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Quitar la serie/ })).toHaveCount(0);
+  await analizarConAxe(page);
   await trabajo(page).fill('100');
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-13 al borrar el 70 y después el 40, "Deshacer" recupera solo el 40', async ({ page }) => {
@@ -243,6 +266,7 @@ test('SPEC-CALC-003/AC-13 al borrar el 70 y después el 40, "Deshacer" recupera 
   await expect(aviso(page)).toContainText('Serie del 40 % borrada');
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+  await analizarConAxe(page);
 });
 
 // FR-08: pulsar "Quitar" en otra tarjeta mientras la primera aún sale. El
@@ -267,6 +291,7 @@ test('SPEC-CALC-003/AC-13 al quitar el 70 y enseguida el 40, el aviso es del 40 
   expect(await page.evaluate(() => window.reaparece)).toEqual([]);
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+  await analizarConAxe(page);
 });
 
 // FR-08: el orden inverso, forzado: la tarjeta del 40 termina de salir antes
@@ -496,6 +521,7 @@ test('SPEC-CALC-003/AC-13 activar los collarines cierra el aviso y la lista sigu
   await page.getByRole('switch', { name: /Collarines/ }).check();
   await expect(aviso(page)).toBeHidden();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+  await analizarConAxe(page);
 });
 
 test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
@@ -509,11 +535,13 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(page.locator('.campo-anadir .unidad')).toHaveText('%');
     await expect(cancelar(page)).toBeVisible();
     await expect(confirmar(page)).toBeVisible();
+    await analizarConAxe(page);
   });
 
   test('no deja teclear más de 3 caracteres', async ({ page }) => {
     await campo(page).pressSequentially('1000');
     await expect(campo(page)).toHaveValue('100');
+    await analizarConAxe(page);
   });
 
   test('50 e Intro: se añade, se cierra y el foco vuelve a "+ Añadir porcentaje"', async ({ page }) => {
@@ -522,6 +550,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
     await expect(campo(page)).toBeHidden();
     await expect(abrir(page)).toBeFocused();
+    await analizarConAxe(page);
   });
 
   test('60 y "Añadir": la lista gana un solo 60', async ({ page }) => {
@@ -530,6 +559,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '60 %', '70 %', '90 %']);
     await expect(campo(page)).toBeHidden();
     await expect(abrir(page)).toBeFocused();
+    await analizarConAxe(page);
   });
 
   test('60 y "Añadir", que antes quita el foco al campo: se añade una sola vez', async ({ page }) => {
@@ -538,6 +568,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await campo(page).blur();
     await confirmar(page).click();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '60 %', '70 %', '90 %']);
+    await analizarConAxe(page);
   });
 
   test('55 y tocar el peso de trabajo: se añade y el foco queda en el peso', async ({ page }) => {
@@ -546,6 +577,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '55 %', '70 %', '90 %']);
     await expect(campo(page)).toBeHidden();
     await expect(trabajo(page)).toBeFocused();
+    await analizarConAxe(page);
   });
 
   test('5 y pasar a segundo plano: al volver sigue abierto con "5" y la lista no cambia', async ({ page }) => {
@@ -554,18 +586,22 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(campo(page)).toBeVisible();
     await expect(campo(page)).toHaveValue('5');
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+    await analizarConAxe(page);
   });
 
   test('0 da el error y, al cambiar a 05, desaparece', async ({ page }) => {
     await campo(page).pressSequentially('0');
     await page.keyboard.press('Enter');
     await expect(error(page)).toHaveText('Escribe un porcentaje entre 1 y 100.');
+    await analizarConAxe(page);
     await page.keyboard.press('Home');
     await page.keyboard.type('0');
     await expect(campo(page)).toHaveValue('00');
     await expect(error(page)).toBeHidden();
+    await analizarConAxe(page);
     await campo(page).fill('05');
     await expect(error(page)).toBeHidden();
+    await analizarConAxe(page);
   });
 
   test('30, Escape y volver a abrir: está vacío', async ({ page }) => {
@@ -573,6 +609,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await page.keyboard.press('Escape');
     await abrir(page).click();
     await expect(campo(page)).toHaveValue('');
+    await analizarConAxe(page);
   });
 
   test('pegar "1000" lo muestra entero y, al confirmar, da el error', async ({ page }) => {
@@ -585,6 +622,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await page.keyboard.press('Enter');
     await expect(error(page)).toHaveText('Escribe un porcentaje entre 1 y 100.');
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+    await analizarConAxe(page);
   });
 
   test('30 y Escape: se cierra sin cambiar la lista y el foco vuelve al botón', async ({ page }) => {
@@ -593,6 +631,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(campo(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
     await expect(abrir(page)).toBeFocused();
+    await analizarConAxe(page);
   });
 
   test('30 y tocar "✕": se cierra sin cambiar la lista', async ({ page }) => {
@@ -601,6 +640,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(campo(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
     await expect(abrir(page)).toBeFocused();
+    await analizarConAxe(page);
   });
 
   test('30 y tocar "✕", que antes quita el foco al campo: cancelar prevalece', async ({ page }) => {
@@ -610,6 +650,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await cancelar(page).click();
     await expect(campo(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+    await analizarConAxe(page);
   });
 
   test('vacío y tocar fuera: se cierra sin mensaje', async ({ page }) => {
@@ -617,6 +658,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(campo(page)).toBeHidden();
     await expect(error(page)).toBeHidden();
     await expect(abrir(page)).toBeVisible();
+    await analizarConAxe(page);
   });
 
   test('0 y tocar fuera: sigue abierto, con el borde rojo y el mensaje debajo', async ({ page }) => {
@@ -627,6 +669,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(error(page)).toHaveText('Escribe un porcentaje entre 1 y 100.');
     const cajaCampo = await page.locator('.campo-anadir').boundingBox();
     expect((await error(page).boundingBox()).y).toBeGreaterThanOrEqual(cajaCampo.y + cajaCampo.height);
+    await analizarConAxe(page);
   });
 
   test('70 e Intro: sigue abierto, con el borde rojo y "Ya tienes una serie del 70 %."', async ({ page }) => {
@@ -636,6 +679,7 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await expect(page.locator('.campo-anadir')).toHaveCSS('border-top-color', ROJO);
     await expect(error(page)).toHaveText('Ya tienes una serie del 70 %.');
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+    await analizarConAxe(page);
   });
 });
 
@@ -648,6 +692,7 @@ test.describe('sin dibujo 3D', () => {
       delete window.WebGL2RenderingContext;
     });
     await page.reload();
+    await analizarConAxe(page);
   });
 
   test('SPEC-CALC-003/AC-18 solo texto en una columna, fichas planas, el aviso de capacidad y todo funciona igual', async ({ page }) => {
@@ -659,25 +704,32 @@ test.describe('sin dibujo 3D', () => {
     for (const t of await series(page).locator('.serie').all()) {
       expect((await t.evaluate((el) => getComputedStyle(el).gridTemplateColumns)).split(' ')).toHaveLength(1);
     }
+    await analizarConAxe(page);
     await desplegarPaneles(page);
     await expect(page.locator('#lista-barras .ficha svg')).toHaveCount(4);
     for (const svg of await page.locator('#lista-barras .ficha svg').all()) await expect(svg).toBeVisible();
+    await analizarConAxe(page);
 
     // Añadir, borrar y deshacer.
     await anadirPorcentaje(page, '50');
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
+    await analizarConAxe(page);
     await deslizar(page, tarjeta(page, 50), 0.5);
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+    await analizarConAxe(page);
     await quitarSerie(page, 90);
     await deshacer(page).click();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+    await analizarConAxe(page);
 
     // Cambiar de barra y habilitar discos.
     await barra(page, 'Olímpica 15 kg').check();
     await expect(series(page).locator('.total')).toHaveText(['40 kg', '70 kg', '90 kg']);
     await expect.poll(() => discosDeSeries(page)).toEqual(['10 + 2,5', '25 + 2,5', '25 + 10 + 2,5']);
+    await analizarConAxe(page);
     await page.getByLabel('25 kg', { exact: true }).click();
     await expect.poll(() => discosDeSeries(page)).toEqual(['10 + 2,5', '20 + 5 + 2,5', '20 + 15 + 2,5']);
+    await analizarConAxe(page);
     await page.getByLabel('25 kg', { exact: true }).click();
 
     // Cambiar de modo: Un punto, 500 kg y el 100 %.
@@ -685,6 +737,7 @@ test.describe('sin dibujo 3D', () => {
     await anadirPorcentaje(page, '100');
     await trabajo(page).fill('500');
     await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
+    await analizarConAxe(page);
   });
 });
 
@@ -702,15 +755,18 @@ test('SPEC-CALC-003 NFR-01 añadir, "Quitar" con el foco y "Deshacer" miden al m
   await medir(campo(page), 'campo');
   await medir(cancelar(page), 'Cancelar');
   await medir(confirmar(page), 'Añadir');
+  await analizarConAxe(page);
   await page.keyboard.press('Escape');
   await botonQuitar(page, 40).focus();
   await medir(botonQuitar(page, 40), 'Quitar');
+  await analizarConAxe(page);
   await page.keyboard.press('Enter');
   await medir(deshacer(page), 'Deshacer');
   // El aviso no tapa el botón de añadir.
   const cajaAviso = await aviso(page).boundingBox();
   const cajaBoton = await abrir(page).boundingBox();
   expect(cajaAviso.y >= cajaBoton.y + cajaBoton.height || cajaAviso.y + cajaAviso.height <= cajaBoton.y).toBe(true);
+  await analizarConAxe(page);
 });
 
 // Contraste de los textos visibles dentro de `raices` frente a su fondo, con el
@@ -773,6 +829,7 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
   r = await contraste(page, ['.anadir']);
   expect(r.fallos).toEqual([]);
   expect(r.medidos).toBeGreaterThan(2);
+  await analizarConAxe(page);
   await page.keyboard.press('Escape');
 
   // El fondo de borrar antes y después del 35 %.
@@ -786,10 +843,12 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
   await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
   r = await contraste(page, ['.arrastra .fondo-borrar']);
   expect(r).toEqual({ fallos: [], medidos: 1 });
+  await analizarConAxe(page);
   await page.mouse.move(x - caja.width * 0.5, y, { steps: 5 });
   await expect(t).toHaveClass(/listo/);
   r = await contraste(page, ['.arrastra .fondo-borrar']);
   expect(r).toEqual({ fallos: [], medidos: 1 });
+  await analizarConAxe(page);
   await page.mouse.move(x, y, { steps: 5 });
   await page.mouse.up();
 
@@ -797,12 +856,14 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
   await botonQuitar(page, 70).focus();
   r = await contraste(page, ['.quitar']);
   expect(r).toEqual({ fallos: [], medidos: 1 });
+  await analizarConAxe(page);
   await page.keyboard.press('Enter');
   // El aviso aparece al terminar la salida de la tarjeta (FR-08).
   await expect(aviso(page)).toBeVisible();
   r = await contraste(page, ['#aviso-borrado']);
   expect(r.fallos).toEqual([]);
   expect(r.medidos).toBe(2);
+  await analizarConAxe(page);
 });
 
 // FR-08 y FR-13: con "Reducir movimiento", la tarjeta sigue al dedo, pero al
@@ -818,10 +879,12 @@ test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta
   await page.mouse.down();
   await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
   expect((await t.locator('.serie').boundingBox()).x).toBeLessThan(caja.x);
+  await analizarConAxe(page);
   await page.mouse.up();
   // Vuelve sin transición: en el mismo instante ya está en su sitio.
   expect(await t.locator('.serie').evaluate((el) => [el.className, el.style.transform, el.getAnimations().length]))
     .toEqual(['serie', '', 0]);
+    await analizarConAxe(page);
 
   await page.evaluate(() => {
     window.borradaAlSoltar = null;
@@ -833,6 +896,7 @@ test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta
   // Se borra al soltar, sin esperar a una salida de lado.
   expect(await page.evaluate(() => window.borradaAlSoltar)).toBe(true);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+  await analizarConAxe(page);
 });
 
 // FR-10: la entrada de las tarjetas no depende del dibujo. La añadida y la que
@@ -844,24 +908,30 @@ test('SPEC-CALC-003 FR-10 sin dibujo, la tarjeta añadida y la que vuelve con "D
   await expect(series(page)).toHaveCount(3);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', 'plano');
   expect(await entradas(page)).toEqual([]);
+  await analizarConAxe(page);
   await anadirPorcentaje(page, '50');
   expect(await entradas(page)).toEqual(['50 % 0→1']);
+  await analizarConAxe(page);
   await quitarSerie(page, 70);
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
   expect(await entradas(page)).toEqual(['70 % 0→1']);
+  await analizarConAxe(page);
   // Ningún disco habilitado y, otra vez, todos: vuelven sin entrada.
   await desplegarPaneles(page);
   const discos = page.locator('#lista-discos input[name="disco"]');
   for (const d of await discos.all()) await d.uncheck();
   await expect(series(page)).toHaveCount(0);
+  await analizarConAxe(page);
   for (const d of await discos.all()) await d.check();
   await expect(series(page)).toHaveCount(4);
   expect(await entradas(page)).toEqual([]);
+  await analizarConAxe(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await anadirPorcentaje(page, '60');
   await expect(series(page)).toHaveCount(5);
   expect(await entradas(page)).toEqual([]);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-11 con muchas series, el aviso de "Deshacer" no tapa "+ Añadir porcentaje"', async ({ page }) => {
@@ -881,4 +951,5 @@ test('SPEC-CALC-003/AC-11 con muchas series, el aviso de "Deshacer" no tapa "+ A
     const solapan = a.y < b.y + b.height && b.y < a.y + a.height;
     expect(solapan, `botón a ${margen} px del borde`).toBe(false);
   }
+  await analizarConAxe(page);
 });
