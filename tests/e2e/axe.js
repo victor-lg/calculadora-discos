@@ -3,6 +3,7 @@
 // y tras cada acción del usuario que cambia lo que se ve. Sin opciones ni otros
 // métodos del builder, sin capturar sus errores y sin tocar la página para el
 // análisis.
+import { cpus } from 'node:os';
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
 import { sinExcepcion, yaNoAparecen } from './excepciones-axe.js';
@@ -50,7 +51,8 @@ export async function analizarConAxe(page) {
   if (espera >= esperaMasLarga + 100) {
     esperaMasLarga = espera;
     const donde = `${test.info().project.name}, ${test.info().titlePath.join(' › ')}`.replaceAll('%', '%25');
-    console.log(`\n::notice::axe esperó ${espera} ms a las animaciones, ${conAnimaciones} sondeos con alguna en curso (${donde})`);
+    const procesos = `${test.info().config.workers} procesos, ${cpus().length} CPU`;
+    console.log(`\n::notice::axe esperó ${espera} ms a las animaciones, ${conAnimaciones} sondeos con alguna en curso (${donde}; ${procesos})`);
   }
   const resultado = await new AxeBuilder({ page }).analyze();
   // Falla si queda una violación sin su excepción o si una excepción ya no aparece.

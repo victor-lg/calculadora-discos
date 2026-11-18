@@ -8,6 +8,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
+  // Experimento del #56 (VIC-31): un solo proceso en la CI, por si las esperas
+  // antes de axe se alargan por contención de CPU (el runner tiene 2 vCPU).
+  workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   use: {
     baseURL: `http://127.0.0.1:${PUERTO}/`,
