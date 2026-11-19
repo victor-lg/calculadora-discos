@@ -8,20 +8,16 @@
 import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, FUENTES_CARGADAS,
-  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarTodas,
+  porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
 const NOMBRES = ['25 kg', '20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg', '1,25 kg'];
 
-const series = (page) => page.locator('#series > li');
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
-const avisos = (page) => page.locator('#avisos > .aviso:not([hidden])');
+const tarjeta = (page, porcentaje) => page.locator('#series > li', { has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 const abrir = (page) => page.getByRole('button', { name: 'Añadir porcentaje' });
 const campo = (page) => page.getByLabel('Nuevo porcentaje');
-const aviso = (page) => page.locator('#aviso-borrado');
-const deshacer = (page) => page.getByRole('button', { name: 'Deshacer' });
 
 // La pantalla entera, con las fuentes de la app ya cargadas: con las de
 // reserva, el texto ocupa otro ancho (§11).
@@ -30,9 +26,10 @@ async function capturar(page, nombre) {
   await expect(page).toHaveScreenshot(nombre, { fullPage: true });
 }
 
+// Cada test parte de la app recién abierta, sin nada guardado.
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
-  expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  expect(await page.evaluate(() => localStorage.length), 'nada guardado al abrir').toBe(0);
   await analizarConAxe(page);
 });
 
@@ -64,11 +61,13 @@ test('SPEC-CALC-003/AC-04 los discos de 25 y 1,25 kg deshabilitados', async ({ p
 });
 
 test('SPEC-CALC-003/AC-05 los tres avisos generales', async ({ page }) => {
-  await desplegarPaneles(page);
+  // Las series se quitan desde su tarjeta: antes de vaciar el peso y de
+  // deshabilitar los discos, que las quitan de la pantalla.
   await quitarTodas(page);
-  for (const nombre of NOMBRES) await disco(page, nombre).click();
+  await botonDiscos(page).click();
+  for (const nombre of NOMBRES) await disco(page, nombre).uncheck();
   await trabajo(page).fill('');
-  await expect(avisos(page)).toHaveText([
+  await expect(page.locator('#avisos > .aviso:not([hidden])')).toHaveText([
     'Escribe el peso de trabajo.',
     'Añade al menos un porcentaje.',
     'Habilita al menos un disco en Mis discos.',
@@ -103,7 +102,7 @@ test('SPEC-CALC-003/AC-18 en el modo Un punto, con 500 kg y el 100 %, el aviso d
   await anadirPorcentaje(page, '100');
   await trabajo(page).fill('500');
   await page.getByLabel('Un punto').check();
-  await expect(series(page).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
+  await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
   await analizarConAxe(page);
   await capturar(page, 'capacidad.png');
 });
@@ -125,15 +124,14 @@ test('SPEC-CALC-003/AC-14 el campo de añadir con el error de 0', async ({ page 
 });
 
 test('SPEC-CALC-003/AC-12 el aviso de "Deshacer" con el foco, tras borrar el 70 % con el teclado', async ({ page }) => {
-  await botonQuitar(page, 70).focus();
-  await page.keyboard.press('Enter');
+  const conElFoco = () => expect(page.getByRole('button', { name: 'Deshacer' })).toBeFocused();
+  await quitarSerie(page, 70);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
-  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
-  await expect(deshacer(page)).toBeFocused();
+  await conElFoco();
   await analizarConAxe(page);
   await capturar(page, 'aviso-deshacer.png');
   // El aviso dura 5 s en tiempo real: si caducó durante la espera, la captura
   // no era del estado que dice su nombre.
-  await expect(aviso(page)).toContainText('Serie del 70 % borrada');
-  await expect(deshacer(page)).toBeFocused();
+  await expect(page.locator('#texto-borrado')).toHaveText('Serie del 70 % borrada');
+  await conElFoco();
 });
