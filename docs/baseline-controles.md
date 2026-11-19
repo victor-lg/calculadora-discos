@@ -69,6 +69,7 @@ otra issue.
 Llegaron con VIC-27 (#48): el `calidad.yml` de la plantilla, con los jobs `mutaciones`
 (Stryker), `codigo-sobrante` (knip) y `duplicados` (jscpd), cada uno con la configuración
 de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ejecución.
+Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a público.
 
 ### `mutaciones` (Stryker)
 
@@ -171,7 +172,10 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   falta 22, con lo que un test debilitado podía pasar. El 90 se eligió cuando la CI
   daba de 94 a 98 por los mutantes por tiempo y no se sabía cuánto podía variar; hoy
   la CI coincide con local, y los mutantes por tiempo solo pueden subir la puntuación,
-  así que un runner más lento no hace saltar el umbral por error. El coste: un cambio
+  así que un runner más lento no hace saltar el umbral por error (sí puede poner el job
+  en rojo por los 30 minutos de `timeout-minutes`, como pasó con el runner `command`).
+  La CI usa el `stryker.config.json` de `main`, así que el 92 solo se aplica desde que
+  este cambio se fusiona; antes se comprobó en local (92,68, salida 0). El coste: un cambio
   que añada código con tests flojos puede bajar de 92 y obligar a reforzar los tests o a
   revisar el umbral en otra issue.
 - **Lo que se probó para acercar la CI a local, sin conseguirlo** (VIC-27): subir la
@@ -180,14 +184,19 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   el job tarda más de 20 minutos. Que más espera no los recupere apunta a que no son
   ejecuciones algo más lentas, sino procesos que en el runner no terminan. La pista del
   G4 del #48 (2 vCPU en los repos privados) es la causa probable que recoge VIC-29, arriba.
-- **Decisión** (Víctor, 2026-11-16): se queda con 3 procesos, la espera por defecto y
-  `break` 90, sabiendo que en la CI el check está casi ciego. `mutaciones` corre en cada PR
-  pero **no pasa a check requerido** en la regla de `main` hasta cerrar VIC-29. Mientras,
-  sus fallos se miran, pero su verde no prueba que los tests detecten los mutantes.
-  La cabecera de `calidad.yml` dice que el nombre de cada job es el check que se marca
-  como requerido: en la calculadora, para `mutaciones`, todavía no. Con VIC-29, la CI ya
-  mide como local y se cumple la condición para hacerlo requerido; marcarlo en la regla
-  de `main` le corresponde a la persona.
+- **Decisión de VIC-27** (Víctor, 2026-11-16; el umbral lo cambia VIC-29, arriba): se
+  quedó con 3 procesos, la espera por defecto y `break` 90, sabiendo que en la CI el check
+  estaba casi ciego. `mutaciones` corre en cada PR pero **no pasa a check requerido** en
+  la regla de `main` hasta cerrar VIC-29. Mientras, sus fallos se miran, pero su verde no
+  prueba que los tests detecten los mutantes. La cabecera de `calidad.yml` dice que el
+  nombre de cada job es el check que se marca como requerido: en la calculadora, para
+  `mutaciones`, todavía no.
+- **Para hacerlo requerido** (lo decide y lo marca la persona): desde VIC-29 la CI mide
+  como local en los ocho jobs posteriores al corte, pero la causa no está confirmada
+  (`nproc`) y nada avisa si vuelven los mutantes por tiempo: con 2 vCPU, un check
+  requerido seguiría en verde sin detectar. Antes de marcarlo conviene confirmar la causa
+  con `nproc` y, en otra issue (R2, `calidad.yml`), que el job falle o avise cuando los
+  mutantes por tiempo pasen de un tope.
 - **Ficheros de test:** Stryker lanza `tests/unit/**/!(sw).test.js`, los mismos que
   `npm test` salvo `sw.test.js`, también en subcarpetas.
 - **Los 50 con error:** el proceso de `tests/unit/series.test.js` sale con el código 7 en
