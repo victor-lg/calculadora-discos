@@ -217,7 +217,7 @@ el paquete sin la imagen.
   No se pudo leer cuántos tests salta cada trozo en la CI: el sandbox del agente no llega
   al almacén de los logs de Actions.
 
-## M27: axe en los E2E (ADR-0007 y ADR-0008)
+## M27: axe en los E2E (ADR-0007, ADR-0008 y ADR-0009)
 
 Llegó con VIC-31 (#56): `@axe-core/playwright` 4.14.0, con `axe-core` 4.14.0 y
 `playwright-core` 1.65.0 en `overrides`, la función auxiliar `tests/e2e/axe.js` y el
@@ -231,12 +231,33 @@ en el código).
   medía el texto a media opacidad (contraste de 1,14 a 2,06). Salió con el dibujo 3D, en
   Chromium y en WebKit (`dibujo.spec.js` AC-09 y `accesibilidad.spec.js` AC-22). Fuera del
   fundido no hay violación, y NFR-02 se aplica al estado estable (SPEC-CALC-003 v0.6). Por
-  ADR-0008 §3.1, la función auxiliar espera, solo leyendo y como mucho 2 s
-  (`ESPERA_MAXIMA_MS`), a que `document.getAnimations()` esté vacío antes de analizar. Si
-  se agota, el test falla con un mensaje que cita «ADR-0008 de la calculadora» y muestra
-  las animaciones en curso. Si lo que se agota es la primera lectura, sale el mismo
-  mensaje, seguido de `Timeout 2000ms exceeded while waiting on the predicate` y sin
-  animaciones que mostrar (anotaciones de la CI de `7e2a34f`).
+  ADR-0008 §3.1, con ADR-0009 §3, la función auxiliar espera, solo leyendo, a que
+  `document.getAnimations()` esté vacío antes de analizar, en dos tiempos:
+  - **Primer tiempo:** hasta que vuelve la primera lectura, como mucho 10 s
+    (`LECTURA_MAXIMA_MS`). Si se agota, el test falla con un mensaje que cita «ADR-0009 de
+    la calculadora», dice que no se obtuvo ninguna lectura, cuánto se esperó y si lo
+    acortó el tiempo máximo del test.
+  - **Segundo tiempo:** si esa lectura ve animaciones, se lee cada 50 ms hasta que no
+    quede ninguna, como mucho 2 s (`ESPERA_MAXIMA_MS`) desde que volvió. Si se agota, el
+    mensaje es el de ADR-0008 («Se esperaba a que terminaran las animaciones antes de axe
+    (ADR-0008 de la calculadora); siguen en curso»), con la cita de ADR-0009, cuánto se
+    esperó, si había una lectura en curso y cuánto llevaba, lo que tardó la última lectura
+    que volvió y sus animaciones.
+  - **Mecanismo:** un bucle propio que lanza su propio error (ADR-0009 §3). Cada lectura
+    compite con su plazo en un `Promise.race`; una lectura que falla sube tal cual, y una
+    que vuelve o falla después del plazo ya no cuenta. Ningún error se captura.
+  - **El tiempo máximo del test:** las dos esperas terminan 250 ms antes que él, como
+    `expect`, para fallar con su propio mensaje. Playwright no publica ni el fin del tiempo
+    máximo del test ni su reloj: se usan `TestInfo._deadline()` e `iso.monotonicTime()` de
+    `playwright-core/lib/coreBundle`, los mismos que usa `expect`. Playwright está fijado a
+    1.65.0 (`overrides` y el test del lockfile, ADR-0007 §3.2); si una versión los quita,
+    la función falla con un mensaje que lo dice.
+  - **Comprobado** en local con páginas de prueba fuera del repo: una animación infinita
+    falla a los 2 s con el mensaje de ADR-0008 y ADR-0009; una página colgada falla a los
+    10 s con el de ADR-0009; con 5 s de test, a los 4,7 s, «lo acortó el tiempo máximo del
+    test». Antes de ADR-0009, una primera lectura agotada salía con el mensaje de ADR-0008
+    seguido de `Timeout 2000ms exceeded while waiting on the predicate` y sin animaciones
+    (CI de `7e2a34f`).
 - **Reloj parado (ADR-0008 §3.2):** con `page.clock.pauseAt`, `analyze()` se cuelga hasta
   el timeout en los dos navegadores (axe usa los temporizadores de la página). En los tests
   con el reloj parado (11 de `anadir-borrar.spec.js` y 8 de `dibujo.spec.js`) se analiza
@@ -263,8 +284,12 @@ en el código).
   `target`, de un solo elemento, son los de una excepción; una violación sin nodos no pasa.
   Una excepción "ya no aparece" si su regla pasa en su elemento (`passes`). Con la lista
   vacía no hay test unitario: llega con la primera excepción.
-- **Espera más larga (ADR-0008 §5):** cada proceso de Playwright escribe en la salida del
-  test, como `::notice::`, cada espera que supera en 100 ms la máxima anterior de su clase
+- **Espera más larga (ADR-0008 §5, ADR-0009 §5).** Desde ADR-0009, cada proceso de
+  Playwright anota en la salida del test, como `::notice::`, la primera lectura y el
+  segundo tiempo (con su primera lectura y el total) cuando superan en 100 ms el anterior
+  de su clase, y cada primera lectura de más de 2 s siempre, con su test. Las cifras
+  anteriores, de antes de ADR-0009: cada proceso escribía cada espera que superaba en
+  100 ms la máxima anterior de su clase
   (con alguna animación vista o sin ninguna), con los sondeos que vieron alguna; la CI la
   recoge como anotación del job. El escalón de 100 ms evita pasar del límite de
   anotaciones del job, y hace que la máxima real pueda ser hasta 99 ms mayor que la última
@@ -297,13 +322,20 @@ en el código).
   ser público y el runner, de 2 a 4 CPU. Con 2 CPU, Playwright ya usaba un proceso por
   defecto (la mitad de las CPU), así que lo que cambió fue la máquina; con 4, sin
   `workers: 1`, usaría 2. Se queda `workers: 1` porque es lo que se midió en verde; su
-  comentario pide revisarlo si una espera sin animaciones pasa de 1,5 s o el runner vuelve
-  a 2 CPU, y entonces es previsible que vuelvan los fallos de `7e2a34f`.
+  comentario pide revisarlo con los criterios de ADR-0009 §6 o si el runner vuelve a 2 CPU.
 - **SPEC-CALC-001/AC-13 vuelve al 3D** (G4 del #56, ronda 2; decisión de Víctor del
   2026-11-19). Había pasado a la vista sin dibujo por la medición de `336851d`, pero
   ADR-0003 (tabla de riesgos) cuenta con que ese E2E vigile la red con three.js en uso:
-  sin 3D, three.js se carga pero no se ejecuta. Vuelve como en `main` y con 4 CPU se mide
-  otra vez; si no cabe en los 2 s, se propone un ADR.
+  sin 3D, three.js se carga pero no se ejecuta. Vuelve como en `main`. En la CI de
+  `a7987f5` (un proceso, 4 CPU), con la espera aún de ADR-0008, no cupo: en Chromium la
+  primera lectura de AC-13 no volvió en 2 s y el test falló, en el recorrido de
+  `sin-conexion.spec.js`. Las demás: con animaciones, como mucho 449 ms (Chromium, AC-22,
+  6 sondeos con alguna; en WebKit, 289 ms); sin ninguna, 1436 ms (Chromium, AC-13) y
+  1425 ms (Chromium, AC-19 de `dibujo.spec.js`), cada una con hasta 99 ms de error. AC-21
+  pasó. **Decisión de Víctor:** ADR-0009 (#60), que da a la primera lectura su propio
+  tiempo máximo, de 10 s, y cuenta los 2 s desde que vuelve. Fusionado en `main` el
+  2026-11-19 y aplicado en `axe.js`.
+- **Medición con ADR-0009 (§5): dos ejecuciones completas de la CI.** Pendiente.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
   AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js` (SPEC-CALC-001
@@ -314,11 +346,11 @@ en el código).
   vigilan el tráfico (`sin-conexion.spec.js`, AC-12 y AC-13) pasan con ella.
 - **Tiempos** (job entero; run 44288720687 frente a los del #53):
 
-  | Trozo | 1.65.0 sin axe (44162310687 / 44164892525) | Con axe (44288720687) | Con axe, 1 proceso y 4 CPU (44397305353) |
-  | --- | --- | --- | --- |
-  | 1/3 | 523 s / 626 s | 677 s | 585 s |
-  | 2/3 | 331 s / 252 s | 519 s | 339 s |
-  | 3/3 | 291 s / 325 s | 543 s | 487 s |
+  | Trozo | 1.65.0 sin axe (44162310687 / 44164892525) | Con axe (44288720687) | Con axe, 1 proceso y 4 CPU (44397305353) | Ídem, AC-13 con 3D (44507094960) |
+  | --- | --- | --- | --- | --- |
+  | 1/3 | 523 s / 626 s | 677 s | 585 s | 444 s |
+  | 2/3 | 331 s / 252 s | 519 s | 339 s | 333 s (falla AC-13) |
+  | 3/3 | 291 s / 325 s | 543 s | 487 s | 342 s |
 
   Con 2 CPU, el más lento fue de 11 min 17 s: cabe en los 15, pero roza los 12 min en que
   ADR-0007 §6 pide revisarlo si pasa de forma habitual. Con 4 CPU y un proceso, 9 min 45 s.
