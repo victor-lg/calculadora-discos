@@ -1,7 +1,7 @@
 ---
 id: ADR-0009
 titulo: la espera antes de axe separa lo que tarda la página en responder de lo que duran las animaciones
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-19
 sustituye: null
 sustituido_por: null
