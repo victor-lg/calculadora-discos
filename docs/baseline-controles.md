@@ -69,6 +69,7 @@ otra issue.
 Llegaron con VIC-27 (#48): el `calidad.yml` de la plantilla, con los jobs `mutaciones`
 (Stryker), `codigo-sobrante` (knip) y `duplicados` (jscpd), cada uno con la configuración
 de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ejecución.
+Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a público.
 
 ### `mutaciones` (Stryker)
 
@@ -77,7 +78,7 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   por mutante por defecto (`timeoutMS` 5000, `timeoutFactor` 1,5). Con el runner
   `command` cada mutante lanzaba todos los unitarios y el job se canceló a los 30 minutos
   (`timeout-minutes`), con 2 procesos y 6,4 s por ejecución (run 43879302616). Umbral
-  `break` 90: la menor puntuación medida (92,68, en local) menos 2, redondeado hacia abajo.
+  `break` 92 desde VIC-29 (antes, 90); el motivo, en «Umbral» más abajo.
 - **Qué muta:** los cinco módulos que importan los tests unitarios: `almacenamiento.js`,
   `calculo.js`, `entrada.js`, `formato.js` y `vista.js`.
 - **Qué queda fuera, como hallazgo:** `app/js/app.js`, `app/js/dibujo.js` y
@@ -91,7 +92,8 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
 - **`disableTypeChecks: false`:** sin él, Stryker añade `// @ts-nocheck` a todos los `.js`
   de su copia de trabajo, también a `app/vendor/three/`, y falla el test que comprueba que
   la copia de three.js es idéntica a la del paquete (ADR-0003 §3.3).
-- **Mediciones** (runner `tap`, los 842 mutantes; cada fila, una ejecución):
+- **Mediciones de VIC-27,** con el repo privado (runner `tap`, los 842 mutantes; cada
+  fila, una ejecución):
 
   | Dónde | Procesos | Job | Muertos | Por tiempo | Supervivientes | Con error | Puntuación |
   | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -109,27 +111,92 @@ de `main`. Medido en la CI del #48 y en local; las cifras de la CI son de una ej
   En local, los 58 supervivientes: 21 en `vista.js`, 19 en `calculo.js`, 13 en
   `almacenamiento.js` y 5 en `entrada.js`.
 - **La puntuación varía con el runner, por los mutantes por tiempo.** Stryker da por
-  detectado un mutante que agota su tiempo. En local acaban así 6, con 2, 3 o 4
-  procesos; en el runner de la CI, entre 41 y 135 según la configuración (con la final,
-  entre 109 y 129 en tres ejecuciones), y con ellos
-  hasta 44 de los 58 que en local sobreviven cuentan como detectados. Por eso la
-  puntuación de la CI es más alta que la real y el umbral se fija sobre la de local. La
-  consecuencia: en la CI el check está casi ciego, porque un test debilitado puede no
-  notarse si sus mutantes acaban por tiempo.
+  detectado un mutante que agota su tiempo, así que cada mutante por tiempo de más solo
+  puede subir la puntuación, nunca bajarla. En local acaban así 6, con 2, 3 o 4 procesos.
+  Con el repo privado, en el runner de la CI acababan así entre 41 y 135 según la
+  configuración (con la final, entre 109 y 129 en tres ejecuciones), y con ellos hasta
+  44 de los 58 que en local sobreviven contaban como detectados: el check estaba casi
+  ciego, porque un test debilitado podía no notarse si sus mutantes acababan por tiempo.
+- **Desde el 2026-11-19, la CI mide lo mismo que local** (VIC-29). Mismo código mutado,
+  mismos tests unitarios y misma configuración (3 procesos, espera por defecto); el salto
+  ocurre entre el job de las 18:35 UTC del 2026-11-18 y el de las 01:00 UTC del
+  2026-11-19. Recuentos: medición del coordinador desde los logs de Actions (VIC-29),
+  sacados de la línea «All files» de cada job. Duraciones: comprobadas con la API de
+  GitHub (`actions/runs/<run>/jobs`). Todos con 50 con error y 0 sin cobertura.
+
+  | Job `mutaciones` | Inicio (UTC) | Job | Muertos | Por tiempo | Supervivientes | Puntuación |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 134919470857 | 2026-11-18 15:38 | 10 min 10 s | 665 | 98 | 29 | 96,34 |
+  | 134942055556 | 2026-11-18 16:11 | 15 min 4 s | 643 | 135 | 14 | 98,23 |
+  | 134969417875 | 2026-11-18 16:50 | 15 min 10 s | 643 | 135 | 14 | 98,23 |
+  | 134981001116 | 2026-11-18 17:07 | 10 min 58 s | 719 | 32 | 41 | 94,82 |
+  | 134991448362 | 2026-11-18 17:23 | 10 min 20 s | 676 | 83 | 33 | 95,83 |
+  | 135014694132 | 2026-11-18 17:58 | 12 min 17 s | 643 | 133 | 16 | 97,98 |
+  | 135024559354 | 2026-11-18 18:13 | 12 min 31 s | 643 | 133 | 16 | 97,98 |
+  | 135039028959 | 2026-11-18 18:35 | 9 min 47 s | 659 | 107 | 26 | 96,72 |
+  | 135256450973 | 2026-11-19 01:00 | 10 min 25 s | 727 | 7 | 58 | 92,68 |
+  | 135501416501 | 2026-11-19 10:35 | 7 min 48 s | 728 | 6 | 58 | 92,68 |
+  | 135540182103 | 2026-11-19 11:50 | 6 min 53 s | 728 | 6 | 58 | 92,68 |
+  | 135553739867 | 2026-11-19 12:16 | 9 min 30 s | 728 | 6 | 58 | 92,68 |
+  | 135561393002 | 2026-11-19 12:30 | 7 min 53 s | 728 | 6 | 58 | 92,68 |
+  | 135581605114 | 2026-11-19 13:07 | 10 min 27 s | 723 | 13 | 56 | 92,93 |
+  | 135754247886 | 2026-11-19 17:36 | 10 min 55 s | 720 | 16 | 56 | 92,93 |
+  | 135763429654 | 2026-11-19 17:51 | 8 min 1 s | 728 | 6 | 58 | 92,68 |
+
+  Antes del corte, entre 32 y 135 por tiempo, entre 14 y 41 supervivientes y una
+  puntuación de 94,82 a 98,23. Después, entre 6 y 16 por tiempo, 56 o 58 supervivientes
+  y 92,68 o 92,93: en cinco de los ocho jobs, exactamente lo de local (728, 6, 58). Los
+  jobs posteriores al corte duran entre 6 min 53 s y 10 min 55 s; los ocho anteriores de
+  la tabla, entre 9 min 47 s y 15 min 10 s (en VIC-27 se llegó a 20 min 29 s).
+- **Causa probable, sin confirmar:** el repo de la calculadora pasó a público el
+  2026-11-19 (hoy la API de GitHub lo da como `public`; la hora del cambio es del
+  coordinador). En los repos públicos el runner `ubuntu-latest` tiene 4 vCPU; en los
+  privados, 2. Con 3 procesos de Stryker más el principal sobre 2 vCPU, la CPU iba
+  sobrecargada y los mutantes acababan por tiempo; con 4, no. Encaja con lo de VIC-27:
+  solo con 2 procesos bajaban a 41. En el intervalo del corte solo entró en `main` el #59
+  (e2e y `mutaciones` solo fuera del borrador), que no cambia Stryker, y el primer job
+  posterior solo trae cambios de `playwright.config.js` y `tests/e2e/axe.js`, que
+  Stryker no ejecuta. Falta confirmarlo con `nproc` en un paso del job: el número de vCPU
+  no sale en la API, que en los dos periodos da la misma etiqueta (`ubuntu-latest`).
+- **Aviso** (para VIC-34 y cualquier cambio de runner): **con 2 vCPU el problema vuelve.**
+  Si el repo vuelve a ser privado o `mutaciones` pasa a un runner propio o de 2 vCPU,
+  hay que esperar otra vez cientos de mutantes por tiempo, una puntuación inflada y un
+  check casi ciego. Antes de ese cambio, mide de nuevo y valora `concurrency` 1 o 2.
+  Como los mutantes por tiempo solo suben la puntuación, el check no se pondrá rojo por
+  ello: el síntoma es que deja de detectar, no que falle.
+- **Umbral** (VIC-29): `break` pasa de 90 a 92; `low` 92 y `high` 95 no cambian, así que
+  la franja de aviso queda entre 92 y 95 y por debajo rompe. La puntuación real es 92,68
+  (local y cinco de ocho jobs de la CI), con 792 mutantes que cuentan (842 menos los 50
+  con error); la CI da 92,68 o 92,93. Con `break` 92 el check falla en cuanto sobreviven
+  6 mutantes más que hoy (734 − 6 = 728 detectados, 91,92). Con el 90 anterior hacían
+  falta 22, con lo que un test debilitado podía pasar. El 90 se eligió cuando la CI
+  daba de 94 a 98 por los mutantes por tiempo y no se sabía cuánto podía variar; hoy
+  la CI coincide con local, y los mutantes por tiempo solo pueden subir la puntuación,
+  así que un runner más lento no hace saltar el umbral por error (sí puede poner el job
+  en rojo por los 30 minutos de `timeout-minutes`, como pasó con el runner `command`).
+  La CI usa el `stryker.config.json` de `main`, así que el 92 solo se aplica desde que
+  este cambio se fusiona; antes se comprobó en local (92,68, salida 0). El coste: un cambio
+  que añada código con tests flojos puede bajar de 92 y obligar a reforzar los tests o a
+  revisar el umbral en otra issue.
 - **Lo que se probó para acercar la CI a local, sin conseguirlo** (VIC-27): subir la
   espera por mutante de 5 a 15 s apenas cambia nada (de 135 a 130 por tiempo) y alarga el
   job casi 6 minutos; bajar a 3 procesos deja 122. Solo con 2 procesos bajan a 41, pero
   el job tarda más de 20 minutos. Que más espera no los recupere apunta a que no son
-  ejecuciones algo más lentas, sino procesos que en el runner no terminan: la causa está
-  sin averiguar y la investiga VIC-29. Una pista para VIC-29 (G4 del #48, sin medir): el
-  repo es privado, y en los repos privados el runner `ubuntu-latest` tiene 2 vCPU, no 4;
-  con 3 o 4 procesos de Stryker más el principal, la CPU va sobrecargada.
-- **Decisión** (Víctor, 2026-11-16): se queda con 3 procesos, la espera por defecto y
-  `break` 90, sabiendo que en la CI el check está casi ciego. `mutaciones` corre en cada PR
-  pero **no pasa a check requerido** en la regla de `main` hasta cerrar VIC-29. Mientras,
-  sus fallos se miran, pero su verde no prueba que los tests detecten los mutantes.
-  La cabecera de `calidad.yml` dice que el nombre de cada job es el check que se marca
-  como requerido: en la calculadora, para `mutaciones`, todavía no.
+  ejecuciones algo más lentas, sino procesos que en el runner no terminan. La pista del
+  G4 del #48 (2 vCPU en los repos privados) es la causa probable que recoge VIC-29, arriba.
+- **Decisión de VIC-27** (Víctor, 2026-11-16; el umbral lo cambia VIC-29, arriba): se
+  quedó con 3 procesos, la espera por defecto y `break` 90, sabiendo que en la CI el check
+  estaba casi ciego. `mutaciones` corre en cada PR pero **no pasa a check requerido** en
+  la regla de `main` hasta cerrar VIC-29. Mientras, sus fallos se miran, pero su verde no
+  prueba que los tests detecten los mutantes. La cabecera de `calidad.yml` dice que el
+  nombre de cada job es el check que se marca como requerido: en la calculadora, para
+  `mutaciones`, todavía no.
+- **Para hacerlo requerido** (lo decide y lo marca la persona): desde VIC-29 la CI mide
+  como local en los ocho jobs posteriores al corte, pero la causa no está confirmada
+  (`nproc`) y nada avisa si vuelven los mutantes por tiempo: con 2 vCPU, un check
+  requerido seguiría en verde sin detectar. Antes de marcarlo conviene confirmar la causa
+  con `nproc` y, en otra issue (R2, `calidad.yml`), que el job falle o avise cuando los
+  mutantes por tiempo pasen de un tope.
 - **Ficheros de test:** Stryker lanza `tests/unit/**/!(sw).test.js`, los mismos que
   `npm test` salvo `sw.test.js`, también en subcarpetas.
 - **Los 50 con error:** el proceso de `tests/unit/series.test.js` sale con el código 7 en
