@@ -10,7 +10,7 @@
 import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, botonCarga, botonDiscos, cargarFuentes, FUENTES_CARGADAS,
-  porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas,
+  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarTodas,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
@@ -22,9 +22,10 @@ const abrir = (page) => page.getByRole('button', { name: 'Añadir porcentaje' })
 const campo = (page) => page.getByLabel('Nuevo porcentaje');
 const avisoBorrado = (page) => page.locator('#aviso-borrado');
 
-// La pantalla entera, con las fuentes de la app ya cargadas: con las de
-// reserva, el texto ocupa otro ancho (§11).
+// La pantalla entera, en la vista sin dibujo y con las fuentes de la app ya
+// cargadas: con las de reserva, el texto ocupa otro ancho (§11).
 async function capturar(page, nombre) {
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', 'plano');
   expect(await cargarFuentes(page)).toEqual(FUENTES_CARGADAS);
   await expect(page).toHaveScreenshot(nombre, { fullPage: true });
 }
@@ -40,7 +41,9 @@ test.beforeEach(async ({ page }) => {
 test('al abrir: los paneles plegados y las tarjetas del 40, 70 y 90 % (SPEC-CALC-003 AC-01)', async ({ page }) => {
   await expect(botonCarga(page)).toHaveAttribute('aria-expanded', 'false');
   await expect(botonDiscos(page)).toHaveAttribute('aria-expanded', 'false');
+  await expect(trabajo(page)).toHaveValue('100');
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+  await expect(abrir(page)).toBeVisible();
   await capturar(page, 'al-abrir.png');
 });
 
@@ -56,6 +59,7 @@ test('los paneles Carga y Mis discos desplegados (SPEC-CALC-003 AC-03 y AC-04)',
 
 test('los discos de 25 y 1,25 kg deshabilitados (SPEC-CALC-003 AC-04)', async ({ page }) => {
   await botonDiscos(page).click();
+  await expect(botonDiscos(page)).toHaveAttribute('aria-expanded', 'true');
   await analizarConAxe(page);
   for (const nombre of ['25 kg', '1,25 kg']) {
     await disco(page, nombre).click();
@@ -72,6 +76,7 @@ test('los tres avisos generales (SPEC-CALC-003 AC-05)', async ({ page }) => {
   await quitarTodas(page);
   await analizarConAxe(page);
   await botonDiscos(page).click();
+  await expect(botonDiscos(page)).toHaveAttribute('aria-expanded', 'true');
   await analizarConAxe(page);
   for (const nombre of NOMBRES) {
     await disco(page, nombre).uncheck();
@@ -104,6 +109,7 @@ test('con 105 kg, la explicación del 70 % desplegada (SPEC-CALC-003 AC-06)', as
 
 test('con los collarines, "+ collarín de 2,5 kg" en el 70 % (SPEC-CALC-003 AC-07)', async ({ page }) => {
   await botonCarga(page).click();
+  await expect(botonCarga(page)).toHaveAttribute('aria-expanded', 'true');
   await analizarConAxe(page);
   await page.getByRole('switch', { name: 'Collarines de competición' }).check();
   await expect(tarjeta(page, 70)).toContainText('+ collarín de 2,5 kg');
@@ -113,6 +119,7 @@ test('con los collarines, "+ collarín de 2,5 kg" en el 70 % (SPEC-CALC-003 AC-0
 
 test('en el modo Un punto, con 500 kg y el 100 %, el aviso de capacidad (SPEC-CALC-003 AC-18)', async ({ page }) => {
   await botonCarga(page).click();
+  await expect(botonCarga(page)).toHaveAttribute('aria-expanded', 'true');
   await analizarConAxe(page);
   await quitarTodas(page);
   await analizarConAxe(page);
@@ -120,6 +127,7 @@ test('en el modo Un punto, con 500 kg y el 100 %, el aviso de capacidad (SPEC-CA
   await expect(porcentajesDeSeries(page)).toHaveText(['100 %']);
   await analizarConAxe(page);
   await trabajo(page).fill('500');
+  await expect(tarjeta(page, 100).locator('.total')).toHaveText('500 kg');
   await analizarConAxe(page);
   await page.getByLabel('Un punto').check();
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
@@ -131,6 +139,9 @@ test('en el modo Un punto, con 500 kg y el 100 %, el aviso de capacidad (SPEC-CA
 test('el campo de añadir abierto (SPEC-CALC-003 AC-14)', async ({ page }) => {
   await abrir(page).click();
   await expect(campo(page)).toBeFocused();
+  await expect(page.locator('.campo-anadir .unidad')).toHaveText('%');
+  await expect(page.getByRole('button', { name: 'Cancelar' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Añadir', exact: true })).toBeVisible();
   await analizarConAxe(page);
   await capturar(page, 'anadir-abierto.png');
 });
@@ -148,11 +159,19 @@ test('el campo de añadir con el error de 0 (SPEC-CALC-003 AC-14)', async ({ pag
   await capturar(page, 'anadir-con-error.png');
 });
 
+// FR-08: la salida de la tarjeta borrada y el cierre de su hueco, como en
+// anadir-borrar.spec.js.
+const SALIDA_MS = 400 + 450;
+
 test('el aviso de "Deshacer" con el foco, tras borrar el 70 % con el teclado (SPEC-CALC-003 AC-12)', async ({ page }) => {
-  // El aviso dura 5 s (FR-08). Su plazo se controla con el reloj de la página
-  // (§11): se para antes de capturar, para que no caduque a mitad. Con el
-  // reloj parado axe se cuelga (ADR-0008 §3.2): se analiza antes, también
-  // tras la recarga con el reloj ya instalado.
+  // El aviso dura 5 s (FR-08), y la captura no puede ir contra ese plazo: el
+  // reloj de la página se para antes de borrar y se avanza a mano (§11), como
+  // en el pararReloj de anadir-borrar.spec.js. Con el reloj parado axe se
+  // cuelga (ADR-0008 §3.2): se analiza hasta pararlo, tras la recarga con el
+  // reloj ya instalado, y no después. El aviso con el foco en "Deshacer" lo
+  // analizan tests con tiempo real: en anadir-borrar.spec.js, "AC-11 la
+  // pulsación larga muestra «Quitar la serie del 70 %», que la borra" y "NFR-02
+  // contraste de añadir…"; en accesibilidad.spec.js, AC-20 y AC-21.
   const conElAviso = async () => {
     await expect(page.locator('#texto-borrado')).toHaveText('Serie del 70 % borrada');
     await expect(page.getByRole('button', { name: 'Deshacer' })).toBeFocused();
@@ -160,14 +179,10 @@ test('el aviso de "Deshacer" con el foco, tras borrar el 70 % con el teclado (SP
   await page.clock.install();
   await page.reload();
   await analizarConAxe(page);
-  await quitarSerie(page, 70);
-  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
-  await conElAviso();
-  await analizarConAxe(page);
-  // Como en pararReloj (anadir-borrar.spec.js): 1 s por delante, para que el
-  // reloj, que sigue corriendo, no lo haya pasado al pararlo. Si el salto
-  // llegara a los 5 s, el aviso se cerraría y conElAviso fallaría.
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await botonQuitar(page, 70).press('Enter');
+  await page.clock.runFor(SALIDA_MS);
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
   await conElAviso();
   await capturar(page, 'aviso-deshacer.png');
   await conElAviso();

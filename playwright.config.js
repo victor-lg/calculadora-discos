@@ -18,10 +18,12 @@ export default defineConfig({
   // una nueva escrita en silencio. Las referencias solo se escriben con
   // --update-snapshots, en la imagen de Playwright de tests.yml, y las aprueba
   // Víctor en el PR. Sin tolerancias: threshold 0 (sin él, Playwright deja
-  // pasar diferencias de color de hasta 0,2) y maxDiffPixels en 0, el valor por
-  // defecto. Dos límites de Playwright: los píxeles que pixelmatch toma por
-  // antialias no cuentan, y scale 'css' reduce la captura de WebKit (3 px por
-  // px CSS) a un píxel por px CSS.
+  // pasar diferencias de color de hasta 0,2), y sin maxDiffPixels ni
+  // maxDiffPixelRatio, así que el límite es 0 píxeles. animations, caret y
+  // scale son los valores por defecto, escritos para que se vean. Dos límites
+  // de Playwright: los píxeles que pixelmatch toma por antialias no cuentan, y
+  // scale 'css' reduce la captura de WebKit (3 px por px CSS) a un píxel por
+  // px CSS.
   updateSnapshots: 'none',
   expect: {
     toHaveScreenshot: { threshold: 0, animations: 'disabled', caret: 'hide', scale: 'css' },
