@@ -430,7 +430,9 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
   (`data-dibujo="plano"`) y su estado, y analiza con axe al llegar y tras cada acción que
   cambia lo que se ve, una vez comprobado su efecto (ADR-0007 §3.3). Como en los demás
   E2E, una función auxiliar de `pantalla.js` (`quitarTodas`, `anadirPorcentaje`) cuenta
-  como una acción: sus pasos intermedios se analizan en otros tests. Fijan el estado que
+  como una acción: sus pasos intermedios se analizan en otros tests; su estado final, el
+  aviso de "Deshacer" incluido, se comprueba antes y después de analizarlo (ADR-0008
+  §3.1, plazos). Fijan el estado que
   capturan, no prueban sus AC: los títulos los citan como «SPEC-CALC-003 AC-01», no en el
   formato que cuenta `trazabilidad`.
 - **El aviso de "Deshacer"** dura 5 s (FR-08). Su test instala el reloj de la página,
@@ -440,7 +442,9 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
   analiza (ADR-0008 §3.2): el aviso con el foco lo analizan los tests con tiempo real que
   nombra su comentario. ADR-0008 §3.2 habla de parar el reloj cuando lo necesita el AC que
   se prueba; aquí lo necesita la captura, que no prueba un AC. **Interpretación pendiente
-  de Víctor.** En la ronda 1 el reloj se paraba después de analizar, con el aviso ya
+  de Víctor.** Una alternativa sin medir (G4, ronda 3): `page.clock.setFixedTime`, con la
+  que axe funciona (ADR-0008 [F5]) y el plazo no vencería. Antes de capturar se comprueba
+  que la página no está desplazada: el aviso va pegado abajo. En la ronda 1 el reloj se paraba después de analizar, con el aviso ya
   corriendo: con `Date.now() + 1` falló una vez en local («Cannot fast-forward to the
   past»), y con 1 s quedaban menos de 4 s para axe frente al plazo.
 - **Sin el dibujo 3D:** todo en la vista de FR-14 (`sin-dibujo.js`). SPEC-CALC-003 §11
@@ -461,7 +465,13 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
   - en la propia llamada de `capturas.spec.js`, que gana a la configuración: las mismas
     tolerancias, `mask`, `clip` o `stylePath` (CSS que puede ocultar elementos);
   - quitando o saltando un test o una llamada a `capturar` (Playwright no falla por un PNG
-    sin test), o cambiando los pasos previos y regenerando;
+    sin test), dejando fuera `capturas.spec.js` (`testIgnore`, `testMatch`, `grep`), o
+    cambiando los pasos previos y regenerando;
+  - cambiando lo que fija el estado: `sin-dibujo.js`, `cargarFuentes` y
+    `FUENTES_CARGADAS` de `pantalla.js`, o el sufijo de las referencias
+    (`testInfo.snapshotSuffix`);
+  - con `--update-snapshots`, `--ignore-snapshots` o `--grep` en la orden de `tests.yml`
+    (esta sí es R2, por `.github/`);
   - sustituyendo los PNG.
 
   El `checks.py` de la calculadora no marca aún `playwright.config.*`, `*-snapshots/` ni
@@ -474,7 +484,8 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
 - **En local**, con los navegadores de 1.64 de la caché y las referencias fuera del repo
   (no valen como referencia: otras versiones dan otros píxeles): 20 passed al generarlas,
   diez ejecuciones seguidas en verde (200 comparaciones sin diferencias) y el test del
-  aviso, 60 veces seguidas en verde (en cada ronda de G4). Unos 13 s con 20 tests.
+  aviso, 60 veces seguidas en verde (en cada ronda de G4; tras la ronda 3, los tres tests
+  con el aviso, 20 veces cada uno). Unos 13 s con 20 tests.
 
 ## osv-scanner: `picomatch` 4.0.7 (GHSA-fc5q-39xc-vjpf), pendiente
 
