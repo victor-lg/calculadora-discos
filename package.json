@@ -14,7 +14,7 @@
     "knip": "6.45.1"
   },
   "dependencies": {
-    "three": "0.170.0"
+    "three": "0.187.0"
   },
   "overrides": {
     "axe-core": "4.14.0",
