@@ -21,6 +21,18 @@ const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 const abrir = (page) => page.getByRole('button', { name: 'Añadir porcentaje' });
 const campo = (page) => page.getByLabel('Nuevo porcentaje');
 const avisoBorrado = (page) => page.locator('#aviso-borrado');
+const avisosGenerales = (page) => page.locator('#avisos > .aviso:not([hidden])');
+
+// Tras quitarTodas: sin tarjetas y con el aviso de la última. El aviso dura 5 s
+// en tiempo real, así que se vuelve a comprobar después de analizar (ADR-0008
+// §3.1, plazos).
+async function sinSeriesConAviso(page, analizar) {
+  const aviso = () => expect(page.locator('#texto-borrado')).toHaveText('Serie del 90 % borrada');
+  await expect(porcentajesDeSeries(page)).toHaveCount(0);
+  await aviso();
+  await analizar();
+  await aviso();
+}
 
 // La pantalla entera, en la vista sin dibujo y con las fuentes de la app ya
 // cargadas: con las de reserva, el texto ocupa otro ancho (§11).
@@ -44,6 +56,8 @@ test('al abrir: los paneles plegados y las tarjetas del 40, 70 y 90 % (SPEC-CALC
   await expect(trabajo(page)).toHaveValue('100');
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(abrir(page)).toBeVisible();
+  await expect(avisosGenerales(page)).toHaveCount(0);
+  await expect(avisoBorrado(page)).toBeHidden();
   await capturar(page, 'al-abrir.png');
 });
 
@@ -54,6 +68,7 @@ test('los paneles Carga y Mis discos desplegados (SPEC-CALC-003 AC-03 y AC-04)',
     await analizarConAxe(page);
   }
   await expect(page.locator('#lista-discos label')).toHaveText(NOMBRES);
+  await expect(page.getByRole('switch', { name: 'Collarines de competición' })).not.toBeChecked();
   await capturar(page, 'paneles-desplegados.png');
 });
 
@@ -74,7 +89,7 @@ test('los tres avisos generales (SPEC-CALC-003 AC-05)', async ({ page }) => {
   // Las series se quitan desde su tarjeta: antes de vaciar el peso y de
   // deshabilitar los discos, que las quitan de la pantalla.
   await quitarTodas(page);
-  await analizarConAxe(page);
+  await sinSeriesConAviso(page, () => analizarConAxe(page));
   await botonDiscos(page).click();
   await expect(botonDiscos(page)).toHaveAttribute('aria-expanded', 'true');
   await analizarConAxe(page);
@@ -83,12 +98,13 @@ test('los tres avisos generales (SPEC-CALC-003 AC-05)', async ({ page }) => {
     await analizarConAxe(page);
   }
   await trabajo(page).fill('');
-  await expect(page.locator('#avisos > .aviso:not([hidden])')).toHaveText([
+  await expect(avisosGenerales(page)).toHaveText([
     'Escribe el peso de trabajo.',
     'Añade al menos un porcentaje.',
     'Habilita al menos un disco en Mis discos.',
   ]);
   await expect(avisoBorrado(page)).toBeHidden();
+  await expect(botonCarga(page)).toHaveAttribute('aria-expanded', 'false');
   await analizarConAxe(page);
   await capturar(page, 'avisos-generales.png');
 });
@@ -122,10 +138,14 @@ test('en el modo Un punto, con 500 kg y el 100 %, el aviso de capacidad (SPEC-CA
   await expect(botonCarga(page)).toHaveAttribute('aria-expanded', 'true');
   await analizarConAxe(page);
   await quitarTodas(page);
-  await analizarConAxe(page);
-  await anadirPorcentaje(page, '100');
-  await expect(porcentajesDeSeries(page)).toHaveText(['100 %']);
-  await analizarConAxe(page);
+  // Añadir el 100 no cierra el aviso (FR-08): se vuelve a comprobar también
+  // después del análisis siguiente.
+  await sinSeriesConAviso(page, async () => {
+    await analizarConAxe(page);
+    await anadirPorcentaje(page, '100');
+    await expect(porcentajesDeSeries(page)).toHaveText(['100 %']);
+    await analizarConAxe(page);
+  });
   await trabajo(page).fill('500');
   await expect(tarjeta(page, 100).locator('.total')).toHaveText('500 kg');
   await analizarConAxe(page);
@@ -184,6 +204,9 @@ test('el aviso de "Deshacer" con el foco, tras borrar el 70 % con el teclado (SP
   await page.clock.runFor(SALIDA_MS);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
   await conElAviso();
+  // El aviso va pegado abajo (position: sticky): su sitio en la captura
+  // depende del desplazamiento.
+  expect(await page.evaluate(() => window.scrollY), 'sin desplazar').toBe(0);
   await capturar(page, 'aviso-deshacer.png');
   await conElAviso();
 });
