@@ -230,10 +230,13 @@ en el código).
   recién añadida mientras dura su fundido de entrada (SPEC-CALC-003 FR-10, 240 ms): axe
   medía el texto a media opacidad (contraste de 1,14 a 2,06). Salió con el dibujo 3D, en
   Chromium y en WebKit (`dibujo.spec.js` AC-09 y `accesibilidad.spec.js` AC-22). Fuera del
-  fundido no hay violación, y NFR-02 se aplica al estado estable (SPEC-CALC-003 v0.6). Por ADR-0008 §3.1, la función auxiliar espera, solo leyendo y
-  como mucho 2 s (`ESPERA_MAXIMA_MS`), a que `document.getAnimations()` esté vacío antes de
-  analizar. Si se agota, el test falla con un mensaje que cita «ADR-0008 de la
-  calculadora» y muestra las animaciones en curso.
+  fundido no hay violación, y NFR-02 se aplica al estado estable (SPEC-CALC-003 v0.6). Por
+  ADR-0008 §3.1, la función auxiliar espera, solo leyendo y como mucho 2 s
+  (`ESPERA_MAXIMA_MS`), a que `document.getAnimations()` esté vacío antes de analizar. Si
+  se agota, el test falla con un mensaje que cita «ADR-0008 de la calculadora» y muestra
+  las animaciones en curso. Si lo que se agota es la primera lectura, sale el mismo
+  mensaje, seguido de `Timeout 2000ms exceeded while waiting on the predicate` y sin
+  animaciones que mostrar (anotaciones de la CI de `7e2a34f`).
 - **Reloj parado (ADR-0008 §3.2):** con `page.clock.pauseAt`, `analyze()` se cuelga hasta
   el timeout en los dos navegadores (axe usa los temporizadores de la página). En los tests
   con el reloj parado (11 de `anadir-borrar.spec.js` y 8 de `dibujo.spec.js`) se analiza
@@ -241,11 +244,16 @@ en el código).
   `dibujo.spec.js` y en los dos `pararReloj`, tras la recarga con el reloj ya instalado (así
   axe sí funciona). Los dos `pararReloj` citan el ADR y nombran los tests con tiempo real
   que analizan lo que se ve con el reloj parado: el aviso de "Deshacer", el foco, el campo
-  de añadir con su error, los paneles y el dibujo. Para el dibujo animándose, el recorrido
-  con el dibujo de `dibujo.spec.js` analiza en cuanto empieza la animación (con
-  `data-animando`). Las tarjetas que salen no se analizan, ni con tiempo real (la espera
-  llega cuando ya no están) ni con el reloj parado: es el hueco de ADR-0008 §3.1. Su
-  contenido se analiza antes de quitarlas.
+  de añadir con su error, los paneles y el dibujo quieto. El campo de añadir con su error
+  y, a la vez, el aviso con el foco en "Deshacer" no lo analiza ningún test: sus partes se
+  analizan por separado. Las tarjetas que salen no se analizan, ni con tiempo real (la
+  espera llega cuando ya no están) ni con el reloj parado: es el hueco de ADR-0008 §3.1.
+  Su contenido se analiza antes de quitarlas. **El dibujo animándose y el que espera los
+  400 ms de FR-11 son otro hueco** (G4 del #56, ronda 2; decisión de Víctor del
+  2026-11-19): el recorrido con el dibujo de `dibujo.spec.js` analiza en cuanto empieza
+  la animación (con `data-animando`), pero nada comprueba que siga cuando corre axe, y la
+  espera antes de axe puede durar más que la animación (la animación del dibujo es de
+  JavaScript, así que la espera no la ve).
 - **Plazos reales (ADR-0008 §3.1):** donde el aviso de "Deshacer" (5 s) tiene que seguir
   visible para el paso siguiente, el análisis va después de ese paso. Donde se analiza con
   el aviso comprobado, el test lo vuelve a comprobar después del análisis, para fallar si
@@ -256,10 +264,15 @@ en el código).
   Una excepción "ya no aparece" si su regla pasa en su elemento (`passes`). Con la lista
   vacía no hay test unitario: llega con la primera excepción.
 - **Espera más larga (ADR-0008 §5):** cada proceso de Playwright escribe en la salida del
-  test, como `::notice::`, cada espera que supera en 100 ms su máxima anterior, con los
-  sondeos que vieron alguna animación; la CI la recoge como anotación del job. En local,
-  con el Chromium de 1.64, la más larga fue de 1110 ms en `dibujo.spec.js` (AC-19, al pasar a la vista
-  sin dibujo), y no por las animaciones: el primer sondeo ya las encontraba vacías, pero
+  test, como `::notice::`, cada espera que supera en 100 ms la máxima anterior de su clase
+  (con alguna animación vista o sin ninguna), con los sondeos que vieron alguna; la CI la
+  recoge como anotación del job. El escalón de 100 ms evita pasar del límite de
+  anotaciones del job, y hace que la máxima real pueda ser hasta 99 ms mayor que la última
+  anotada. Hasta `b4ace2a` había una sola máxima para las dos clases, así que una espera
+  con animaciones posterior a una más larga sin ellas no se anotaba: las cifras «con
+  animaciones» de abajo son solo las anotadas, no la máxima. En local, con el Chromium de
+  1.64, la más larga fue de 1110 ms en `dibujo.spec.js` (AC-19, al pasar a la vista sin
+  dibujo), y no por las animaciones: el primer sondeo ya las encontraba vacías, pero
   `page.evaluate` tardaba en volver con la página ocupada. En la CI de `336851d`, con AC-13
   de `sin-conexion.spec.js` aún con el 3D: la más larga con animaciones, 495 ms (Chromium,
   6 sondeos con alguna; en WebKit, 298 ms); sin ninguna, 1223 ms (Chromium, AC-19 de
@@ -275,20 +288,26 @@ en el código).
   estuviera quieto. **Experimento de Víctor:** un solo proceso de Playwright en la CI
   (`workers: 1` en `playwright.config.js`), por si era contención de CPU; la anotación
   dice cuántos procesos y CPU ve el runner. En la CI de `b4ace2a` pasan los tres trozos,
-  AC-21 incluido. Con animaciones, como mucho 541 ms (Chromium, AC-22, 6 sondeos con
-  alguna; en WebKit, 299 ms); sin ninguna, 1331 ms (Chromium, AC-19 de `dibujo.spec.js`):
-  por debajo de 1,5 s, así que no hace falta el ADR-0009. El margen es corto (169 ms) y es
-  una sola ejecución. Y el experimento no aísla la causa: entre `7e2a34f` y `b4ace2a` el
-  repo pasó a ser público y el runner, de 2 a 4 CPU. Con 2 CPU, Playwright ya usaba un
-  proceso por defecto (la mitad de las CPU), así que lo que cambió fue la máquina; con 4,
-  sin `workers: 1`, usaría 2. Se queda `workers: 1` porque es lo que se midió en verde.
+  AC-21 incluido. Con animaciones, la más larga anotada es de 541 ms (Chromium, AC-22, 6
+  sondeos con alguna; en WebKit, 299 ms), antes de la de 1331 ms sin ninguna (Chromium,
+  AC-19 de `dibujo.spec.js`), que sí es la máxima, con hasta 99 ms de error: entre 1331 y
+  1430 ms. Por debajo de 1,5 s, así que no hace falta el ADR-0009, con un margen de entre
+  70 y 169 ms frente a 1,5 s y de entre 570 y 669 ms frente a los 2 s, en una sola
+  ejecución. El experimento no aísla la causa: entre `7e2a34f` y `b4ace2a` el repo pasó a
+  ser público y el runner, de 2 a 4 CPU. Con 2 CPU, Playwright ya usaba un proceso por
+  defecto (la mitad de las CPU), así que lo que cambió fue la máquina; con 4, sin
+  `workers: 1`, usaría 2. Se queda `workers: 1` porque es lo que se midió en verde; su
+  comentario pide revisarlo si una espera sin animaciones pasa de 1,5 s o el runner vuelve
+  a 2 CPU, y entonces es previsible que vuelvan los fallos de `7e2a34f`.
+- **SPEC-CALC-001/AC-13 vuelve al 3D** (G4 del #56, ronda 2; decisión de Víctor del
+  2026-11-19). Había pasado a la vista sin dibujo por la medición de `336851d`, pero
+  ADR-0003 (tabla de riesgos) cuenta con que ese E2E vigile la red con three.js en uso:
+  sin 3D, three.js se carga pero no se ejecuta. Vuelve como en `main` y con 4 CPU se mide
+  otra vez; si no cabe en los 2 s, se propone un ADR.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
-  AC-22 miden la pantalla entera, dibujo incluido) y AC-12 de `sin-conexion.spec.js`. AC-13
-  de `sin-conexion.spec.js` pasa a la vista sin dibujo, en sus dos contextos (el segundo,
-  abierto con `browser.newContext`, no hereda el `test` de `sin-dibujo.js`, así que
-  `sinDibujo` se le aplica a mano), por la medición de la espera (arriba). Decisión de
-  Víctor del 2026-11-18. No cambia lo que comprueba AC-13.
+  AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js` (SPEC-CALC-001
+  AC-12 y AC-13).
 - **Lo que hace la librería:** `analyze()` deja `window.axe` en la página analizada y, al
   terminar, abre una página `about:blank` en el mismo contexto, la analiza y la cierra
   (`@axe-core/playwright` 4.14.0, `finishRun`). No genera peticiones de red: los tests que

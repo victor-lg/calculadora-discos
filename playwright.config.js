@@ -9,7 +9,9 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   // Un solo proceso en la CI: con él se midió la espera antes de axe en verde
-  // (ADR-0008 §5; docs/baseline-controles.md, M27).
+  // (ADR-0008 §5; docs/baseline-controles.md, M27), pero la medición no aísla
+  // la causa (el runner pasó a la vez de 2 a 4 CPU). Se revisa si una espera
+  // sin animaciones pasa de 1,5 s o el runner vuelve a 2 CPU.
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   use: {
