@@ -408,7 +408,7 @@ en el código del #56).
 
 Llegan con VIC-31 (PR 4): `tests/e2e/capturas.spec.js`, con una captura de la pantalla
 entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-003, a
-390 × 844 px (el ancho de §5) y en los dos proyectos: 20 referencias, que irán a
+390 × 844 px (el ancho de §5) y en los dos proyectos: 20 referencias, en
 `tests/e2e/capturas.spec.js-snapshots/`. Como el ejemplo de sdd-workflow#48:
 
 - **Sin tolerancias ni máscaras.** `playwright.config.js` fija `updateSnapshots: 'none'`
@@ -441,22 +441,30 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
   captura con el reloj parado, así que el plazo no corre. Con el reloj parado no se
   analiza (ADR-0008 §3.2): el aviso con el foco lo analizan los tests con tiempo real que
   nombra su comentario. ADR-0008 §3.2 habla de parar el reloj cuando lo necesita el AC que
-  se prueba; aquí lo necesita la captura, que no prueba un AC. **Interpretación pendiente
-  de Víctor.** Una alternativa sin medir (G4, ronda 3): `page.clock.setFixedTime`, con la
-  que axe funciona (ADR-0008 [F5]) y el plazo no vencería. Antes de capturar se comprueba
-  que la página no está desplazada: el aviso va pegado abajo. En la ronda 1 el reloj se paraba después de analizar, con el aviso ya
-  corriendo: con `Date.now() + 1` falló una vez en local («Cannot fast-forward to the
+  se prueba; aquí lo necesita la captura, que no prueba un AC. **Decisión de Víctor**
+  (2026-11-19): se acepta, porque cumple ADR-0008: ese estado no se analiza con el reloj
+  parado y ya lo analizan los tests con tiempo real. No se prueba `setFixedTime`. Antes
+  de capturar se comprueba que la página no está desplazada: el aviso va pegado abajo. En
+  la ronda 1 el reloj se paraba después de analizar, con el aviso ya corriendo: con `Date.now() + 1` falló una vez en local («Cannot fast-forward to the
   past»), y con 1 s quedaban menos de 4 s para axe frente al plazo.
 - **Sin el dibujo 3D:** todo en la vista de FR-14 (`sin-dibujo.js`). SPEC-CALC-003 §11
   excluye comparar el dibujo píxel a píxel, y en la CI se pinta por software.
 - **Lo que no se captura:** los estados intermedios (el gesto de borrar, las tarjetas
   entrando o saliendo), el ancho de 360 px (AC-08) y el zoom al 200 % (AC-22), que tienen
   sus propias medidas en los E2E.
-- **Las referencias las genera Víctor** en el contenedor de `tests.yml` (Playwright 1.65.0,
-  digest `sha256:9beb5460…4e73dbe`, `linux/amd64` como el runner), desde un clon limpio en
-  el commit revisado, y eso vale como su aprobación. Pendiente: la generación, cinco
-  ejecuciones sin `--update-snapshots` (falsos positivos) y el rojo con un cambio de
-  aspecto. Si un test falla al generarlas, su PNG puede haberse escrito igual: se repite.
+- **Las referencias las generó Víctor** (2026-11-19) en el contenedor de `tests.yml`
+  (Playwright 1.65.0, digest `sha256:9beb5460…4e73dbe`, `linux/amd64` como el runner y
+  `CI=1`, un proceso), desde un clon limpio en `401ffde`, el commit revisado, y eso vale
+  como su aprobación. Se subieron sin tocarlas (`f1bb543`), con las mismas sumas sha256
+  que dio él, que están en el PR. En el contenedor:
+  - la generación: 20 passed, unos 42 s;
+  - falsos positivos: cinco ejecuciones seguidas sin `--update-snapshots`, 20 passed cada
+    vez, unos 38 s: ningún falso positivo en 100 comparaciones;
+  - el rojo: con `--superficie` un nivel más azul (`#16181b` a `#16181c`), 20 failed, de
+    100 648 a 260 243 píxeles distintos por captura. Con el `threshold` por defecto (0,2),
+    según la fórmula de pixelmatch, un cambio así no habría fallado (no se midió).
+
+  Si un test falla al generarlas, su PNG puede haberse escrito igual: se repite.
 - **Riesgo aceptado: el control vive en la rama.** La CI usa la configuración, los tests y
   las referencias del PR, no los de `main`. Un PR puede apagarlo con los E2E en verde:
   - en `playwright.config.js`, global o por proyecto: `updateSnapshots` distinto de
@@ -476,7 +484,9 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
 
   El `checks.py` de la calculadora no marca aún `playwright.config.*`, `*-snapshots/` ni
   los tests como R2 (la plantilla marca los dos primeros desde sdd-workflow#48), ni hay un
-  check sobre esas opciones: hoy lo para la revisión de Víctor. Además, un
+  check sobre esas opciones: hoy lo para la revisión de Víctor. **Decisión de Víctor**
+  (2026-11-19): se acepta por ahora; marcar como R2 las capturas y `playwright.config.*`
+  en `checks.py` va en un PR aparte de `.github/`. Además, un
   `--update-snapshots` en el PC (WSL también es `linux`) escribe en las mismas rutas que
   las referencias aprobadas.
 - **Si una captura falla en la CI,** `tests.yml` no sube `test-results/`: la imagen y la
