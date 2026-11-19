@@ -363,8 +363,10 @@ en el código).
   el segundo tiempo, 1,5 s frente a los 2 s. En WebKit, como mucho 494 ms de primera
   lectura y 263 ms de segundo tiempo. Las primeras lecturas con animaciones vuelven en
   1 o 2 ms: el retraso solo aparece en lecturas sin animaciones, con el 3D. **Se cumple
-  un criterio de ADR-0009 §6** (la primera lectura pasa de 5 s en el intento 1): por
-  §5, la persona decide antes de fusionar.
+  un criterio de ADR-0009 §6** (la primera lectura pasa de 5 s en el intento 1).
+  **Decisión de Víctor** (2026-11-19, por ADR-0009 §6): se aceptan los 6100 ms como dentro
+  del margen, sin ADR nuevo. La investigación de por qué AC-13 de SPEC-CALC-001 concentra
+  las primeras lecturas lentas va aparte, en VIC-35.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
   AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js` (SPEC-CALC-001
