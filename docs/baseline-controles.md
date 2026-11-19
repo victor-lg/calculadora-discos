@@ -407,31 +407,56 @@ en el código).
 ## M27: capturas de referencia (regresión visual)
 
 Llegan con VIC-31 (PR 4): `tests/e2e/capturas.spec.js`, con una captura de la pantalla
-entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-003, en los
-dos proyectos: 20 referencias en `tests/e2e/capturas.spec.js-snapshots/`. Como el ejemplo
-de sdd-workflow#48:
+entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-003, a
+390 × 844 px (el ancho de §5) y en los dos proyectos: 20 referencias, que irán a
+`tests/e2e/capturas.spec.js-snapshots/`. Como el ejemplo de sdd-workflow#48:
 
 - **Sin tolerancias ni máscaras.** `playwright.config.js` fija `updateSnapshots: 'none'`
-  (una captura que falta es un fallo) y, para `toHaveScreenshot`, solo
-  `animations: 'disabled'`, `caret: 'hide'` y `scale: 'css'`.
+  (una captura que falta es un fallo) y, para `toHaveScreenshot`, `threshold: 0` (sin él,
+  Playwright compara con 0,2 y deja pasar cambios de color de decenas de niveles por
+  canal), `animations: 'disabled'`, `caret: 'hide'` y `scale: 'css'`. `maxDiffPixels` y
+  `maxDiffPixelRatio` quedan en 0, su valor por defecto.
+- **Límites de Playwright que se aceptan:** pixelmatch no cuenta los píxeles que toma por
+  antialias, y Playwright no permite cambiarlo. Con `scale: 'css'`, la captura de WebKit
+  (iPhone 17, 3 px por px CSS) se reduce a un píxel por px CSS: un cambio de menos de un
+  px CSS puede no verse. Es lo que hace las capturas estables entre los dos proyectos.
 - **Los estados:** al abrir (AC-01), los dos paneles desplegados (AC-03 y AC-04), los
   discos de 25 y 1,25 kg deshabilitados (AC-04), los tres avisos generales (AC-05), la
   explicación del 70 % desplegada (AC-06), el collarín (AC-07), el aviso de capacidad del
   modo Un punto (AC-18), el campo de añadir abierto y con el error de 0 (AC-14) y el aviso
-  de "Deshacer" con el foco (AC-12). Cada test analiza con axe antes de capturar.
+  de "Deshacer" con el foco (AC-12). Cada test comprueba su estado y analiza con axe al
+  llegar y tras cada acción que cambia lo que se ve (ADR-0007 §3.3). Fijan el estado que
+  capturan, no prueban sus AC: los títulos los citan como «SPEC-CALC-003 AC-01», no en el
+  formato que cuenta `trazabilidad`.
+- **El aviso de "Deshacer"** dura 5 s (FR-08). Su test instala el reloj de la página,
+  analiza antes de pararlo (ADR-0008 §3.2) y lo para 1 s por delante antes de capturar,
+  como el `pararReloj` de `anadir-borrar.spec.js`; comprueba el aviso y el foco antes y
+  después de la captura. Con `Date.now() + 1` en lugar de 1 s, falló una vez en local
+  («Cannot fast-forward to the past»).
 - **Sin el dibujo 3D:** todo en la vista de FR-14 (`sin-dibujo.js`). SPEC-CALC-003 §11
   excluye comparar el dibujo píxel a píxel, y en la CI se pinta por software.
 - **Lo que no se captura:** los estados intermedios (el gesto de borrar, las tarjetas
   entrando o saliendo), el ancho de 360 px (AC-08) y el zoom al 200 % (AC-22), que tienen
   sus propias medidas en los E2E.
 - **Las referencias las genera Víctor** en el contenedor de `tests.yml` (Playwright 1.65.0,
-  digest `sha256:9beb5460…4e73dbe`), desde un clon limpio en el commit revisado, y eso
-  vale como su aprobación. Pendiente: la generación, cinco ejecuciones sin
-  `--update-snapshots` (falsos positivos) y el rojo con un cambio de aspecto.
+  digest `sha256:9beb5460…4e73dbe`, `linux/amd64` como el runner), desde un clon limpio en
+  el commit revisado, y eso vale como su aprobación. Pendiente: la generación, cinco
+  ejecuciones sin `--update-snapshots` (falsos positivos) y el rojo con un cambio de
+  aspecto. Si un test falla al generarlas, su PNG puede haberse escrito igual: se repite.
+- **Riesgo aceptado: el control vive en la rama.** La CI usa la configuración y las
+  referencias del PR, no las de `main`. Un PR puede apagarlo (`updateSnapshots` distinto
+  de `'none'`, `ignoreSnapshots`, `threshold` o `maxDiff*`, otra ruta de referencias) o
+  cambiar los PNG con los E2E en verde. El `checks.py` de la calculadora no marca aún
+  `playwright.config.*` ni `*-snapshots/` como R2 (la plantilla sí, desde sdd-workflow#48),
+  ni hay un check sobre esas opciones: hoy lo para la revisión de Víctor. Además, un
+  `--update-snapshots` en el PC (WSL también es `linux`) escribe en las mismas rutas que
+  las referencias aprobadas.
+- **Si una captura falla en la CI,** `tests.yml` no sube `test-results/`: la imagen y la
+  diferencia solo se ven reproduciéndolo en el contenedor.
 - **En local**, con los navegadores de 1.64 de la caché y las referencias fuera del repo
-  (no valen como referencia: otras versiones dan otros píxeles): 20 passed al generarlas y
-  en cinco ejecuciones seguidas, ningún falso positivo en 100 comparaciones. Unos 10 s en
-  total con 20 tests.
+  (no valen como referencia: otras versiones dan otros píxeles): 20 passed al generarlas,
+  diez ejecuciones seguidas en verde (200 comparaciones sin diferencias) y el test del
+  aviso, 60 veces seguidas en verde. Unos 13 s con 20 tests.
 
 ## osv-scanner: `picomatch` 4.0.7 (GHSA-fc5q-39xc-vjpf), pendiente
 
