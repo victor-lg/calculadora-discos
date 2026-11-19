@@ -5,15 +5,17 @@ estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-19
 sustituye: null
 sustituido_por: null
-modifica: ["ADR-0008 (§3.1, «Tiempo máximo explícito, de 2 s»: desde cuándo se cuentan los 2 s)"]
+modifica: ["ADR-0008 (§3.1, «Tiempo máximo explícito, de 2 s»: los 2 s se cuentan desde la primera lectura que ve animaciones, y esa primera lectura tiene su propio tiempo máximo, de 10 s; §5: la medición anota aparte la duración de la primera lectura)"]
 referencias: ["ADR-0003", "ADR-0007", "ADR-0008", "SPEC-CALC-001", "SPEC-CALC-003", "VIC-31", "PR #56"]
 ---
 
 <!--
 Redactado por Claude (VIC-31), por decisión de Víctor en el PR #56: si, tras pasar AC-13 de
 sin-conexion.spec.js a la vista sin dibujo y después probar un solo proceso de Playwright en la
-CI, alguna espera sin animaciones seguía sin margen, proponer este ADR con su opción 1. Cambia
-solo el punto de la cabecera (`modifica`); el resto de ADR-0008 sigue vigente y no se edita.
+CI, alguna espera sin animaciones seguía sin margen, proponer este ADR con su opción 1. Víctor
+pidió después que la primera lectura tuviera su propio tiempo máximo, con su mensaje, su
+medición y su criterio de revisión. Cambia solo los puntos de la cabecera (`modifica`); el
+resto de ADR-0008 sigue vigente y no se edita.
 -->
 
 # ADR-0009 — El tiempo máximo de la espera antes de axe cuenta desde la primera lectura que ve animaciones
@@ -52,8 +54,9 @@ el #56 no tiene la CI en verde y no puede fusionarse.
 - **Ventajas:** el tiempo máximo vuelve a medir lo que ADR-0008 quería, cuánto duran las
   animaciones. Una animación que no termina sigue haciendo fallar el test a los 2 s de
   verla. No cambia la página ni el tiempo máximo.
-- **Inconvenientes:** la primera lectura no tiene tiempo máximo propio: queda acotada por el
-  del test. Las lecturas siguientes siguen incluyendo lo que tarda la página en responder.
+- **Inconvenientes:** la primera lectura necesita su propio tiempo máximo, que mide otra cosa
+  (cuánto tarda la página en responder) y no tiene un techo conocido. Las lecturas siguientes
+  siguen incluyendo lo que tarda la página en responder.
 
 ### Opción B: subir el tiempo máximo
 
@@ -72,8 +75,12 @@ el #56 no tiene la CI en verde y no puede fusionarse.
 
 **Opción A.** La espera de ADR-0008 §3.1 se hace en dos tiempos, los dos solo leyendo:
 
-1. **Primera lectura**, sin tiempo máximo propio (el del test la acota). Si no hay ninguna
-   animación en curso, se analiza.
+1. **Primera lectura**, con su propio tiempo máximo, explícito y holgado: **10 s**, en una
+   constante con nombre en la función auxiliar, pasada a la propia lectura. Si no hay
+   ninguna animación en curso, se analiza. Si se agota, el test falla con un mensaje que
+   cita «ADR-0009 de la calculadora» y dice que la página no respondió a la lectura en ese
+   tiempo, no que haya animaciones en curso. Como en ADR-0008, no se reintenta ni se
+   captura el error.
 2. **Si hay alguna,** la espera sigue leyendo hasta que no haya ninguna, con el tiempo
    máximo de 2 s de ADR-0008 contado desde esa primera lectura y pasado a la propia espera.
    El fallo y su mensaje son los de ADR-0008: citan «ADR-0008 de la calculadora» y
@@ -82,13 +89,22 @@ el #56 no tiene la CI en verde y no puede fusionarse.
 Lo demás de ADR-0008 §3.1 no cambia: solo lee, no filtra, y una animación que no termina
 hace fallar el test.
 
+**Por qué 10 s.** La lectura más larga que volvió en la CI tardó 1436 ms, en una espera que
+no vio animaciones (`a7987f5`, §1). Las que no volvieron se cortaron a los 2 s, así que de
+ellas solo se sabe que pasaron de 2 s. 10 s son unas 7 veces la mayor medida y 5 veces el
+corte de 2 s, y caben en el tiempo máximo de un test por defecto (30 s) con margen para el
+resto del test. Más tiempo acercaría el fallo al del test, que no dice qué pasó; menos
+dejaría poco margen sobre lo que ya se ha visto pasar de 2 s.
+
 ## 4. Consecuencias
 
-- **Beneficios:** la CI sin GPU deja de fallar porque la página tarde en responder, y el
-  tiempo máximo vuelve a ser el de las animaciones.
+- **Beneficios:** la CI sin GPU deja de fallar porque la página tarde unos segundos en
+  responder, y el tiempo máximo de 2 s vuelve a ser el de las animaciones. Cada fallo dice
+  cuál de las dos cosas pasó: la página no respondió (ADR-0009) o una animación no terminó
+  (ADR-0008).
 - **Costes aceptados:**
-  - Si la página no responde, la primera lectura espera hasta el tiempo máximo del test, y
-    el fallo es de tiempo del test, no el mensaje de ADR-0008.
+  - Una página que tarda hasta 10 s en responder pasa sin fallo; la medición de §5 lo
+    hace visible y §6 fija cuándo revisarlo.
   - Las lecturas del segundo tiempo siguen incluyendo lo que tarda la página en responder:
     si las animaciones coinciden con la página ocupada, se puede agotar igual. La medición
     de §5 lo vigila.
@@ -96,20 +112,28 @@ hace fallar el test.
 
   | Riesgo | Mitigación |
   | --- | --- |
-  | Se pierde un aviso temprano de una página colgada | El tiempo máximo del test sigue fallando; ninguna espera se reintenta ni se captura. |
+  | La primera lectura se acerca a los 10 s y el fallo se vuelve intermitente | La medición de §5 la anota aparte; §6 pide revisar antes, a la mitad. |
   | Un fallo intermitente en el segundo tiempo | La medición de §5 anota las esperas con animaciones aparte; si se repite, la persona decide. |
 
 - **Impacto:** en el #56, `tests/e2e/axe.js` y su baseline. No cambia la app ni los tests.
 
 ## 5. Validación
 
+La medición de ADR-0008 §5 anota por separado, en la salida de los tests de la CI, tres
+cosas: la duración más larga de la primera lectura, la espera más larga con animaciones (el
+segundo tiempo, desde la primera lectura que las ve) y la espera más larga sin animaciones.
 Antes de fusionar el #56: la CI en verde en los dos navegadores y con el 3D, y en el
-baseline, la espera más larga del segundo tiempo frente a los 2 s.
+baseline, la primera lectura más larga frente a los 10 s y la espera con animaciones más
+larga frente a los 2 s, con sus márgenes.
 
 ## 6. Seguimiento
 
-Se revisa este ADR si el segundo tiempo falla en la CI sin una animación que no termina, o
-si la CI pasa a tener GPU.
+Se revisa este ADR:
+
+- si la primera lectura más larga medida en la CI pasa de la mitad de su tiempo máximo
+  (5 s), o se agota alguna vez;
+- si el segundo tiempo falla en la CI sin una animación que no termina;
+- si la CI pasa a tener GPU.
 
 ## 7. Fuentes
 
