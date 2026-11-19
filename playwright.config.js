@@ -8,8 +8,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
-  // Experimento del #56 (VIC-31): un solo proceso en la CI, por si las esperas
-  // antes de axe se alargan por contención de CPU (el runner tiene 2 vCPU).
+  // Un solo proceso en la CI: con él se midió la espera antes de axe en verde
+  // (ADR-0008 §5; docs/baseline-controles.md, M27).
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
   use: {

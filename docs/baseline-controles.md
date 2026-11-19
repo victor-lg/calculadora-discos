@@ -267,14 +267,27 @@ en el código).
   falló (`Timeout 2000ms exceeded while waiting on the predicate`, sin animaciones que
   mostrar): no había margen. **Decisión de Víctor:** AC-13 a la vista sin dibujo; si
   entonces todas las esperas sin animaciones quedan por debajo de 1,5 s, se sigue; si no,
-  un ADR-0009 que cuente los 2 s desde la primera lectura que ve animaciones. La medición
-  siguiente se anota con las correcciones de la ronda 2 de G4.
+  un ADR-0009 que cuente los 2 s desde la primera lectura que ve animaciones. En la CI de
+  `7e2a34f`, con AC-13 ya sin dibujo, no bastó: con animaciones, como mucho 276 ms; sin
+  ninguna, 742 ms, y dos primeras lecturas que no volvieron en 2 s (Chromium, AC-19 de
+  `dibujo.spec.js` y el `beforeEach` de `accesibilidad.spec.js`). Además, AC-21 de
+  `accesibilidad.spec.js` agotó los 30 s del test esperando a que «+ Añadir porcentaje»
+  estuviera quieto. **Experimento de Víctor:** un solo proceso de Playwright en la CI
+  (`workers: 1` en `playwright.config.js`), por si era contención de CPU; la anotación
+  dice cuántos procesos y CPU ve el runner. En la CI de `b4ace2a` pasan los tres trozos,
+  AC-21 incluido. Con animaciones, como mucho 541 ms (Chromium, AC-22, 6 sondeos con
+  alguna; en WebKit, 299 ms); sin ninguna, 1331 ms (Chromium, AC-19 de `dibujo.spec.js`):
+  por debajo de 1,5 s, así que no hace falta el ADR-0009. El margen es corto (169 ms) y es
+  una sola ejecución. Y el experimento no aísla la causa: entre `7e2a34f` y `b4ace2a` el
+  repo pasó a ser público y el runner, de 2 a 4 CPU. Con 2 CPU, Playwright ya usaba un
+  proceso por defecto (la mitad de las CPU), así que lo que cambió fue la máquina; con 4,
+  sin `workers: 1`, usaría 2. Se queda `workers: 1` porque es lo que se midió en verde.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
   AC-22 miden la pantalla entera, dibujo incluido) y AC-12 de `sin-conexion.spec.js`. AC-13
   de `sin-conexion.spec.js` pasa a la vista sin dibujo, en sus dos contextos (el segundo,
   abierto con `browser.newContext`, no hereda el `test` de `sin-dibujo.js`, así que
-  `sinDibujo` se le aplica a mano), por la medición de la espera (abajo). Decisión de
+  `sinDibujo` se le aplica a mano), por la medición de la espera (arriba). Decisión de
   Víctor del 2026-11-18. No cambia lo que comprueba AC-13.
 - **Lo que hace la librería:** `analyze()` deja `window.axe` en la página analizada y, al
   terminar, abre una página `about:blank` en el mismo contexto, la analiza y la cierra
@@ -282,14 +295,15 @@ en el código).
   vigilan el tráfico (`sin-conexion.spec.js`, AC-12 y AC-13) pasan con ella.
 - **Tiempos** (job entero; run 44288720687 frente a los del #53):
 
-  | Trozo | 1.65.0 sin axe (44162310687 / 44164892525) | Con axe (44288720687) |
-  | --- | --- | --- |
-  | 1/3 | 523 s / 626 s | 677 s |
-  | 2/3 | 331 s / 252 s | 519 s |
-  | 3/3 | 291 s / 325 s | 543 s |
+  | Trozo | 1.65.0 sin axe (44162310687 / 44164892525) | Con axe (44288720687) | Con axe, 1 proceso y 4 CPU (44397305353) |
+  | --- | --- | --- | --- |
+  | 1/3 | 523 s / 626 s | 677 s | 585 s |
+  | 2/3 | 331 s / 252 s | 519 s | 339 s |
+  | 3/3 | 291 s / 325 s | 543 s | 487 s |
 
-  El más lento, 11 min 17 s: cabe en los 15, pero roza los 12 min en que ADR-0007 §6 pide
-  revisarlo si pasa de forma habitual. Una sola ejecución.
+  Con 2 CPU, el más lento fue de 11 min 17 s: cabe en los 15, pero roza los 12 min en que
+  ADR-0007 §6 pide revisarlo si pasa de forma habitual. Con 4 CPU y un proceso, 9 min 45 s.
+  Una sola ejecución de cada.
 - **`duplicados` (jscpd) en rojo, por decisión de Víctor:** 16 clones nuevos, todos en
   tests. 15 son bloques de los E2E que ya se parecían (el `beforeEach` con `goto` y
   `localStorage`, `segundoPlano`, `romperAlmacen`, los eventos de ciclo de vida, tests de
