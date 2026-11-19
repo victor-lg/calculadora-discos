@@ -8,7 +8,6 @@ import {
   cargarFuentes, FUENTES_CARGADAS,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
-import { sinDibujo } from './sin-dibujo.js';
 import { readFileSync } from 'node:fs';
 import { arrancar } from './servidor.js';
 
@@ -199,13 +198,10 @@ async function recorrido(context, base, conDatos, sockets) {
 }
 
 test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos de la persona', async ({ browser, context }, testInfo) => {
-  // Hace dos recorridos completos: tiene 240 s (decisión de Víctor del
-  // 2026-11-03, PR #33, cuando corría con el dibujo 3D). Corre en la vista sin
-  // dibujo (SPEC-CALC-003 FR-14), en sus dos contextos: con el 3D por software,
-  // la página tardaba más de los 2 s de la espera antes de axe (ADR-0008) solo
-  // en responder. Decisión de Víctor del 2026-11-18 (PR #56).
+  // Hace dos recorridos completos con el dibujo 3D activo (ADR-0003 §4), que en
+  // la CI se pinta por software y pasa de 90 s: tiene 240 s (decisión de Víctor
+  // del 2026-11-03, PR #33).
   test.setTimeout(240_000);
-  await sinDibujo(context);
   const origen = new URL(servidor.base).origin;
   // Recorrido de referencia, sin datos, en otro origen (otro puerto), así que
   // con su propio service worker y su propio almacenamiento.
@@ -219,7 +215,6 @@ test('SPEC-CALC-001/AC-13 todas las peticiones van al propio origen y sin datos 
   // comprobación de actualización de sw.js, que bajo carga llegaba después del
   // margen y se contaba en el recorrido con datos).
   const contextoReferencia = await browser.newContext({ ...testInfo.project.use, serviceWorkers: 'allow' });
-  await sinDibujo(contextoReferencia);
 
   // Lo que ve el navegador: sirve para detectar peticiones a otros orígenes,
   // que nunca llegarían a nuestro servidor.
