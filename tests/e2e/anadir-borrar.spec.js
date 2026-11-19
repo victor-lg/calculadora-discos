@@ -362,7 +362,9 @@ async function pararReloj(page) {
   //   "AC-12 con el teclado…";
   // - el campo de añadir abierto con su error, con el foco en él: "AC-12 con el
   //   campo de añadir abierto, «Deshacer» deja el foco en el campo" y "NFR-02
-  //   contraste de añadir…";
+  //   contraste de añadir…". El campo con su error y, a la vez, el aviso con el
+  //   foco en "Deshacer" no lo analiza ningún test: se analizan por separado
+  //   (NFR-02 analiza el campo con su error y, aparte, el aviso);
   // - la lista tras borrar, añadir o deshacer: "AC-11 deslizar un 20 %…" y los
   //   de AC-13 de este fichero.
   // La tarjeta que sale, también quieta esperando sus temporizadores con el

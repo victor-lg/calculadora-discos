@@ -151,7 +151,8 @@ test('SPEC-CALC-003 FR-07 FR-16 recorrido con el dibujo: cambiar el peso, borrar
   // SPEC-CALC-001 AC-02: con 105 kg cambian el 70 y el 90 %; el 40 % no.
   await trabajo(page).fill('105');
   // El dibujo animándose, que los tests con el reloj parado no analizan
-  // (ADR-0008 §3.2): en cuanto empieza la animación.
+  // (ADR-0008 §3.2): en cuanto empieza la animación. No se comprueba que siga
+  // al analizar: es un hueco (ver pararReloj).
   await page.waitForFunction(() => document.querySelector('#series .dibujo[data-animando="true"]'), null, { polling: 'raf' });
   await analizarConAxe(page);
   await comprobarDibujos(page, [
@@ -518,11 +519,14 @@ async function pararReloj(page, quitar = []) {
   // pararlo (en el beforeEach, tras cada serie que se quita y aquí, tras la
   // recarga con el reloj instalado) y no después. Lo que estos 8 tests ven con
   // el reloj parado lo analizan tests con tiempo real:
-  // - el dibujo animándose: "FR-07 FR-16 recorrido con el dibujo…", al cambiar
-  //   el peso;
-  // - el dibujo quieto con cualquier carga, también mientras espera los 400 ms,
-  //   y la tarjeta añadida tras su fundido: el mismo recorrido y los demás tests
-  //   con tiempo real de este fichero;
+  // - el dibujo quieto con varias cargas y la tarjeta añadida tras su fundido:
+  //   "FR-07 FR-16 recorrido con el dibujo…", "AC-09 cada tarjeta tiene un
+  //   dibujo…", "AC-10 en Un punto…" y "FR-16 cada dibujo expone la carga…";
+  // - el dibujo animándose y el que espera los 400 ms: es un hueco, como el de
+  //   las tarjetas que salen (ADR-0008 §3.1). El recorrido analiza en cuanto
+  //   empieza la animación, pero nada comprueba que siga cuando corre axe: la
+  //   espera antes de axe puede durar más que ella. Decisión de Víctor del
+  //   2026-11-19 (G4 del PR #56);
   // - los paneles desplegados, los collarines, otra barra y el peso de la
   //   barra: "FR-16 cada dibujo expone la carga…" y, en accesibilidad.spec.js,
   //   AC-20 y AC-21;

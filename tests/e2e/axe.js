@@ -27,9 +27,12 @@ const animacionesEnCurso = () => document.getAnimations().map((a) => {
   };
 });
 
-// ADR-0008 §5: la espera más larga de este proceso, solo en la salida del test.
-// La CI la recoge como anotación del job (`::notice::`).
-let esperaMasLarga = 0;
+// ADR-0008 §5: la espera más larga de este proceso, con y sin animaciones por
+// separado, solo en la salida del test. La CI la recoge como anotación del job
+// (`::notice::`); se escribe cuando supera en 100 ms la anterior de su clase,
+// para no pasar del límite de anotaciones del job, así que la máxima real puede
+// ser hasta 99 ms mayor que la última anotada.
+const esperaMasLarga = { con: 0, sin: 0 };
 
 export async function analizarConAxe(page) {
   // ADR-0008 §3.1: se analiza sin animaciones en curso. La espera solo lee: a
@@ -48,9 +51,11 @@ export async function analizarConAxe(page) {
     intervals: [50],
   }).toEqual([]);
   const espera = Date.now() - inicio;
-  if (espera >= esperaMasLarga + 100) {
-    esperaMasLarga = espera;
-    const donde = `${test.info().project.name}, ${test.info().titlePath.join(' › ')}`.replaceAll('%', '%25');
+  const clase = conAnimaciones ? 'con' : 'sin';
+  if (espera >= esperaMasLarga[clase] + 100) {
+    esperaMasLarga[clase] = espera;
+    const donde = `${test.info().project.name}, ${test.info().titlePath.join(' › ')}`
+      .replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
     const procesos = `${test.info().config.workers} procesos, ${cpus().length} CPU`;
     console.log(`\n::notice::axe esperó ${espera} ms a las animaciones, ${conAnimaciones} sondeos con alguna en curso (${donde}; ${procesos})`);
   }
