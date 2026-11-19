@@ -14,6 +14,14 @@ export default defineConfig({
   // de ADR-0009 §6 o si el runner vuelve a 2 CPU.
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
+  // Regresión visual (capturas.spec.js): una captura que falta es un fallo, no
+  // una nueva escrita en silencio. Las referencias solo se escriben con
+  // --update-snapshots, en la imagen de Playwright de tests.yml, y las aprueba
+  // Víctor en el PR. Sin tolerancias: cualquier píxel distinto falla.
+  updateSnapshots: 'none',
+  expect: {
+    toHaveScreenshot: { animations: 'disabled', caret: 'hide', scale: 'css' },
+  },
   use: {
     baseURL: `http://127.0.0.1:${PUERTO}/`,
     // El service worker solo se permite en las pruebas que lo necesitan
