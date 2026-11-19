@@ -7,6 +7,7 @@ import {
   trabajo, pesoBarra, barra, desplegarPaneles, discosDeSeries, anadirPorcentaje, quitarSerie,
   cargarFuentes, FUENTES_CARGADAS,
 } from './pantalla.js';
+import { analizarConAxe } from './axe.js';
 import { readFileSync } from 'node:fs';
 import { arrancar } from './servidor.js';
 
@@ -127,6 +128,7 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
   const primera = await context.newPage();
   await primera.goto(servidor.base);
   await esperarServiceWorker(primera);
+  await analizarConAxe(primera);
   await primera.close();
 
   // Arranque de cero sin conexión: página nueva, y nada debe llegar al origen.
@@ -138,12 +140,14 @@ test('SPEC-CALC-001/AC-12 sin conexión, la app se abre y reproduce AC-01', asyn
   expect(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
   // SPEC-CALC-003 §11 (AC-24): también las fuentes salen de la caché.
   expect(await cargarFuentes(page)).toEqual(FUENTES_CARGADAS);
+  await analizarConAxe(page);
 
   await trabajo(page).fill('100');
   await expect(series(page).locator('.porcentaje')).toHaveText(['40 %', '70 %', '90 %']);
   await expect(series(page).locator('.total')).toHaveText(['40 kg', '70 kg', '90 kg']);
   await expect.poll(() => discosDeSeries(page)).toEqual(['10', '25', '25 + 10']);
   await expect(series(page).locator('.diferencia')).toHaveCount(0);
+  await analizarConAxe(page);
   expect(llegadas.slice(antes)).toEqual([]);
 });
 
@@ -154,6 +158,7 @@ async function recorrido(context, base, conDatos, sockets) {
   page.on('websocket', (ws) => sockets.push(ws.url()));
   await page.goto(base);
   await esperarServiceWorker(page);
+  await analizarConAxe(page);
   if (conDatos) {
     await desplegarPaneles(page);
     await barra(page, 'Recta').check();
@@ -172,9 +177,11 @@ async function recorrido(context, base, conDatos, sockets) {
     }
     await expect(page.locator('#lista-discos input:checked')).toHaveCount(4);
     await expect(series(page)).toHaveCount(3);
+    await analizarConAxe(page);
   }
   await page.reload();
   expect(page.url()).toBe(base);
+  await analizarConAxe(page);
   // ADR-0004: lo guardado vuelve tras el arranque de cero, sin salir del dispositivo.
   if (conDatos) {
     await desplegarPaneles(page);
@@ -184,6 +191,7 @@ async function recorrido(context, base, conDatos, sockets) {
     await expect(pesoBarra(page)).toHaveValue('7,35');
     await barra(page, 'Z').check();
     await expect(pesoBarra(page)).toHaveValue('8,65');
+    await analizarConAxe(page);
   }
   await page.close();
   await new Promise((r) => setTimeout(r, MARGEN_TRAS_CERRAR_MS));

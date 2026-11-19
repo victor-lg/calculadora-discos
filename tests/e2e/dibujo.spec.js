@@ -4,6 +4,7 @@
 // de FR-14 (SPEC-CALC-003 §11, ADR-0003 §4).
 import { test, expect as esperar } from '@playwright/test';
 import { trabajo, pesoBarra, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar, vigilarEntradas, entradas } from './pantalla.js';
+import { analizarConAxe } from './axe.js';
 
 // En la CI, sin GPU, cada dibujo se pinta por software, y con varios tests a la
 // vez puede tardar más de los 5 s de espera por defecto.
@@ -12,6 +13,7 @@ const expect = esperar.configure({ timeout: 20_000 });
 const series = (page) => page.locator('#series > li');
 const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 const dibujo = (page, porcentaje) => tarjeta(page, porcentaje).locator('.dibujo');
+const aviso = (page) => page.locator('#aviso-borrado');
 
 // Cuenta los contextos WebGL que crea la página, y los guarda para poder
 // retirarlos (WEBGL_lose_context).
@@ -45,6 +47,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await exigirDibujo3D(page);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-08 con 360 px, texto y dibujo en una columna; con 390 px, en dos', async ({ page }) => {
@@ -63,6 +66,7 @@ test('SPEC-CALC-003/AC-08 con 360 px, texto y dibujo en una columna; con 390 px,
       }
       await expect.poll(() => pintado(t.locator('.dibujo'))).toBe(true);
     }
+    await analizarConAxe(page);
   }
 });
 
@@ -75,11 +79,13 @@ test('SPEC-CALC-003/AC-09 cada tarjeta tiene un dibujo con su etiqueta accesible
   await trabajo(page).fill('40');
   await expect(dibujo(page, 40)).toHaveAttribute('aria-label', 'Sin discos');
   await expect.poll(() => pintado(dibujo(page, 40))).toBe(true);
+  await analizarConAxe(page);
 
   await trabajo(page).fill('120');
   await anadirPorcentaje(page, '100');
   await expect(dibujo(page, 100)).toHaveAttribute('aria-label', 'Carga: 2 de 25 kg');
   await expect.poll(() => pintado(dibujo(page, 100))).toBe(true);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-10 en Un punto solo se dibujan los discos que caben en 310 mm', async ({ page }) => {
@@ -97,11 +103,13 @@ test('SPEC-CALC-003/AC-10 en Un punto solo se dibujan los discos que caben en 31
   const lienzo = await dibujo(page, 100).boundingBox();
   expect(caja.width).toBeGreaterThan(serie.width - 40);
   expect(caja.y).toBeGreaterThanOrEqual(lienzo.y + lienzo.height);
+  await analizarConAxe(page);
 
   await trabajo(page).fill('301,25');
   await expect(tarjeta(page, 100).locator('.total')).toHaveText('301,25 kg');
   await expect(dibujo(page, 100)).toHaveAttribute('aria-label', 'Carga: 11 de 25 kg');
   await expect(dibujo(page, 100)).toHaveAttribute('data-discos', Array(11).fill('2500').join(','));
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-16 cada dibujo expone la carga que muestra, collarín incluido, y que no se anima', async ({ page }) => {
@@ -112,12 +120,15 @@ test('SPEC-CALC-003 FR-16 cada dibujo expone la carga que muestra, collarín inc
   await page.getByLabel('Collarines de competición').check();
   await expect(dibujo(page, 70)).toHaveAttribute('data-discos', '2000,250');
   await expect(dibujo(page, 70)).toHaveAttribute('data-collarin', 'true');
+  await analizarConAxe(page);
   await barra(page, 'Z').check();
   await expect(dibujo(page, 70)).toHaveAttribute('data-equipo', 'z');
+  await analizarConAxe(page);
   await page.getByLabel('Dos lados').check();
   await expect(dibujo(page, 70)).toHaveAttribute('data-equipo', 'maquina');
   await expect(dibujo(page, 70)).toHaveAttribute('data-collarin', 'false');
   for (const l of await series(page).locator('.dibujo').all()) await expect(l).toHaveAttribute('data-animando', 'false');
+  await analizarConAxe(page);
 });
 
 // FR-16: lo que muestra cada dibujo, en el orden de las tarjetas. Cuando
@@ -139,11 +150,17 @@ test('SPEC-CALC-003 FR-07 FR-16 recorrido con el dibujo: cambiar el peso, borrar
   ]);
   // SPEC-CALC-001 AC-02: con 105 kg cambian el 70 y el 90 %; el 40 % no.
   await trabajo(page).fill('105');
+  // El dibujo animándose, que los tests con el reloj parado no analizan
+  // (ADR-0008 §3.2): en cuanto empieza la animación. No se comprueba que siga
+  // al analizar: es un hueco (ver pararReloj).
+  await page.waitForFunction(() => document.querySelector('#series .dibujo[data-animando="true"]'), null, { polling: 'raf' });
+  await analizarConAxe(page);
   await comprobarDibujos(page, [
     ['40 %', 'Carga: 10 kg', '1000'],
     ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
     ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
   ]);
+  await analizarConAxe(page);
   // Borrar con el gesto, deslizando sobre el dibujo (FR-08).
   await deslizar(page, tarjeta(page, 70), 0.5);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
@@ -158,6 +175,7 @@ test('SPEC-CALC-003 FR-07 FR-16 recorrido con el dibujo: cambiar el peso, borrar
     ['70 %', 'Carga: 25 + 1,25 kg', '2500,125'],
     ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
   ]);
+  await analizarConAxe(page);
   await anadirPorcentaje(page, '50');
   await comprobarDibujos(page, [
     ['40 %', 'Carga: 10 kg', '1000'],
@@ -166,6 +184,7 @@ test('SPEC-CALC-003 FR-07 FR-16 recorrido con el dibujo: cambiar el peso, borrar
     ['90 %', 'Carga: 25 + 10 + 1,25 kg', '2500,1000,125'],
   ]);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-07 las fichas de barra muestran su miniatura en 3D', async ({ page }) => {
@@ -180,6 +199,7 @@ test('SPEC-CALC-003 FR-07 las fichas de barra muestran su miniatura en 3D', asyn
   // Todas a la misma escala: el mismo lienzo y el mismo tamaño en pantalla.
   const tamanos = await miniaturas.evaluateAll((ls) => ls.map((l) => `${l.width}×${l.height} ${l.clientWidth}×${l.clientHeight}`));
   expect(new Set(tamanos).size).toBe(1);
+  await analizarConAxe(page);
 });
 
 test('ADR-0003 §5 con 20 series hay un solo contexto WebGL y todas las tarjetas tienen su dibujo', async ({ page }) => {
@@ -194,6 +214,7 @@ test('ADR-0003 §5 con 20 series hay un solo contexto WebGL y todas las tarjetas
     expect(await pintado(l)).toBe(true);
   }
   expect(await page.evaluate(() => window.contextosWebGL.length)).toBe(1);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-08 el dibujo no recibe los toques: el gesto y la pulsación larga son de la tarjeta', async ({ page }) => {
@@ -206,6 +227,7 @@ test('SPEC-CALC-003 FR-08 el dibujo no recibe los toques: el gesto y la pulsaci�
   await page.waitForTimeout(600);
   await page.mouse.up();
   await expect(page.getByRole('button', { name: 'Quitar la serie del 70 %' })).toBeVisible();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-13 con "Reducir movimiento", el dibujo aparece sin transiciones', async ({ page }) => {
@@ -214,6 +236,7 @@ test('SPEC-CALC-003 FR-13 con "Reducir movimiento", el dibujo aparece sin transi
   await expect(dibujo(page, 50)).toHaveAttribute('aria-label', 'Carga: 15 kg');
   const animaciones = await tarjeta(page, 50).evaluate((li) => li.getAnimations({ subtree: true }).length);
   expect(animaciones).toBe(0);
+  await analizarConAxe(page);
 });
 
 // SPEC-CALC-003 FR-15: el sistema retira el contexto gráfico y lo devuelve
@@ -269,6 +292,7 @@ test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se oc
     expect(await pintado(dibujo(page, p))).toBe(true);
     expect(await columnas(tarjeta(page, p))).toBe(2);
   }
+  await analizarConAxe(page);
 
   // De 100 a 105: en la misma tarea en que cambia el texto, el 70 y el 90 %
   // ocultan su dibujo; el 40 %, que no cambia de carga, lo conserva.
@@ -289,10 +313,12 @@ test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se oc
   await expect(dibujo(page, 40)).toBeVisible();
   await expect(dibujo(page, 40)).toHaveAttribute('aria-label', 'Carga: 10 kg');
   expect(await columnas(tarjeta(page, 40))).toBe(2);
+  await analizarConAxe(page);
   // Pasada la espera de FR-11, sigue igual.
   await page.waitForTimeout(600);
   await expect(dibujo(page, 70)).toBeHidden();
   await expect(dibujo(page, 40)).toBeVisible();
+  await analizarConAxe(page);
   // Si la carga vuelve a la que está pintada, su dibujo vuelve a verse
   // (decisión de Víctor del 2026-11-03, PR #36).
   await trabajo(page).fill('100');
@@ -301,15 +327,18 @@ test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se oc
     await expect(dibujo(page, p)).toHaveAttribute('aria-label', etiqueta);
     expect(await columnas(tarjeta(page, p))).toBe(2);
   }
+  await analizarConAxe(page);
   await trabajo(page).fill('105');
   await expect(dibujo(page, 70)).toBeHidden();
   await expect(dibujo(page, 90)).toBeHidden();
+  await analizarConAxe(page);
 
   // Al recuperarlo, todas se repintan, también la que no cambió.
   await borrarLienzos(page);
   await recuperarContexto(page);
   await esperarDibujos(page, [[40, 'Carga: 10 kg'], [70, 'Carga: 25 + 1,25 kg'], [90, 'Carga: 25 + 10 + 1,25 kg']]);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-19 si al volver a primer plano el contexto no se recupera, la app pasa a la vista sin dibujo', async ({ page }) => {
@@ -321,18 +350,21 @@ test('SPEC-CALC-003/AC-19 si al volver a primer plano el contexto no se recupera
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm. Se dibujan los que caben.');
   await expect(dibujo(page, 100)).toHaveAttribute('aria-label', 'Carga: 11 de 25 kg');
   await expect(dibujo(page, 100)).toHaveAttribute('data-animando', 'false');
+  await analizarConAxe(page);
 
   await perderContexto(page);
   // Sin volver a primer plano, los dibujos siguen.
   await page.waitForTimeout(3500);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
   await expect(dibujo(page, 100)).toBeVisible();
+  await analizarConAxe(page);
 
   await segundoPlano(page);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', 'plano');
   await expect(page.locator('.dibujo, .miniatura')).toHaveCount(0);
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
   for (const t of await series(page).all()) expect(await columnas(t)).toBe(1);
+  await analizarConAxe(page);
   // Los cambios siguientes se pintan sin dibujo, y las fichas de barra vuelven
   // a su dibujo plano.
   await trabajo(page).fill('105');
@@ -341,13 +373,16 @@ test('SPEC-CALC-003/AC-19 si al volver a primer plano el contexto no se recupera
   await expect(series(page)).toHaveCount(4);
   await expect(page.locator('.dibujo')).toHaveCount(0);
   for (const svg of await page.locator('#lista-barras .ficha svg').all()) await expect(svg).toBeVisible();
+  await analizarConAxe(page);
   // Aunque el sistema devuelva el contexto después, sigue sin dibujo hasta el
   // siguiente arranque.
   await recuperarContexto(page);
   await page.waitForTimeout(500);
   await expect(page.locator('.dibujo')).toHaveCount(0);
+  await analizarConAxe(page);
   await page.reload();
   await exigirDibujo3D(page);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-15 si el contexto vuelve poco después de volver a primer plano, se sigue dibujando', async ({ page }) => {
@@ -361,6 +396,7 @@ test('SPEC-CALC-003 FR-15 si el contexto vuelve poco después de volver a primer
   await page.waitForTimeout(3500);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
   await esperarDibujos(page, INICIALES);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-15 la espera del contexto se cancela al pasar a segundo plano y vuelve a empezar al volver', async ({ page }) => {
@@ -375,11 +411,13 @@ test('SPEC-CALC-003 FR-15 la espera del contexto se cancela al pasar a segundo p
   await page.waitForTimeout(2000);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
   await expect(dibujo(page, 40)).toBeVisible();
+  await analizarConAxe(page);
   // Al volver, la espera empieza de nuevo: a los 2 s sigue, a los 3 s ya no.
   await visibilidad(page, 'visible');
   await page.waitForTimeout(2000);
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
   await expect(page.locator('html')).toHaveAttribute('data-dibujo', 'plano', { timeout: 3000 });
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-15 al volver a primer plano con contexto, todas las tarjetas se repintan', async ({ page }) => {
@@ -388,6 +426,7 @@ test('SPEC-CALC-003 FR-15 al volver a primer plano con contexto, todas las tarje
   await borrarLienzos(page);
   await segundoPlano(page);
   await esperarDibujos(page, INICIALES);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda sin dibujo hasta que se pinta', async ({ page }) => {
@@ -400,6 +439,7 @@ test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda s
   await expect(dibujo(page, 70)).toBeHidden();
   await expect(dibujo(page, 90)).toBeHidden();
   await expect(dibujo(page, 40)).toBeVisible();
+  await analizarConAxe(page);
 
   // Las miniaturas, sin pintar porque el panel Carga estaba plegado, dejan ver
   // el dibujo plano de su ficha.
@@ -408,6 +448,7 @@ test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda s
     await expect(ficha.locator('svg')).toBeVisible();
     await expect(ficha.locator('.miniatura')).toBeHidden();
   }
+  await analizarConAxe(page);
   // Una tarjeta nueva, y las que cambian de equipo, quedan solo con texto, y
   // el aviso de capacidad no dice "Se dibujan los que caben.".
   await page.getByLabel('Un punto').check();
@@ -415,12 +456,14 @@ test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda s
   await expect(tarjeta(page, 100).locator('.total')).toHaveText('105 kg');
   await expect(dibujo(page, 100)).toBeHidden();
   expect(await columnas(tarjeta(page, 100))).toBe(1);
+  await analizarConAxe(page);
   await trabajo(page).fill('500');
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
   for (const p of [40, 70, 90, 100]) {
     await expect(dibujo(page, p)).toBeHidden();
     expect(await columnas(tarjeta(page, p))).toBe(1);
   }
+  await analizarConAxe(page);
 
   await recuperarContexto(page);
   for (const p of [40, 70, 90, 100]) {
@@ -429,6 +472,7 @@ test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda s
     await expect.poll(() => pintado(dibujo(page, p)), `${p} %`).toBe(true);
   }
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm. Se dibujan los que caben.');
+  await analizarConAxe(page);
   // Las fichas de barra solo se ven en el modo Barra.
   await page.getByLabel('Barra', { exact: true }).check();
   for (const ficha of await page.locator('#lista-barras .ficha').all()) {
@@ -436,6 +480,7 @@ test('SPEC-CALC-003 FR-15 sin contexto, lo que aparece o espera su turno queda s
     await expect.poll(() => pintado(ficha.locator('.miniatura'))).toBe(true);
     await expect(ficha.locator('svg')).toBeHidden();
   }
+  await analizarConAxe(page);
 });
 
 // SPEC-CALC-003 FR-11 a FR-13: la animación de la carga. Sus tiempos se prueban
@@ -455,8 +500,14 @@ async function pararReloj(page, quitar = []) {
   test.setTimeout(90_000);
   if (quitar.length) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const p of quitar) await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
-    await expect(series(page)).toHaveCount(3 - quitar.length);
+    for (const [i, p] of quitar.entries()) {
+      await page.getByRole('button', { name: `Quitar la serie del ${p} %` }).press('Enter');
+      await expect(series(page)).toHaveCount(3 - i - 1);
+      await expect(aviso(page)).toContainText(`Serie del ${p} % borrada`);
+      await analizarConAxe(page);
+      // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+      await expect(aviso(page)).toContainText(`Serie del ${p} % borrada`);
+    }
     await page.emulateMedia({ reducedMotion: 'no-preference' });
   }
   await page.clock.install();
@@ -464,6 +515,26 @@ async function pararReloj(page, quitar = []) {
   await exigirDibujo3D(page);
   // AC-16: al abrir la app, ningún dibujo tiene una animación en curso.
   await comprobarDibujos(page, INICIO.filter(([p]) => !quitar.includes(parseInt(p, 10))));
+  // ADR-0008 §3.2: con el reloj parado, analyze() no funciona. Se analiza hasta
+  // pararlo (en el beforeEach, tras cada serie que se quita y aquí, tras la
+  // recarga con el reloj instalado) y no después. Lo que estos 8 tests ven con
+  // el reloj parado lo analizan tests con tiempo real:
+  // - el dibujo quieto con varias cargas y la tarjeta añadida tras su fundido:
+  //   "FR-07 FR-16 recorrido con el dibujo…", "AC-09 cada tarjeta tiene un
+  //   dibujo…", "AC-10 en Un punto…" y "FR-16 cada dibujo expone la carga…";
+  // - el dibujo animándose y el que espera los 400 ms: es un hueco, como el de
+  //   las tarjetas que salen (ADR-0008 §3.1). El recorrido analiza en cuanto
+  //   empieza la animación, pero nada comprueba que siga cuando corre axe: la
+  //   espera antes de axe puede durar más que ella. Decisión de Víctor del
+  //   2026-11-19 (G4 del PR #56);
+  // - los paneles desplegados, los collarines, otra barra y el peso de la
+  //   barra: "FR-16 cada dibujo expone la carga…" y, en accesibilidad.spec.js,
+  //   AC-20 y AC-21;
+  // - la marca de diferencia desplegada (aquí, con "Reducir movimiento"): en
+  //   accesibilidad.spec.js, "AC-21 contraste con campos con error, marcas…";
+  // - el aviso de "Deshacer" y la lista sin series: los que nombra pararReloj
+  //   de anadir-borrar.spec.js y su "SPEC-CALC-001/AC-46…".
+  await analizarConAxe(page);
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
 }
 
@@ -737,6 +808,7 @@ test('ADR-0003 §3.5 si pintar es lento, cada fotograma pinta una sola tarjeta y
   await page.reload();
   await exigirDibujo3D(page);
   await comprobarDibujos(page, INICIO);
+  await analizarConAxe(page);
   await page.evaluate(() => { window.lento = true; });
   await trabajo(page).fill('105');
   await comprobarDibujos(page, [
@@ -747,4 +819,5 @@ test('ADR-0003 §3.5 si pintar es lento, cada fotograma pinta una sola tarjeta y
   const porFotograma = await page.evaluate(() => window.porFotograma);
   expect(porFotograma.length).toBeGreaterThan(2);
   expect(Math.max(...porFotograma)).toBe(1);
+  await analizarConAxe(page);
 });

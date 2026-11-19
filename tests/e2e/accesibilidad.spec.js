@@ -6,6 +6,7 @@ import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, anadirPorcentaje,
   botonQuitar, quitarSerie, deslizar, porcentajesDeSeries, cargarFuentes, FUENTES_CARGADAS,
 } from './pantalla.js';
+import { analizarConAxe } from './axe.js';
 
 const series = (page) => page.locator('#series > li');
 const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
@@ -55,6 +56,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
   expect(await cargarFuentes(page)).toEqual(FUENTES_CARGADAS);
+  await analizarConAxe(page);
 });
 
 // Los estados de AC-20, en orden: cada uno parte del anterior. Con 105 kg hay
@@ -64,22 +66,29 @@ async function recorrerEstados(page, medir) {
   await trabajo(page).blur();
   await expect(page.locator('.diferencia')).not.toHaveCount(0);
   await medir('paneles plegados');
+  await analizarConAxe(page);
 
   await desplegarPaneles(page);
   await barra(page, 'Z').check();
   await medir('paneles desplegados');
+  await analizarConAxe(page);
 
   await abrir(page).click();
   await expect(campo(page)).toBeFocused();
   await medir('campo de añadir abierto');
+  await analizarConAxe(page);
   await page.keyboard.press('Escape');
 
   await quitarSerie(page, 40);
   await expect(aviso(page)).toBeVisible();
   await medir('aviso de "Deshacer"');
+  await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(aviso(page)).toBeVisible();
 
   await botonQuitar(page, 70).focus();
   await medir('"Quitar la serie del 70 %" con el foco');
+  await analizarConAxe(page);
 }
 
 // Lo que se puede pulsar y se ve. Los radios y casillas transparentes cubren su
@@ -242,11 +251,13 @@ test('SPEC-CALC-003/AC-21 contraste del fondo de borrar antes y después del 35 
   let r = await medirContraste(page);
   expect(r.fallos, 'antes del 35 %').toEqual([]);
   expect(r.textos, 'antes del 35 %').toContain('"Borrar"');
+  await analizarConAxe(page);
   await page.mouse.move(x - caja.width * 0.5, y, { steps: 5 });
   await expect(t).toHaveClass(/listo/);
   r = await medirContraste(page);
   expect(r.fallos, 'después del 35 %').toEqual([]);
   expect(r.textos, 'después del 35 %').toContain('"Borrar"');
+  await analizarConAxe(page);
   await page.mouse.move(x, y, { steps: 5 });
   await page.mouse.up();
 });
@@ -265,23 +276,27 @@ test('SPEC-CALC-003/AC-21 contraste con campos con error, marcas, explicación, 
   let r = await medirContraste(page);
   expect(r.fallos, 'marcas, collarín y tipo deshabilitado').toEqual([]);
   expect(r.noTexto).toBeGreaterThan(4);
+  await analizarConAxe(page);
 
   // El peso de trabajo con el foco.
   await trabajo(page).focus();
   r = await medirContraste(page);
   expect(r.fallos, 'peso de trabajo con el foco').toEqual([]);
+  await analizarConAxe(page);
 
   // Campos con error: el peso de trabajo, el de la barra y el de añadir.
   await trabajo(page).fill('0');
   await expect(page.locator('#error-trabajo')).toBeVisible();
   r = await medirContraste(page);
   expect(r.fallos, 'peso de trabajo con error').toEqual([]);
+  await analizarConAxe(page);
   await trabajo(page).fill('105');
   await barra(page, 'Z').check();
   await pesoBarra(page).fill('0,5');
   await expect(pesoBarra(page)).toHaveAttribute('aria-invalid', 'true');
   r = await medirContraste(page);
   expect(r.fallos, 'peso de la barra con error').toEqual([]);
+  await analizarConAxe(page);
   await pesoBarra(page).fill('8,5');
   await abrir(page).click();
   await campo(page).pressSequentially('0');
@@ -289,6 +304,7 @@ test('SPEC-CALC-003/AC-21 contraste con campos con error, marcas, explicación, 
   await expect(page.locator('#error-porcentaje')).toBeVisible();
   r = await medirContraste(page);
   expect(r.fallos, 'campo de añadir con error').toEqual([]);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-21 el indicador de foco de cada control cumple 3:1', async ({ page }) => {
@@ -301,10 +317,12 @@ test('SPEC-CALC-003/AC-21 el indicador de foco de cada control cumple 3:1', asyn
   // Peso, 2 pliegues, modos, fichas, interruptor, peso de la barra, tipos,
   // marcas, "Quitar" de cada tarjeta y "+ Añadir porcentaje".
   expect(r.vistos).toBeGreaterThan(15);
+  await analizarConAxe(page);
 
   await abrir(page).click();
   const enCampo = await medirFoco(page);
   expect(enCampo.r, 'campo de añadir').toBeGreaterThanOrEqual(3);
+  await analizarConAxe(page);
   await page.keyboard.press('Escape');
   await quitarSerie(page, 40);
   await deshacer(page).focus();
@@ -313,6 +331,9 @@ test('SPEC-CALC-003/AC-21 el indicador de foco de cada control cumple 3:1', asyn
   const enDeshacer = await medirFoco(page);
   expect(enDeshacer.nombre).toBe('Deshacer');
   expect(enDeshacer.r, 'Deshacer').toBeGreaterThanOrEqual(3);
+  await analizarConAxe(page);
+  // ADR-0008 §3.1: el aviso caduca a los 5 s; se comprueba después del análisis.
+  await expect(deshacer(page)).toBeFocused();
 });
 
 // AC-22: lo que se corta o se solapa. Se miden las cajas de cada línea de
@@ -410,23 +431,28 @@ test('SPEC-CALC-003/AC-22 al 200 % (195 px), nada se corta ni se solapa ni hay d
   await pesoBarra(page).fill('0,5');
   await trabajo(page).fill('0');
   await medir('errores de los pesos');
+  await analizarConAxe(page);
   await pesoBarra(page).fill('8,5');
   await trabajo(page).fill('105');
   await page.locator('.diferencia').first().click();
   await expect(page.locator('.detalle:not([hidden])')).toHaveCount(1);
   await medir('explicación y collarín');
+  await analizarConAxe(page);
   await abrir(page).click();
   await campo(page).pressSequentially('0');
   await page.keyboard.press('Enter');
   await expect(page.locator('#error-porcentaje')).toBeVisible();
   await medir('campo de añadir con error');
+  await analizarConAxe(page);
   await page.keyboard.press('Escape');
   await trabajo(page).fill('999,99');
   await medir('peso de trabajo de 6 caracteres');
+  await analizarConAxe(page);
   // Con la Z de 8,5 kg, el 70 % de 10 kg (7 kg) no llega a la barra.
   await trabajo(page).fill('10');
   await expect(tarjeta(page, 70).locator('.linea')).toHaveText('Solo la barra');
   await medir('"Solo la barra"');
+  await analizarConAxe(page);
 });
 
 // FR-08 sin AC propio: a 390 px, "Quitar" con el foco tapaba la mitad de la
@@ -443,26 +469,33 @@ test('SPEC-CALC-003/AC-22 al 200 % (195 px) se abren los paneles y se añaden, b
   await page.setViewportSize(ZOOM_200);
   await botonCarga(page).click();
   await expect(page.locator('#panel-carga')).toBeVisible();
+  await analizarConAxe(page);
   await barra(page, 'Recta').check();
   await expect(barra(page, 'Recta')).toBeChecked();
+  await analizarConAxe(page);
   await botonDiscos(page).click();
   await expect(page.locator('#panel-discos')).toBeVisible();
+  await analizarConAxe(page);
   await disco(page, '25 kg').click();
   await expect(disco(page, '25 kg')).not.toBeChecked();
+  await analizarConAxe(page);
   await disco(page, '25 kg').click();
 
   await anadirPorcentaje(page, '55');
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '55 %', '70 %', '90 %']);
+  await analizarConAxe(page);
 
   // Borrar con el gesto, deshacer; borrar con el botón, deshacer.
   await deslizar(page, tarjeta(page, 55), 0.6);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '55 %', '70 %', '90 %']);
+  await analizarConAxe(page);
   await quitarSerie(page, 90);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '55 %', '70 %']);
   const caja = await deshacer(page).boundingBox();
   expect(caja.x + caja.width).toBeLessThanOrEqual(ZOOM_200.width);
   await deshacer(page).click();
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '55 %', '70 %', '90 %']);
+  await analizarConAxe(page);
 });

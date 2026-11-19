@@ -6,6 +6,7 @@ import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar,
   porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, quitarTodas, deslizar,
 } from './pantalla.js';
+import { analizarConAxe } from './axe.js';
 
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
 const CLAVE_RECTA = 'calculadora-discos:v1:peso-recta';
@@ -32,6 +33,7 @@ const romperAlmacen = (page) => page.evaluate(() => {
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-02 el peso de trabajo: etiqueta, "kg", 6 caracteres, teclado decimal y crece con el texto', async ({ page }) => {
@@ -49,12 +51,15 @@ test('SPEC-CALC-003/AC-02 el peso de trabajo: etiqueta, "kg", 6 caracteres, tecl
   // El texto entero cabe en el campo, sin desplazarse ni recortarse (WebKit
   // suma 1 px de cursor a scrollWidth).
   expect(await campo.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await analizarConAxe(page);
 
   await campo.pressSequentially('7');
   await expect(campo).toHaveValue('102,55');
+  await analizarConAxe(page);
   await campo.fill('');
   await campo.pressSequentially('1234567');
   await expect(campo).toHaveValue('123456');
+  await analizarConAxe(page);
 
   await copiar(page, '100,125');
   await pegar(page, campo);
@@ -62,6 +67,7 @@ test('SPEC-CALC-003/AC-02 el peso de trabajo: etiqueta, "kg", 6 caracteres, tecl
   await expect(avisos(page)).toHaveText(['El peso de trabajo admite como máximo dos decimales.']);
   await expect(series(page)).toHaveCount(0);
   expect(await campo.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-03 el panel Carga: resumen, modos, fichas, collarines y peso de la barra', async ({ page }) => {
@@ -85,9 +91,11 @@ test('SPEC-CALC-003/AC-03 el panel Carga: resumen, modos, fichas, collarines y p
   const collarines = page.getByRole('switch', { name: 'Collarines de competición' });
   await expect(collarines).not.toBeChecked();
   await expect(collarines).toHaveAccessibleDescription('2,5 kg cada uno; suman 5 kg en las series con discos');
+  await analizarConAxe(page);
 
   await collarines.check();
   await expect(resumenCarga(page)).toHaveText('Barra · Olímpica 20 kg · collarines');
+  await analizarConAxe(page);
 
   await barra(page, 'Z').check();
   await expect(pesoBarra(page)).toHaveValue('10');
@@ -99,14 +107,17 @@ test('SPEC-CALC-003/AC-03 el panel Carga: resumen, modos, fichas, collarines y p
   await expect(resumenCarga(page)).toHaveText('Barra · Z 10 kg · collarines');
   // A la vez, el mensaje bajo el campo y el aviso general.
   await expect(avisos(page)).toHaveText([REVISAR_BARRA]);
+  await analizarConAxe(page);
 
   await pesoBarra(page).fill('8,5');
   await expect(pesoBarra(page)).toBeFocused();
   await expect(resumenCarga(page)).toHaveText('Barra · Z 8,5 kg · collarines');
   await expect(pesosFichas(page)).toHaveText(['Olímpica 20 kg', 'Olímpica 15 kg', 'Recta 10 kg', 'Z 8,5 kg']);
+  await analizarConAxe(page);
   await pesoBarra(page).fill('');
   await expect(resumenCarga(page)).toHaveText('Barra · Z 10 kg · collarines');
   await expect(pesosFichas(page).last()).toHaveText('Z 10 kg');
+  await analizarConAxe(page);
 
   await page.getByRole('radio', { name: 'Dos lados' }).check();
   await expect(page.locator('#lista-barras')).toBeHidden();
@@ -114,14 +125,18 @@ test('SPEC-CALC-003/AC-03 el panel Carga: resumen, modos, fichas, collarines y p
   await expect(pesoBarra(page)).toBeHidden();
   await expect(page.locator('#nota-maquina')).toHaveText('Los discos se cargan en el cuerno de la máquina.');
   await expect(resumenCarga(page)).toHaveText('Dos lados · máquina');
+  await analizarConAxe(page);
   await page.getByRole('radio', { name: 'Un punto' }).check();
   await expect(resumenCarga(page)).toHaveText('Un punto · máquina');
+  await analizarConAxe(page);
 
   await botonCarga(page).click();
   await expect(botonCarga(page)).toHaveAttribute('aria-expanded', 'false');
   await expect(botonDiscos(page)).toHaveAttribute('aria-expanded', 'false');
+  await analizarConAxe(page);
   await botonDiscos(page).click();
   await expect(botonDiscos(page)).toHaveAttribute('aria-expanded', 'true');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-04 el panel Mis discos: puntos, "N de 7", su anuncio y los tipos deshabilitados', async ({ page }) => {
@@ -134,6 +149,7 @@ test('SPEC-CALC-003/AC-04 el panel Mis discos: puntos, "N de 7", su anuncio y lo
 
   await botonDiscos(page).click();
   await expect(page.locator('#lista-discos label')).toHaveText(NOMBRES);
+  await analizarConAxe(page);
   for (const nombre of ['25 kg', '1,25 kg']) {
     await disco(page, nombre).click();
     await expect(disco(page, nombre)).not.toBeChecked();
@@ -142,6 +158,7 @@ test('SPEC-CALC-003/AC-04 el panel Mis discos: puntos, "N de 7", su anuncio y lo
     // Y su dibujo, en gris.
     const dibujo = page.locator('.disco', { has: disco(page, nombre) }).locator('.dibujo-disco');
     await expect(dibujo).toHaveCSS('filter', 'grayscale(1)');
+    await analizarConAxe(page);
   }
   await expect(disco(page, '20 kg')).toBeChecked();
   await expect(page.locator('.disco', { has: disco(page, '20 kg') }).locator('.peso-disco'))
@@ -151,9 +168,11 @@ test('SPEC-CALC-003/AC-04 el panel Mis discos: puntos, "N de 7", su anuncio y lo
   await expect(page.locator('#puntos-discos i[data-cent="125"]')).toHaveClass(/apagado/);
   await expect(page.locator('#cuenta-discos')).toHaveText('5 de 7');
   await expect(botonDiscos(page)).toHaveAccessibleName('Mis discos: 5 de 7 habilitados');
+  await analizarConAxe(page);
 
   for (const nombre of ['20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg']) await disco(page, nombre).click();
   await expect(page.locator('#cuenta-discos')).toHaveText('0 de 7');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-05 los avisos generales: región anunciada y su orden', async ({ page }) => {
@@ -174,6 +193,7 @@ test('SPEC-CALC-003/AC-05 los avisos generales: región anunciada y su orden', a
     'Añade al menos un porcentaje.',
     'Habilita al menos un disco en Mis discos.',
   ]);
+  await analizarConAxe(page);
 
   // Z con 0,5, lista vacía, sin tipos y el aviso de fallo al guardar: el 50
   // se guarda y, al quitarlo, la lista vacía ya no se puede guardar. Para
@@ -193,6 +213,7 @@ test('SPEC-CALC-003/AC-05 los avisos generales: región anunciada y su orden', a
     'Habilita al menos un disco en Mis discos.',
     'No se ha podido guardar: se mantendrá hasta cerrar la app',
   ]);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-05 sin tipos y peso inferior a la barra: los dos avisos, en su orden', async ({ page }) => {
@@ -203,6 +224,7 @@ test('SPEC-CALC-003/AC-05 sin tipos y peso inferior a la barra: los dos avisos, 
     'Habilita al menos un disco en Mis discos.',
     'El peso de trabajo es inferior a la barra: elige una barra más ligera o revisa el peso.',
   ]);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-25 con el panel plegado, el aviso general dice que hay que revisar la barra', async ({ page }) => {
@@ -213,12 +235,14 @@ test('SPEC-CALC-003/AC-25 con el panel plegado, el aviso general dice que hay qu
   await expect(page.locator('#panel-carga')).toBeHidden();
   await expect(series(page)).toHaveCount(0);
   await expect(avisos(page)).toHaveText([REVISAR_BARRA]);
+  await analizarConAxe(page);
 
   await botonCarga(page).click();
   await expect(pesoBarra(page)).toHaveValue('0,5');
   await pesoBarra(page).fill('8,5');
   await expect(avisos(page)).toHaveCount(0);
   await expect(series(page)).toHaveCount(3);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-001/AC-45 plegar Carga con el foco en el peso de trabajo lo guarda', async ({ page }) => {
@@ -228,6 +252,7 @@ test('SPEC-CALC-001/AC-45 plegar Carga con el foco en el peso de trabajo lo guar
   await expect(trabajo(page)).toBeFocused();
   await expect(page.locator('#panel-carga')).toBeHidden();
   expect(await guardado(page, CLAVE_TRABAJO)).toBe('"110"');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-001/AC-45 plegar Carga termina la edición de la barra sin descartar el texto', async ({ page }) => {
@@ -236,6 +261,7 @@ test('SPEC-CALC-001/AC-45 plegar Carga termina la edición de la barra sin desca
   await pesoBarra(page).fill('7,5');
   await pesoBarra(page).blur();
   expect(await guardado(page, CLAVE_RECTA)).toBe('7.5');
+  await analizarConAxe(page);
 
   await pesoBarra(page).fill('0,5');
   await plegarCargaSinFoco(page);
@@ -244,19 +270,23 @@ test('SPEC-CALC-001/AC-45 plegar Carga termina la edición de la barra sin desca
   await expect(avisos(page)).toHaveText([REVISAR_BARRA]);
   await expect(resumenCarga(page)).toHaveText('Barra · Recta 7,5 kg');
   expect(await guardado(page, CLAVE_RECTA)).toBe('7.5');
+  await analizarConAxe(page);
 
   await botonCarga(page).click();
   await barra(page, 'Z').check();
   await barra(page, 'Recta').check();
   await expect(pesoBarra(page)).toHaveValue('7,5');
+  await analizarConAxe(page);
 
   // Ahora con un toque de verdad en el botón, que quita el foco al campo.
   await pesoBarra(page).fill('8');
   await botonCarga(page).click();
   await expect(resumenCarga(page)).toHaveText('Barra · Recta 8 kg');
   expect(await guardado(page, CLAVE_RECTA)).toBe('8');
+  await analizarConAxe(page);
   await botonCarga(page).click();
   await expect(pesosFichas(page).nth(2)).toHaveText('Recta 8 kg');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-001/AC-45 con la recta en 8 sin salir del campo, plegar la deja guardada en 8 kg', async ({ page }) => {
@@ -268,6 +298,7 @@ test('SPEC-CALC-001/AC-45 con la recta en 8 sin salir del campo, plegar la deja 
   await plegarCargaSinFoco(page);
   await expect(resumenCarga(page)).toHaveText('Barra · Recta 8 kg');
   expect(await guardado(page, CLAVE_RECTA)).toBe('8');
+  await analizarConAxe(page);
 });
 
 // NFR-01 y NFR-02 de los controles de arriba. Las pruebas de toda la pantalla
@@ -281,6 +312,7 @@ test('SPEC-CALC-003 NFR-01 los controles de arriba miden al menos 44 × 44 px', 
   ].join(', '));
   const n = await controles.count();
   expect(n).toBe(1 + 2 + 3 + 4 + 1 + 1 + 7);
+  await analizarConAxe(page);
   for (let i = 0; i < n; i++) {
     const caja = await controles.nth(i).boundingBox();
     const quien = await controles.nth(i).evaluate((el) => el.id || el.textContent);
@@ -305,8 +337,10 @@ test('SPEC-CALC-003 NFR-01 el toque en cualquier punto de un modo, una ficha o u
     return tapados;
   });
   expect(tapados).toEqual([]);
+  await analizarConAxe(page);
   await disco(page, '25 kg').click();
   await expect(disco(page, '25 kg')).toBeChecked();
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 NFR-02 contraste de los textos, bordes de campo, interruptor y foco de arriba', async ({ page }) => {
@@ -365,6 +399,7 @@ test('SPEC-CALC-003 NFR-02 contraste de los textos, bordes de campo, interruptor
     return fallos;
   });
   expect(fallos).toEqual([]);
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferencia', async ({ page }) => {
@@ -379,6 +414,7 @@ test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferenci
   await expect(puntos).toHaveCount(2);
   const colores = await puntos.evaluateAll((ps) => ps.map((p) => getComputedStyle(p).backgroundColor));
   expect(colores).toEqual(['rgb(200, 16, 46)', 'rgb(195, 200, 207)']);
+  await analizarConAxe(page);
 
   const marca = t.getByRole('button', { name: '1 kg menos que el objetivo. Ver detalle' });
   await expect(marca).toHaveText('−1 kg');
@@ -388,6 +424,7 @@ test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferenci
   await expect(marca).toHaveAttribute('aria-expanded', 'false');
   const detalle = t.locator('.detalle');
   await expect(detalle).toBeHidden();
+  await analizarConAxe(page);
   const plegada = (await t.boundingBox()).height;
 
   await marca.click();
@@ -403,10 +440,12 @@ test('SPEC-CALC-003/AC-06 la tarjeta del 70 % con 105 kg y su marca de diferenci
   expect(cajaDetalle.y + cajaDetalle.height).toBeLessThanOrEqual(caja.y + caja.height);
   // La marca toma el color de acento.
   expect(await fondo()).toBe('rgb(255, 138, 42)');
+  await analizarConAxe(page);
 
   await marca.click();
   await expect(marca).toHaveAttribute('aria-expanded', 'false');
   await expect(detalle).toBeHidden();
+  await analizarConAxe(page);
 });
 
 // Decisión de presentación sin AC (FR-06 no dice qué pasa al repintar): la
@@ -417,10 +456,12 @@ test('la explicación desplegada sigue abierta al repintar las tarjetas', async 
   await quitarSerie(page, 40);
   await expect(tarjeta(page, 70).locator('.diferencia')).toHaveAttribute('aria-expanded', 'true');
   await expect(tarjeta(page, 70).locator('.detalle')).toBeVisible();
+  await analizarConAxe(page);
   // Una tarjeta que se queda sin diferencia vuelve plegada.
   await trabajo(page).fill('100');
   await trabajo(page).fill('105');
   await expect(tarjeta(page, 70).locator('.diferencia')).toHaveAttribute('aria-expanded', 'false');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003/AC-07 "Solo la barra", "×n" con su anuncio y el collarín', async ({ page }) => {
@@ -432,6 +473,7 @@ test('SPEC-CALC-003/AC-07 "Solo la barra", "×n" con su anuncio y el collarín',
   await expect(t40.locator('.explicacion')).toBeVisible();
   await expect(t40.locator('.diferencia')).toHaveCount(0);
   await expect(t40).not.toContainText('Por lado');
+  await analizarConAxe(page);
 
   await anadirPorcentaje(page, '100');
   await trabajo(page).fill('120');
@@ -443,11 +485,13 @@ test('SPEC-CALC-003/AC-07 "Solo la barra", "×n" con su anuncio y el collarín',
   const anunciado = await t100.locator('.discos').ariaSnapshot();
   expect(anunciado).toContain('2 discos de 25 kg');
   expect(anunciado).not.toContain('×2');
+  await analizarConAxe(page);
 
   await trabajo(page).fill('100');
   await desplegarPaneles(page);
   await page.getByRole('switch', { name: /Collarines/ }).check();
   await expect(tarjeta(page, 70).locator('.collarin')).toHaveText('+ collarín de 2,5 kg');
+  await analizarConAxe(page);
 });
 
 test('SPEC-CALC-003 NFR-01 las marcas de diferencia miden al menos 44 × 44 px', async ({ page }) => {
@@ -456,6 +500,7 @@ test('SPEC-CALC-003 NFR-01 las marcas de diferencia miden al menos 44 × 44 px',
   const marcas = page.locator('.diferencia');
   const n = await marcas.count();
   expect(n).toBeGreaterThan(0);
+  await analizarConAxe(page);
   for (let i = 0; i < n; i++) {
     const caja = await marcas.nth(i).boundingBox();
     expect(caja.width).toBeGreaterThanOrEqual(44);
@@ -511,9 +556,11 @@ test('SPEC-CALC-003 NFR-02 contraste de las tarjetas: marca plegada y desplegada
   let r = await contrasteTarjetas(page);
   expect(r.fallos).toEqual([]);
   expect(r.medidos).toBeGreaterThan(10);
+  await analizarConAxe(page);
 
   await trabajo(page).fill('40');
   await expect(tarjeta(page, 40).locator('.linea')).toHaveText('Solo la barra');
   r = await contrasteTarjetas(page);
   expect(r.fallos).toEqual([]);
+  await analizarConAxe(page);
 });
