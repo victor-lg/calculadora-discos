@@ -5,7 +5,7 @@ estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-19
 sustituye: null
 sustituido_por: null
-modifica: ["ADR-0008 (§3, punto 1, «Tiempo máximo explícito, de 2 s» y «Fallo claro ante una animación que no termina»: la espera se hace en dos tiempos, una primera lectura con su propio tiempo máximo, de 10 s, y su mensaje, y los 2 s contados desde que vuelve una lectura con animaciones, con un mensaje que dice también si había una lectura en curso; §4 y §6: «el tiempo máximo» es el de 2 s del segundo tiempo, y una primera lectura de más de 2 s cuenta como cercana a un plazo de la app; §5: qué se mide y qué se exige antes de fusionar el #56)"]
+modifica: ["ADR-0008 (§3, punto 1, «Tiempo máximo explícito, de 2 s» y «Fallo claro ante una animación que no termina»: la espera se hace en dos tiempos, una primera lectura con su propio tiempo máximo, de 10 s, y su mensaje, y los 2 s contados desde que vuelve una lectura con animaciones, con un mensaje que dice también si había una lectura en curso; los dos mensajes dicen el tiempo de verdad esperado; un bucle propio de lecturas es una forma admitida; §4 y §6: «el tiempo máximo» es el de 2 s del segundo tiempo, y los criterios de revisión pasan a los de ADR-0009 §6; §5: qué se mide y qué se exige antes de fusionar el #56)"]
 referencias: ["ADR-0003", "ADR-0007", "ADR-0008", "SPEC-CALC-001", "SPEC-CALC-003", "VIC-31", "PR #56"]
 ---
 
@@ -49,7 +49,7 @@ anotación desde `b4ace2a` y, antes, del baseline del #56 [F1]. De las esperas a
 se sabe que pasaron de 2 s. En WebKit no ha habido ninguna. En `7e2a34f`, además, AC-21 de
 `accesibilidad.spec.js` (Chromium) agotó los 30 s del test en un `click`, esperando a que el
 botón estuviera visible, habilitado y quieto, justo después de un análisis que había
-pasado; no se sabe cuánto duró esa espera ni si tiene la misma causa.
+pasado; no se sabe cuánto duró esa espera ni si tiene la misma causa, y esta decisión no lo resuelve: el bloqueo no estaba en la espera antes de axe.
 
 Solo se agotan esperas de Chromium con el dibujo 3D, que en la CI se pinta por software. La
 hipótesis es que el tiempo se va en que vuelva la lectura, no en las animaciones; por qué
@@ -63,12 +63,13 @@ CI en verde y no puede fusionarse.
 ### Opción A: separar la primera lectura del tiempo de las animaciones
 
 - **Ventajas:** el tiempo máximo de 2 s vuelve a medir lo que ADR-0008 quería, cuánto
-  duran las animaciones. Una animación que no termina sigue haciendo fallar el test a los
-  2 s de verla. Cada fallo dice cuál de las dos cosas se agotó.
+  duran las animaciones. Una animación que no termina sigue haciendo fallar el test, a los
+  2 s de que vuelva la lectura que la ve. Cada fallo dice cuál de las dos cosas se agotó.
 - **Inconvenientes:** la primera lectura necesita su propio tiempo máximo, que mide otra
   cosa (cuánto tarda en volver una lectura) y no tiene un techo conocido. Las lecturas del
   segundo tiempo siguen incluyendo ese retraso.
-- **Riesgos:** que la cifra elegida para la primera lectura no baste (§6).
+- **Riesgos:** que la cifra elegida para la primera lectura no baste, y que una animación
+  finita tenga más margen que antes (§4, §6).
 
 ### Opción B: subir el tiempo máximo de 2 s
 
@@ -77,6 +78,7 @@ CI en verde y no puede fusionarse.
   termina, por un motivo que no tiene que ver con ella. Como en A, la cifra sería una
   elección, no una medida; la diferencia es que en B esa elección afloja también el
   control de las animaciones.
+- **Riesgos:** que una animación que no termina tarde más en hacer fallar el test.
 
 ### Opción C: quitar carga a la CI
 
@@ -85,6 +87,7 @@ CI en verde y no puede fusionarse.
   bastó en `7e2a34f`. AC-19 de `dibujo.spec.js` y AC-20 a AC-22 de `accesibilidad.spec.js`
   necesitan el 3D. Con un proceso y 4 CPU, `b4ace2a` pasó, pero con AC-13 sin dibujo; con
   AC-13 otra vez en 3D (`a7987f5`), falló. Las CPU del runner no las decide el proyecto.
+- **Riesgos:** que vuelva a fallar en cuanto cambie el runner.
 
 ### Opción D: medir las animaciones con el reloj de la página
 
@@ -93,13 +96,19 @@ para que el retraso de las lecturas no cuente.
 
 - **Ventajas:** el segundo tiempo dejaría de depender de lo que tarda cada lectura.
 - **Inconvenientes:** cada lectura sigue necesitando volver, así que no quita el problema
-  de la primera. Cambia más de ADR-0008 que A.
+  de la primera. Combinada con A cerraría el margen que A da a las animaciones finitas
+  (§4), pero cambia también cómo se mide cada animación, y A con la medición de §5 basta
+  para vigilarlo.
+- **Riesgos:** que el tiempo de la página y el del proceso de Playwright no se comparen
+  bien.
 
 ## 3. Decisión
 
 **Opción A.** La espera de ADR-0008 §3, punto 1, se hace en dos tiempos, los dos solo
 leyendo y sin capturar errores. Es la espera que admite ADR-0008 en su forma («la espera
-del punto 1, y nada más»); el mecanismo lo elige el PR que la implementa.
+del punto 1, y nada más»); el mecanismo lo elige el PR que la implementa. Se admite
+`expect.poll` o un bucle propio de lecturas que, al agotarse, lanza su propio error con
+los datos de los mensajes; en ningún caso se captura ni se relanza un error ajeno.
 
 1. **Primer tiempo: hasta que vuelva la primera lectura.** Los 10 s empiezan al empezar la
    espera y terminan cuando vuelve una lectura de `getAnimations()`. Son una constante con
@@ -108,31 +117,35 @@ del punto 1, y nada más»); el mecanismo lo elige el PR que la implementa.
    - **Si una lectura falla con un error** (por ejemplo, porque la página se ha cerrado),
      el test falla con ese error, como hoy: no se captura ni se repite.
    - **Si se agota**, el test falla con un mensaje que cita «ADR-0009 de la calculadora» y
-     dice que no se obtuvo ninguna lectura en 10 s. No se reintenta la espera ni se
+     dice que no se obtuvo ninguna lectura, con el tiempo que de verdad se esperó y si lo
+     acortó el tiempo máximo del test. No se reintenta la espera ni se
      captura el error. Una lectura que siga en curso cuando se agota no cambia nada: solo
      lee, y el test ya ha fallado.
 2. **Segundo tiempo: si la primera lectura vuelve con animaciones.** Se sigue leyendo,
    como en ADR-0008, hasta que no haya ninguna, con el tiempo máximo de 2 s de ADR-0008,
    **contado desde que vuelve esa primera lectura** y pasado a la propia espera.
-   - **Si se agota**, el test falla con un mensaje que cita «ADR-0008 de la calculadora» y
-     «ADR-0009 de la calculadora», muestra las animaciones de la última lectura que volvió
-     y dice si había una lectura en curso al agotarse y cuánto llevaba esperando. Así se
+   - **Si se agota**, el test falla con el mensaje de ADR-0008 («Se esperaba a que
+     terminaran las animaciones antes de axe», citando «ADR-0008 de la calculadora»), al
+     que se añade la cita de «ADR-0009 de la calculadora», las animaciones de la última
+     lectura que volvió (la primera, si no volvió ninguna más), el tiempo que de verdad se
+     esperó y si lo acortó el tiempo máximo del test, y si había una lectura en curso al
+     agotarse y cuánto llevaba esperando. Así se
      distingue una animación que no termina (las lecturas vuelven y siguen viéndola) de
      una lectura que no vuelve.
 
 Lo demás de ADR-0008 §3, punto 1, no cambia: solo lee, no filtra, y una animación que no
 termina hace fallar el test. En ADR-0008 §4 y §6, «el tiempo máximo» es ahora el de 2 s
-del segundo tiempo; y como una primera lectura puede durar más que los plazos de la app
-que los tests analizan (los 5 s del aviso de "Deshacer" y los 3 s de FR-15), una primera
-lectura de más de 2 s se anota con su test (§5) y cuenta para el criterio de ADR-0008 §6
-sobre los plazos.
+del segundo tiempo. Como una primera lectura puede durar más que los plazos de la app que
+los tests analizan (los 5 s del aviso de "Deshacer" y los 3 s de FR-15), cada primera
+lectura de más de 2 s se anota con su test (§5), para poder ligarla a un fallo; la
+revisión la disparan solo los criterios de §6.
 
 **Los 10 s son una elección; ningún dato los acota.** De las primeras lecturas solo se sabe
-que las que volvieron tardaron como mucho 1436 ms y que otras pasaron de 2 s, sin saber
-cuánto. 10 s son 5 veces el tiempo máximo anterior y dejan al menos 20 s de los 30 s de un
-test para el resto. Si AC-21 tuvo la misma causa, 10 s no le habrían bastado, pero el test
-habría fallado a los 10 s con el mensaje de ADR-0009 en lugar de a los 30 s sin decir qué
-pasó. Se revisan con la medición (§5) y el criterio de §6.
+que las anotadas que volvieron tardaron como mucho 1436 ms (hasta unos 1535 ms, por el
+escalón de la anotación) y que otras pasaron de 2 s, sin saber cuánto. 10 s son 5 veces
+el tiempo máximo anterior y un tercio de los 30 s de un test: una sola lectura lenta no
+agota el test, aunque varias sí (§4). Se revisan con la medición (§5) y el criterio de
+§6.
 
 ## 4. Consecuencias
 
@@ -148,9 +161,14 @@ pasó. Se revisan con la medición (§5) y el criterio de §6.
   - Un estado con plazo puede caducar durante una primera lectura lenta. Lo detecta la
     comprobación posterior que exige ADR-0008, con un mensaje que parece un fallo de la
     app; la anotación de §5 lo liga a la lectura lenta.
-  - Una animación finita pero más larga de lo debido puede terminar dentro de una primera
-    lectura lenta y no llegar a verse. Antes fallaba a los 2 s. Solo pasa con lecturas
-    lentas; en local o con lecturas rápidas se sigue viendo.
+  - Una animación finita tiene ahora de margen lo que tarde la primera lectura más 2 s,
+    hasta 12 s en el peor caso, en lugar de 2 s desde que empieza la espera. Con lecturas
+    de 1,4 s como las de la CI, una cadena de 3 s, que antes fallaba, pasa. Si la primera
+    lectura es lenta, la animación puede incluso terminar dentro de ella y no llegar a
+    verse. En local, con lecturas rápidas, el margen vuelve a ser casi 2 s. §5 mide el
+    tiempo total de las esperas con animaciones para verlo.
+  - Una lectura vacía puede volver hasta 10 s después de hacerse en la página; si en ese
+    intervalo empieza una animación encadenada, `analyze()` empieza con ella en curso.
   - El segundo tiempo sigue incluyendo lo que tardan las lecturas: si las animaciones
     coinciden con lecturas lentas, se puede agotar igual. Sería un fallo de más, no un
     hueco, y su mensaje dice si había una lectura en curso.
@@ -176,15 +194,17 @@ La medición de ADR-0008 §5 pasa a anotar, en la salida de los tests de la CI:
 - por cada proceso de Playwright, la **primera lectura** más larga (desde que empieza la
   espera hasta que vuelve la primera lectura), haya visto animaciones o no;
 - por cada proceso, el **segundo tiempo** más largo, desde que vuelve la primera lectura
-  con animaciones hasta que no queda ninguna, con lo que tardó esa primera lectura;
+  con animaciones hasta que no queda ninguna, con lo que tardó esa primera lectura y el
+  tiempo total desde que empezó la espera;
 - cada primera lectura de más de 2 s, con su test, aunque no sea la más larga.
 
 Antes de fusionar el #56: **dos** ejecuciones completas de la CI en verde, en los dos
 navegadores y con el 3D, y en su baseline, de las dos, la primera lectura más larga frente
-a los 10 s y el segundo tiempo más largo frente a los 2 s, con sus márgenes. Dos
+a los 10 s y el segundo tiempo más largo frente a los 2 s, con sus márgenes, y el total
+más largo de las esperas con animaciones. Dos
 ejecuciones no prueban que no vaya a fallar; bastan para fusionar porque el criterio de §6
-sigue vigilando después. Si en alguna la primera lectura pasa de 5 s, se aplica §6 antes
-de fusionar.
+sigue vigilando después. Si en alguna se cumple un criterio de §6, se aplica antes de
+fusionar.
 
 ## 6. Seguimiento
 
@@ -193,9 +213,10 @@ La persona decide, con un ADR nuevo si cambia la decisión:
 - si la primera lectura más larga medida en la CI pasa de 5 s (la mitad de su tiempo
   máximo) o se agota alguna vez. Es un aviso de fallo cercano, no de deriva: una subida
   lenta por debajo de 5 s no lo dispara;
-- si el segundo tiempo se agota en la CI con una lectura en curso;
-- si falla un test (por un plazo de la app o por su tiempo máximo) con una primera lectura
-  de más de 2 s anotada;
+- si el segundo tiempo más largo pasa de 1 s (la mitad de su tiempo máximo), o se agota
+  en la CI con una lectura en curso;
+- si falla un test (por un plazo de la app o por su tiempo máximo) que tiene anotada en
+  esa misma ejecución una primera lectura de más de 2 s;
 - si la CI pasa a tener GPU, o cambian las CPU del runner.
 
 ## 7. Fuentes
