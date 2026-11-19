@@ -349,7 +349,22 @@ en el código).
   pasó. **Decisión de Víctor:** ADR-0009 (#60), que da a la primera lectura su propio
   tiempo máximo, de 10 s, y cuenta los 2 s desde que vuelve. Fusionado en `main` el
   2026-11-19 y aplicado en `axe.js`.
-- **Medición con ADR-0009 (§5): dos ejecuciones completas de la CI.** Pendiente.
+- **Medición con ADR-0009 (§5): dos ejecuciones completas de la CI**, sobre `30f6bd9`
+  (run 44524504021, intentos 1 y 2), con un proceso y 4 CPU. Las dos en verde, en los dos
+  navegadores y con el 3D (AC-13 de SPEC-CALC-001 incluido). Cada cifra puede ser hasta
+  99 ms mayor por el escalón de la anotación.
+
+  | | Primera lectura más larga (frente a 10 s) | Segundo tiempo más largo (frente a 2 s) | Total más largo con animaciones | Trozos |
+  | --- | --- | --- | --- | --- |
+  | Intento 1 | **6100 ms** (Chromium, SPEC-CALC-001/AC-13; otra de 2158 ms en el mismo test) | 406 ms (Chromium, AC-22) | 407 ms | 413, 410 y 485 s |
+  | Intento 2 | 1867 ms (Chromium, SPEC-CALC-001/AC-13) | 478 ms (Chromium, AC-22) | 479 ms | 496, 299 y 398 s |
+
+  Márgenes: la primera lectura, 3,9 s frente a los 10 s en el intento 1 y 8,1 s en el 2;
+  el segundo tiempo, 1,5 s frente a los 2 s. En WebKit, como mucho 494 ms de primera
+  lectura y 263 ms de segundo tiempo. Las primeras lecturas con animaciones vuelven en
+  1 o 2 ms: el retraso solo aparece en lecturas sin animaciones, con el 3D. **Se cumple
+  un criterio de ADR-0009 §6** (la primera lectura pasa de 5 s en el intento 1): por
+  §5, la persona decide antes de fusionar.
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
   AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js` (SPEC-CALC-001
