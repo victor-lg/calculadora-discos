@@ -17,6 +17,8 @@ const LECTURA_MAXIMA_MS = 10_000;
 // vuelve la primera lectura que las ve.
 const ESPERA_MAXIMA_MS = 2000;
 const INTERVALO_MS = 50;
+// ADR-0009 §5: una primera lectura de más de 2 s se anota siempre, con su test.
+const LECTURA_ANOTADA_MS = 2000;
 // Como `expect`, la espera termina 250 ms antes que el tiempo máximo del test,
 // para fallar con su propio mensaje y no con el del test.
 const MARGEN_TEST_MS = 250;
@@ -40,14 +42,15 @@ const animacionesEnCurso = () => document.getAnimations().map((a) => {
 // publica: `iso.monotonicTime()` de playwright-core y `TestInfo._deadline()`,
 // los mismos que usa `expect`. Playwright está fijado a una versión exacta
 // (ADR-0007 §3.2); si dejan de existir, falla aquí.
+// `finDelTest()` se llama antes que `ahora()`, para que, si faltan, el fallo lo
+// diga. Si desaparece el export `iso`, falla antes, al importar este módulo.
 const ahora = () => iso.monotonicTime();
 function finDelTest() {
   const info = test.info();
   if (typeof info._deadline !== 'function' || typeof iso?.monotonicTime !== 'function') {
     throw new Error('La espera antes de axe (ADR-0009 de la calculadora) necesita TestInfo._deadline() e iso.monotonicTime() de Playwright, que esta versión no tiene');
   }
-  const { deadline } = info._deadline();
-  return deadline ? deadline - MARGEN_TEST_MS : Infinity;
+  return info._deadline().deadline - MARGEN_TEST_MS;
 }
 
 // Una lectura con plazo: lo que vuelve, o null si el plazo llega antes. Si la
@@ -58,20 +61,24 @@ async function leer(page, hasta) {
   let reloj;
   const plazo = new Promise((resolver) => { reloj = setTimeout(() => resolver(null), Math.max(0, hasta - inicio)); });
   const lectura = page.evaluate(animacionesEnCurso).then((enCurso) => ({ enCurso, ms: Math.round(ahora() - inicio) }));
-  const leida = await Promise.race([lectura, plazo]);
-  clearTimeout(reloj);
-  return leida ?? { enCurso: null, ms: Math.round(ahora() - inicio) };
+  try {
+    const leida = await Promise.race([lectura, plazo]);
+    return leida ?? { enCurso: null, ms: Math.round(ahora() - inicio) };
+  } finally {
+    clearTimeout(reloj);
+  }
 }
 
 const pausa = (ms) => new Promise((resolver) => { setTimeout(resolver, Math.max(0, ms)); });
 
-// ADR-0009 §5: por proceso, la primera lectura más larga y el segundo tiempo
-// más largo, solo en la salida del test. La CI los recoge como anotaciones del
-// job (`::notice::`). Se escriben cuando superan en 100 ms el anterior de su
-// clase, para no pasar del límite de anotaciones del job, así que el máximo real
-// puede ser hasta 99 ms mayor que el último anotado. Cada primera lectura de más
-// de 2 s se anota siempre, con su test.
-const masLarga = { primera: 0, segundo: 0 };
+// ADR-0009 §5: por proceso, la primera lectura más larga, el segundo tiempo más
+// largo y el total más largo de las esperas con animaciones, solo en la salida
+// del test. La CI los recoge como anotaciones del job (`::notice::`). Se
+// escriben cuando superan en 100 ms el anterior de su clase, para no pasar del
+// límite de anotaciones del job, así que el máximo real puede ser hasta 99 ms
+// mayor que el último anotado. Cada primera lectura de más de 2 s se anota
+// siempre, con su test, en cuanto vuelve (aunque el segundo tiempo falle).
+const masLarga = { primera: 0, segundo: 0, total: 0 };
 
 function anotar(texto) {
   const info = test.info();
@@ -81,14 +88,23 @@ function anotar(texto) {
   console.log(`\n::notice::${linea}`);
 }
 
-function medir(primera, segundo, total, sondeos) {
-  if (primera >= masLarga.primera + 100 || primera > ESPERA_MAXIMA_MS) {
+function medirPrimera(primera, conAnimaciones) {
+  if (primera >= masLarga.primera + 100 || primera > LECTURA_ANOTADA_MS) {
     masLarga.primera = Math.max(masLarga.primera, primera);
-    anotar(`axe: la primera lectura tardó ${primera} ms${primera > ESPERA_MAXIMA_MS ? ' (más de 2 s)' : ''}`);
+    const mas = primera > LECTURA_ANOTADA_MS ? ' (más de 2 s)' : '';
+    anotar(`axe: la primera lectura tardó ${primera} ms${mas}, ${conAnimaciones ? 'con' : 'sin'} animaciones`);
   }
-  if (segundo !== null && segundo >= masLarga.segundo + 100) {
+}
+
+function medirSegundo(primera, segundo, total, sondeos) {
+  const texto = `${sondeos} lecturas con alguna animación; la primera lectura, ${primera} ms; el segundo tiempo, ${segundo} ms; en total, ${total} ms`;
+  if (segundo >= masLarga.segundo + 100) {
     masLarga.segundo = segundo;
-    anotar(`axe: el segundo tiempo duró ${segundo} ms, ${sondeos} lecturas con alguna animación; la primera lectura, ${primera} ms; en total, ${total} ms`);
+    anotar(`axe: segundo tiempo más largo: ${texto}`);
+  }
+  if (total >= masLarga.total + 100) {
+    masLarga.total = total;
+    anotar(`axe: espera con animaciones más larga: ${texto}`);
   }
 }
 
@@ -97,8 +113,8 @@ export async function analizarConAxe(page) {
   // espera solo lee: a media animación (por ejemplo, el fundido de entrada de
   // una tarjeta, SPEC-CALC-003 FR-10), axe mediría el texto a media opacidad, y
   // el contraste se exige en el estado estable (SPEC-CALC-003 v0.6, NFR-02).
-  const inicio = ahora();
   const finTest = finDelTest();
+  const inicio = ahora();
 
   // Primer tiempo: hasta que vuelva la primera lectura.
   const hasta = Math.min(inicio + LECTURA_MAXIMA_MS, finTest);
@@ -107,13 +123,14 @@ export async function analizarConAxe(page) {
     const acortado = hasta < inicio + LECTURA_MAXIMA_MS ? '; lo acortó el tiempo máximo del test' : '';
     throw new Error(`No se obtuvo ninguna lectura de las animaciones antes de axe en ${primera.ms} ms, de los ${LECTURA_MAXIMA_MS} ms del primer tiempo (ADR-0009 de la calculadora)${acortado}`);
   }
+  medirPrimera(primera.ms, primera.enCurso.length > 0);
 
   // Segundo tiempo: si la primera lectura vuelve con animaciones, se sigue
-  // leyendo hasta que no haya ninguna, con 2 s desde que volvió.
-  let segundo = null;
-  let sondeos = 0;
+  // leyendo hasta que no haya ninguna, con 2 s desde que volvió. No se lanza
+  // una lectura con menos de un intervalo por delante, así que en la práctica
+  // dura algo menos de 2 s: falla antes, nunca deja pasar.
   if (primera.enCurso.length) {
-    sondeos = 1;
+    let sondeos = 1;
     const desde = ahora();
     const limite = Math.min(desde + ESPERA_MAXIMA_MS, finTest);
     let ultima = primera;
@@ -121,7 +138,6 @@ export async function analizarConAxe(page) {
     while (ultima.enCurso.length) {
       if (ahora() + INTERVALO_MS >= limite) break;
       await pausa(INTERVALO_MS);
-      // Una lectura lanzada con menos de un intervalo por delante no diría nada.
       if (limite - ahora() < INTERVALO_MS) break;
       const leida = await leer(page, limite);
       if (leida.enCurso === null) {
@@ -137,13 +153,13 @@ export async function analizarConAxe(page) {
       const enVuelo = pendiente === null ? 'ninguna lectura en curso' : `una lectura en curso desde hace ${pendiente} ms`;
       throw new Error([
         'Se esperaba a que terminaran las animaciones antes de axe (ADR-0008 de la calculadora); siguen en curso.',
-        `Segundo tiempo (ADR-0009 de la calculadora): ${esperado} ms de ${ESPERA_MAXIMA_MS} ms${acortado}; ${enVuelo}; la última lectura que volvió tardó ${ultima.ms} ms y vio:`,
+        `Segundo tiempo (ADR-0009 de la calculadora): ${esperado} ms de ${ESPERA_MAXIMA_MS} ms${acortado}; ${enVuelo}; la primera lectura tardó ${primera.ms} ms; la última que volvió, ${ultima.ms} ms, y vio:`,
         JSON.stringify(ultima.enCurso, null, 2),
       ].join('\n'));
     }
-    segundo = Math.round(ahora() - desde);
+    const fin = ahora();
+    medirSegundo(primera.ms, Math.round(fin - desde), Math.round(fin - inicio), sondeos);
   }
-  medir(primera.ms, segundo, Math.round(ahora() - inicio), sondeos);
 
   const resultado = await new AxeBuilder({ page }).analyze();
   // Falla si queda una violación sin su excepción o si una excepción ya no aparece.

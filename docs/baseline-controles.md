@@ -241,18 +241,24 @@ en el código).
     quede ninguna, como mucho 2 s (`ESPERA_MAXIMA_MS`) desde que volvió. Si se agota, el
     mensaje es el de ADR-0008 («Se esperaba a que terminaran las animaciones antes de axe
     (ADR-0008 de la calculadora); siguen en curso»), con la cita de ADR-0009, cuánto se
-    esperó, si había una lectura en curso y cuánto llevaba, lo que tardó la última lectura
-    que volvió y sus animaciones.
+    esperó, si había una lectura en curso y cuánto llevaba, lo que tardaron la primera
+    lectura y la última que volvió, y sus animaciones. No se lanza una lectura con menos de
+    50 ms por delante, así que en la práctica dura algo menos de 2 s: falla antes, nunca
+    deja pasar.
   - **Mecanismo:** un bucle propio que lanza su propio error (ADR-0009 §3). Cada lectura
     compite con su plazo en un `Promise.race`; una lectura que falla sube tal cual, y una
-    que vuelve o falla después del plazo ya no cuenta. Ningún error se captura.
+    que vuelve o falla después del plazo ya no cuenta, y su temporizador se cancela en un
+    `finally`. Ningún error se captura.
   - **El tiempo máximo del test:** las dos esperas terminan 250 ms antes que él, como
     `expect`, para fallar con su propio mensaje. Playwright no publica ni el fin del tiempo
     máximo del test ni su reloj: se usan `TestInfo._deadline()` e `iso.monotonicTime()` de
     `playwright-core/lib/coreBundle`, los mismos que usa `expect`. Playwright está fijado a
-    1.65.0 (`overrides` y el test del lockfile, ADR-0007 §3.2); si una versión los quita,
-    la función falla con un mensaje que lo dice.
-  - **Comprobado** en local con páginas de prueba fuera del repo: una animación infinita
+    1.65.0 (`overrides` y el test del lockfile, ADR-0007 §3.2). Si una versión quita
+    `_deadline()` o `monotonicTime()`, la función falla con un mensaje que lo dice, antes de
+    leer el reloj; si quita el export `iso`, falla al importar `axe.js`. En los dos casos,
+    falla: nunca deja pasar un análisis.
+  - **Medición manual en local**, con páginas de prueba fuera del repo (no es un test del
+    repo, y no hay ninguno del mecanismo): una animación infinita
     falla a los 2 s con el mensaje de ADR-0008 y ADR-0009; una página colgada falla a los
     10 s con el de ADR-0009; con 5 s de test, a los 4,7 s, «lo acortó el tiempo máximo del
     test». Antes de ADR-0009, una primera lectura agotada salía con el mensaje de ADR-0008
@@ -285,9 +291,17 @@ en el código).
   Una excepción "ya no aparece" si su regla pasa en su elemento (`passes`). Con la lista
   vacía no hay test unitario: llega con la primera excepción.
 - **Espera más larga (ADR-0008 §5, ADR-0009 §5).** Desde ADR-0009, cada proceso de
-  Playwright anota en la salida del test, como `::notice::`, la primera lectura y el
-  segundo tiempo (con su primera lectura y el total) cuando superan en 100 ms el anterior
-  de su clase, y cada primera lectura de más de 2 s siempre, con su test. Las cifras
+  Playwright anota en la salida del test, como `::notice::`, tres máximos por separado,
+  cuando superan en 100 ms el anterior de su clase: la primera lectura (con o sin
+  animaciones), el segundo tiempo y el total de las esperas con animaciones (estos dos,
+  con la primera lectura, el segundo tiempo y el total). Además, cada primera lectura de
+  más de 2 s se anota siempre, con su test, en cuanto vuelve, aunque el segundo tiempo
+  falle después. En la CI de `3e6fe4d`, con la primera versión de ADR-0009 en `axe.js`
+  (antes de las correcciones de la ronda 3 de G4), los tres trozos pasaron: primera
+  lectura más larga, 2413 ms (Chromium, AC-21 de `accesibilidad.spec.js`) y 2006 ms
+  (Chromium, SPEC-CALC-001/AC-13), las dos de más de 2 s, que con ADR-0008 habrían
+  fallado; segundo tiempo más largo, 530 ms (Chromium, AC-22). Trozos: 576, 327 y 484 s.
+  No cuenta para ADR-0009 §5, que pide las dos ejecuciones sobre el SHA final. Las cifras
   anteriores, de antes de ADR-0009: cada proceso escribía cada espera que superaba en
   100 ms la máxima anterior de su clase
   (con alguna animación vista o sin ninguna), con los sondeos que vieron alguna; la CI la
