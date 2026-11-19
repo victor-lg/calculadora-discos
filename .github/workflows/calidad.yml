@@ -109,6 +109,11 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
+      # Diagnóstico de VIC-44: vCPU del runner (en los repos privados, 2; en los públicos, 4).
+      - name: CPU del runner
+        if: steps.preparar.outputs.stryker == 'si' && !github.event.pull_request.draft
+        run: nproc
+
       # --force: ejecuta todos los mutantes aunque la rama traiga un fichero incremental.
       # Con cero mutantes la puntuación es NaN y Stryker no aplica el umbral: falla aquí.
       # Un mutante Ignored no cuenta en la puntuación: lo dejan así un comentario
@@ -150,6 +155,44 @@ jobs:
           ' "$informe" || { echo "::error::Hay mutantes Ignored: no cuentan en la puntuación"; exit 1; }
           fi
           exit "$estado"
+
+      # Diagnóstico de VIC-44, sin alarma: lista los mutantes que acaban por tiempo y su total,
+      # también si Stryker ha fallado. Nunca cambia el resultado del job. Ficheros y
+      # sustituciones salen del código de la rama: van entre stop-commands, como la salida de
+      # Stryker.
+      - name: Mutantes por tiempo
+        if: ${{ !cancelled() && steps.preparar.outputs.stryker == 'si' && !github.event.pull_request.draft }}
+        run: |
+          informe=$(python3 -I -c '
+          import json, sys
+          print((json.load(open(sys.argv[1], encoding="utf-8")).get("jsonReporter") or {}).get("fileName") or "reports/mutation/mutation.json")
+          ' "$RUNNER_TEMP/stryker.config.json")
+          if [ ! -f "$informe" ]; then
+            echo "Sin informe JSON en $informe: no hay mutantes que listar."; exit 0
+          fi
+          token=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+          echo "::stop-commands::$token"
+          estado=0
+          python3 -I -c '
+          import json, sys
+          informe = json.load(open(sys.argv[1], encoding="utf-8"))
+          total = 0
+          for f, datos in sorted(informe["files"].items()):
+              for m in datos["mutants"]:
+                  if m["status"] != "Timeout":
+                      continue
+                  total += 1
+                  linea = (m.get("location") or {}).get("start", {}).get("line")
+                  mutador = m.get("mutatorName")
+                  sustitucion = m.get("replacement")
+                  print(f"{f}:{linea} {mutador}: {sustitucion!r}")
+          print(f"Mutantes por tiempo: {total}")
+          ' "$informe" || estado=$?
+          echo "::$token::"
+          if [ "$estado" -ne 0 ]; then
+            echo "::warning::No se ha podido leer el informe JSON de Stryker (salida $estado)"
+          fi
+          exit 0
 
       - name: Aviso de borrador
         if: steps.preparar.outputs.stryker == 'si' && github.event.pull_request.draft
