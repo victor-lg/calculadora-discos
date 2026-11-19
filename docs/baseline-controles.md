@@ -367,6 +367,13 @@ en el código).
   **Decisión de Víctor** (2026-11-19, por ADR-0009 §6): se aceptan los 6100 ms como dentro
   del margen, sin ADR nuevo. La investigación de por qué AC-13 de SPEC-CALC-001 concentra
   las primeras lecturas lentas va aparte, en VIC-35.
+- **Tercera ejecución de ADR-0009 §5**, sobre `eab8788`, el último commit del #56 (mismo
+  árbol que `1f8db57`, su squash en `main`), con un proceso (`workers: 1`). Datos de
+  Víctor, en verde: primera lectura más larga, 1618 ms (Chromium, SPEC-CALC-001/AC-13),
+  con 8,4 s de margen frente a los 10 s; segundo tiempo más largo, 509 ms, con 1,5 s frente
+  a los 2 s. Cada cifra, con hasta 99 ms de error por el escalón de la anotación. No se
+  cumple ningún criterio de ADR-0009 §6. AC-13 vuelve a tener la primera lectura más larga
+  (VIC-35).
 - **Sin 3D:** los E2E que no tratan del dibujo ya corrían en la vista de FR-14
   (`sin-dibujo.js`). Siguen con el 3D `dibujo.spec.js`, `accesibilidad.spec.js` (AC-20 a
   AC-22 miden la pantalla entera, dibujo incluido) y `sin-conexion.spec.js` (SPEC-CALC-001
@@ -396,6 +403,35 @@ en el código).
 - **En local** no se pudieron usar los navegadores de 1.65 (el sandbox no llega a
   `cdn.playwright.dev`): los E2E se ejecutaron con los de 1.64 que había en la caché, con
   una configuración fuera del repo.
+
+## M27: capturas de referencia (regresión visual)
+
+Llegan con VIC-31 (PR 4): `tests/e2e/capturas.spec.js`, con una captura de la pantalla
+entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-003, en los
+dos proyectos: 20 referencias en `tests/e2e/capturas.spec.js-snapshots/`. Como el ejemplo
+de sdd-workflow#48:
+
+- **Sin tolerancias ni máscaras.** `playwright.config.js` fija `updateSnapshots: 'none'`
+  (una captura que falta es un fallo) y, para `toHaveScreenshot`, solo
+  `animations: 'disabled'`, `caret: 'hide'` y `scale: 'css'`.
+- **Los estados:** al abrir (AC-01), los dos paneles desplegados (AC-03 y AC-04), los
+  discos de 25 y 1,25 kg deshabilitados (AC-04), los tres avisos generales (AC-05), la
+  explicación del 70 % desplegada (AC-06), el collarín (AC-07), el aviso de capacidad del
+  modo Un punto (AC-18), el campo de añadir abierto y con el error de 0 (AC-14) y el aviso
+  de "Deshacer" con el foco (AC-12). Cada test analiza con axe antes de capturar.
+- **Sin el dibujo 3D:** todo en la vista de FR-14 (`sin-dibujo.js`). SPEC-CALC-003 §11
+  excluye comparar el dibujo píxel a píxel, y en la CI se pinta por software.
+- **Lo que no se captura:** los estados intermedios (el gesto de borrar, las tarjetas
+  entrando o saliendo), el ancho de 360 px (AC-08) y el zoom al 200 % (AC-22), que tienen
+  sus propias medidas en los E2E.
+- **Las referencias las genera Víctor** en el contenedor de `tests.yml` (Playwright 1.65.0,
+  digest `sha256:9beb5460…4e73dbe`), desde un clon limpio en el commit revisado, y eso
+  vale como su aprobación. Pendiente: la generación, cinco ejecuciones sin
+  `--update-snapshots` (falsos positivos) y el rojo con un cambio de aspecto.
+- **En local**, con los navegadores de 1.64 de la caché y las referencias fuera del repo
+  (no valen como referencia: otras versiones dan otros píxeles): 20 passed al generarlas y
+  en cinco ejecuciones seguidas, ningún falso positivo en 100 comparaciones. Unos 10 s en
+  total con 20 tests.
 
 ## osv-scanner: `picomatch` 4.0.7 (GHSA-fc5q-39xc-vjpf), pendiente
 
