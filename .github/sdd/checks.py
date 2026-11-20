@@ -26,6 +26,13 @@ Comprueba:
                 entre comillas (un `#` sin comillas se lee como comentario).
   lefthook      ADR-0008: la única configuración de lefthook es `lefthook.json`, solo con
                 las claves que no amplían lo que se ejecuta, y no se quita si `main` la tiene.
+  hallazgos     VIC-38: cada hallazgo de G4 de las respuestas de los revisores tiene su
+                línea en la reconciliación del PR, con gravedad, prueba y resolución, y
+                descartar uno que debe corregirse o importante pide una prueba (`sdd-review`).
+                Las respuestas van en comentarios del PR: solo cuentan los de CUENTAS_G4.
+  cambios       M8 (VIC-39): publica los commits que entraron tras la última ronda de G4, desde el
+                que vio cada revisor (`Commit revisado:` en su comentario), y falla si falta o si la
+                descripción trae esa lista escrita a mano.
 
 Los PR de Dependabot (M38) no siguen las convenciones de nombres ni declaran AC: ver
 `es_de_dependabot`, que la acota al autor del PR y de sus commits y a lo que tocan.
@@ -33,7 +40,9 @@ Los PR de Dependabot (M38) no siguen las convenciones de nombres ni declaran AC:
 Uso local:
   PR_BODY="$(cat cuerpo.md)" PR_TITLE="feat(calculo): …" PR_BRANCH="feat/vic-12-calculo" \
     python3 .github/sdd/checks.py --base refs/remotes/origin/main
-Sin PR_TITLE ni PR_BRANCH, el check de convenciones no se ejecuta.
+Sin PR_TITLE ni PR_BRANCH, el check de convenciones no se ejecuta. PR_COMENTARIOS es la ruta
+de los comentarios del PR (`gh api --paginate …/issues/N/comments`); sin ella, el
+check de hallazgos solo lee la descripción.
 
 Como hook `commit-msg` de lefthook, solo el formato del mensaje:
   python3 -I .github/sdd/checks.py --mensaje .git/COMMIT_EDITMSG
@@ -43,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import html
 import json
 import os
 import re
@@ -824,6 +834,307 @@ def ficheros_versionados() -> dict[str, str] | None:
     return versionados
 
 
+# --- Hallazgos de G4 (VIC-38) ---------------------------------------------
+
+# Una línea por hallazgo en la reconciliación del PR (skill `sdd-review`):
+#   - G4-1-A-01 · debe corregirse · prueba: `app.js:12` · resolución: corregido en 1a2b3c4
+# Cuenta cualquier lista, casilla, cita o tabla que empiece por el ID, para que otra forma
+# falle por formato y no pase sin comprobar. Fuera de <details> y de bloques de código.
+# La descripción la escribe cualquiera: nada de expresiones con retroceso sobre una línea entera.
+HALLAZGO_ID = r"G4-[1-9]\d*-[A-Z]-\d{2,3}"
+RE_HALLAZGO = re.compile(rf"^\s*(?:>\s*)*(?:[-*+]|\d+[.)]|\|)\s*(?:\[[ xX]\]\s*)?[*`]*({HALLAZGO_ID})\b[*`]*(.*)$")
+# El hallazgo en la respuesta del revisor (`reviewer.md`), con la gravedad que le dio: fuera de
+# lo plegado, un título o una línea en negrita que empieza por el ID; dentro, cualquier línea
+# que empiece por él, también en una lista, una casilla, una cita o una tabla.
+RE_RESPUESTA = re.compile(rf"^\s*(?:#{{1,6}}\s+|\*\*)[*`]*({HALLAZGO_ID})\b(.*)$")
+RE_RESPUESTA_PLEGADA = re.compile(rf"^\s*(?:>\s*)*(?:#{{1,6}}\s+|[-*+]\s+|\d+[.)]\s+|\|\s*)?(?:\[[ xX]\]\s*)?[*_`]*({HALLAZGO_ID})\b(.*)$")
+RE_ALGUN_HALLAZGO = re.compile(HALLAZGO_ID)
+RE_CAMPO_PRUEBA = re.compile(r"·[ \t]*prueba:", re.I)
+RE_CAMPO_RESOLUCION = re.compile(r"·[ \t]*resolución:", re.I)
+GRAVEDADES = ("debe corregirse", "importante", "menor")
+SIN_GRAVEDAD = "sin gravedad"
+RE_CORREGIDO = re.compile(r"^corregido en `?[0-9a-f]{7,40}`?(?:(?:,| y) `?[0-9a-f]{7,40}`?)*$", re.I)
+RE_DESCARTADO = re.compile(r"^descartado(?::(?P<prueba>.*))?$", re.I)
+PREGUNTA = "pregunta a la persona"
+RE_PLEGADO = re.compile(r"<details\b|</details\s*>", re.I)
+RE_CERCA = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+RE_COMENTARIO_BLOQUE = re.compile(r"^ {0,3}<!--")
+# Las respuestas de los revisores van en comentarios del PR. El repo puede ser público y comentar
+# puede cualquiera: solo cuentan los comentarios de estas cuentas (la de la persona y la del agente).
+CUENTAS_G4 = ("victor-lg-bot", "victor-lg")
+
+
+def sin_codigo_en_linea(linea: str) -> str:
+    """La línea con el código en línea cambiado por espacios, como en Markdown: una racha de N
+    comillas invertidas solo cierra con otra de N, y una sin pareja es texto."""
+    rachas = [(m.start(), m.end()) for m in re.finditer(r"`+", linea)]
+    siguiente, ultima = [None] * len(rachas), {}
+    for j in range(len(rachas) - 1, -1, -1):
+        largo = rachas[j][1] - rachas[j][0]
+        siguiente[j], ultima[largo] = ultima.get(largo), j
+    partes, i, k = [], 0, 0
+    while k < len(rachas):
+        j = siguiente[k]
+        if j is None:
+            k += 1
+            continue
+        a, b = rachas[k][0], rachas[j][1]
+        partes += [linea[i:a], " " * (b - a)]
+        i, k = b, j + 1
+    return "".join(partes) + linea[i:]
+
+
+def lineas_visibles(cuerpo_pr: str) -> tuple[list[tuple[str, bool]], list[str]]:
+    """Las líneas del PR como las muestra GitHub, sin comentarios HTML ni bloques de código, cada
+    una con si va plegada en <details> (anidados o no), y lo que queda sin cerrar. Un `<!--`, un
+    `<details>` o una cerca dentro de código es texto."""
+    lineas, plegado, cerca, comentario = [], 0, None, False
+    # Solo los saltos de Markdown: `splitlines()` también corta en U+2028 y otros que GitHub no.
+    for linea in re.split(r"\r\n|\r|\n", cuerpo_pr):
+        m = RE_CERCA.match(linea)
+        if cerca:
+            # Cierra una cerca del mismo carácter y al menos igual de larga, sin nada detrás.
+            if m and m.group(1)[0] == cerca[0] and len(m.group(1)) >= len(cerca) and not linea[m.end():].strip():
+                cerca = None
+            continue
+        # Un comentario que empieza la línea es un bloque hasta la línea con `-->`; en medio de
+        # una línea, solo si se cierra en ella (si no, es texto).
+        if comentario:
+            comentario = "-->" not in linea
+            continue
+        if RE_COMENTARIO_BLOQUE.match(linea) and "-->" not in linea:
+            comentario = True
+            continue
+        # Tras una cerca de comillas invertidas, otra comilla invertida en la línea la hace texto.
+        if m and not (m.group(1)[0] == "`" and "`" in linea[m.end():]):
+            cerca = m.group(1)
+            continue
+        oculta = sin_codigo_en_linea(linea)
+        tramos, i = [], 0
+        while (ini := oculta.find("<!--", i)) >= 0 and (fin := oculta.find("-->", ini + 4)) >= 0:
+            tramos.append((i, ini))
+            i = fin + 3
+        tramos.append((i, len(linea)))
+        antes = plegado
+        for t in RE_PLEGADO.finditer("".join(oculta[a:b] for a, b in tramos)):
+            plegado = max(0, plegado + (-1 if t.group(0).startswith("</") else 1))
+        lineas.append(("".join(linea[a:b] for a, b in tramos), antes > 0 or plegado > 0))
+    sin_cerrar = (["un `<details>` (ciérralo con `</details>`)"] if plegado else []) + \
+                 ([f"un bloque de código (ciérralo con `{cerca}`)"] if cerca else []) + \
+                 (["un comentario HTML (ciérralo con `-->`)"] if comentario else [])
+    return lineas, sin_cerrar
+
+
+def gravedad_al_principio(texto: str) -> str:
+    texto = texto.lstrip(" \t*_`·:—–-|").lower()
+    return next((g for g in GRAVEDADES if texto.startswith(g)), SIN_GRAVEDAD)
+
+
+def mas_grave(previa: str | None, gravedad: str) -> str:
+    """Sin gravedad reconocible cuenta como la mayor: para descartarlo hace falta prueba."""
+    if previa is None:
+        return gravedad
+    if SIN_GRAVEDAD in (previa, gravedad):
+        return SIN_GRAVEDAD
+    return min(previa, gravedad, key=GRAVEDADES.index)
+
+
+def gravedades_de_los_revisores(lineas: list[tuple[str, bool]],
+                                gravedades: dict[str, str] | None = None) -> dict[str, str]:
+    """La gravedad de cada hallazgo de las respuestas, añadida a `gravedades` si se da; si un ID sale
+    varias veces, la mayor."""
+    gravedades = {} if gravedades is None else gravedades
+    for linea, plegada in lineas:
+        m = (RE_RESPUESTA_PLEGADA if plegada else RE_RESPUESTA).match(linea)
+        if m:
+            gravedades[m.group(1)] = mas_grave(gravedades.get(m.group(1)), gravedad_al_principio(m.group(2)))
+    return gravedades
+
+
+def comentarios_de_g4(ruta: str) -> list[tuple[str, str]] | None:
+    """El enlace y el cuerpo de los comentarios del PR que escribieron las cuentas de CUENTAS_G4, de
+    la salida de `gh api --paginate`: una lista por página, una detrás de otra. None si no se puede leer."""
+    lector, paginas, i = json.JSONDecoder(), [], 0
+    try:
+        texto = Path(ruta).read_text(encoding="utf-8")
+        while i < len(texto.rstrip()):
+            pagina, i = lector.raw_decode(texto, len(texto) - len(texto[i:].lstrip()))
+            paginas.append(pagina)
+    except (OSError, ValueError):
+        return None
+    if not paginas or not all(isinstance(p, list) for p in paginas):
+        return None
+    comentarios = []
+    for c in (c for p in paginas for c in p):
+        if not isinstance(c, dict):
+            return None
+        # Sin usuario (una cuenta borrada) no es de CUENTAS_G4: se ignora, no se falla por él.
+        usuario = c.get("user") if isinstance(c.get("user"), dict) else {}
+        if usuario.get("login") in CUENTAS_G4 and isinstance(c.get("body"), str):
+            comentarios.append((str(c.get("html_url", "")), c["body"]))
+    return comentarios
+
+
+def campos_de_hallazgo(campos: str) -> tuple[str, str, str] | None:
+    """Gravedad, prueba y resolución de `· <gravedad> · prueba: … · resolución: …`. La prueba
+    puede citar otra línea de hallazgo: la resolución es lo que sigue al último campo."""
+    resto = campos.strip()
+    prueba = RE_CAMPO_PRUEBA.search(resto)
+    resoluciones = list(RE_CAMPO_RESOLUCION.finditer(resto))
+    if not resto.startswith("·") or not prueba or not resoluciones:
+        return None
+    # Sin `·` en la gravedad, la prueba va antes que la resolución.
+    gravedad = resto[1:prueba.start()]
+    if "·" in gravedad:
+        return None
+    return gravedad, resto[prueba.end():resoluciones[-1].start()], resto[resoluciones[-1].end():]
+
+
+def check_hallazgos(inf: Informe, cuerpo_pr: str, comentarios: list[tuple[str, str]] = ()) -> None:
+    lineas, sin_cerrar = lineas_visibles(cuerpo_pr)
+    # Sin ningún ID de hallazgo, no hay nada que esconder: un PR sin G4 (R0, Dependabot) no falla aquí.
+    for que in sin_cerrar if RE_ALGUN_HALLAZGO.search(cuerpo_pr) else []:
+        inf.error("hallazgos", f"la descripción del PR tiene {que} sin cerrar: lo que sigue no se puede comprobar.")
+    del_revisor = gravedades_de_los_revisores(lineas)
+    # En un comentario, toda línea que empieza por un ID es un hallazgo, como en lo plegado.
+    for enlace, cuerpo in comentarios:
+        en_comentario, abierto = lineas_visibles(cuerpo)
+        for que in abierto if RE_ALGUN_HALLAZGO.search(cuerpo) else []:
+            inf.error("hallazgos", f"el comentario {enlace or 'del PR'} tiene {que} sin cerrar: lo que sigue no se puede comprobar.")
+        gravedades_de_los_revisores([(linea, True) for linea, _ in en_comentario], del_revisor)
+    vistos, preguntas = set(), []
+    for linea, plegada in lineas:
+        m = None if plegada else RE_HALLAZGO.match(linea)
+        if not m:
+            continue
+        hid, campos = m.groups()
+        if hid in vistos:
+            inf.error("hallazgos", f"`{hid}` aparece dos veces en la reconciliación; deja una sola línea por hallazgo.")
+            continue
+        vistos.add(hid)
+        c = campos_de_hallazgo(campos)
+        if not c:
+            inf.error("hallazgos", f"`{hid}` no sigue el formato `- {hid} · <gravedad> · prueba: <test, línea o cita> · resolución: <resolución>` (`sdd-review`).")
+            continue
+        gravedad, prueba, resolucion = (x.strip().strip("*_").strip() for x in c)
+        gravedad = gravedad.lower()
+        if gravedad not in GRAVEDADES:
+            inf.error("hallazgos", f"`{hid}`: la gravedad `{gravedad}` no es {', '.join(GRAVEDADES)}.")
+        if not prueba:
+            inf.error("hallazgos", f"`{hid}` no tiene prueba: cada hallazgo cita un test, una línea o un texto.")
+        # Bajar la gravedad no ahorra la prueba: cuenta la mayor, la del revisor o la confirmada.
+        graves = {gravedad, del_revisor.get(hid, "")} - {"menor", ""}
+        descartado = RE_DESCARTADO.match(resolucion)
+        if RE_CORREGIDO.match(resolucion):
+            pass
+        elif descartado:
+            if graves and not (descartado.group("prueba") or "").strip():
+                inf.error("hallazgos", f"`{hid}` ({' / '.join(sorted(graves))}) se descarta sin prueba. Escribe `descartado: <test, línea o cita>`; si no la hay, `{PREGUNTA}`.")
+        elif resolucion.lower() == PREGUNTA:
+            preguntas.append(hid)
+        else:
+            inf.error("hallazgos", f"`{hid}` no tiene resolución (`{resolucion[:80] or 'vacía'}`): escribe `corregido en <sha>`, `descartado: <prueba>` o `{PREGUNTA}`.")
+    faltan = sorted(set(del_revisor) - vistos)
+    if faltan:
+        inf.error("hallazgos", f"los revisores dieron {', '.join(f'`{h}`' for h in faltan)} y la reconciliación no tiene su línea.")
+    if preguntas:
+        inf.aviso("hallazgos", f"hallazgos pendientes de la persona: {', '.join(f'`{h}`' for h in preguntas)}. Respóndelos antes de aprobar.")
+
+
+# --- Cambios tras la última ronda (M8, VIC-39) ----------------------------
+
+# Cada revisor deja en su comentario, fuera de <details> y de bloques de código, el commit que vio:
+#   Commit revisado: G4-1-A · 0123456789abcdef0123456789abcdef01234567
+RE_COMMIT_REVISADO = re.compile(r"^\s*Commit revisado:\s*`?(G4-([1-9]\d*)-([A-Z]))`?\s*·\s*`?([0-9a-f]{40})`?\s*$")
+# Una lista escrita a mano en la descripción: un título, un elemento de lista, una cita, una tabla, una
+# etiqueta en negrita o un rótulo en HTML (`<summary>`, `<b>`) que empieza por el nombre de la sección.
+# Una lista de palabras: otra redacción no la ve. Sin retroceso sobre la línea entera: cada vuelta de
+# `(?:<…>|[*_])*` consume un `<` o una marca, y `[^>]*` para en el primer `>`.
+RE_LISTA_A_MANO = re.compile(r"^\s*(?:>\s*)*(?:#{1,6}\s+)?(?:[-*+]\s+|\d+[.)]\s+|\|\s*)?(?:\[[ xX]\]\s*)?"
+                             r"(?:<[a-z][a-z0-9]*\b[^>]*>\s*|[*_])*(?:cambios|commits)[*_]*\s+"
+                             r"(?:despu[eé]s\s+de|tras|desde|posteriores\s+a)\s+la\s+[uú]ltima\s+(?:ronda|revisi[oó]n)", re.I)
+RE_RONDA_METRICAS = re.compile(r"^Métricas G4: PR #\d+ · ronda ([1-9]\d*) ·")
+
+
+def rondas_de_g4(comentarios: list[tuple[str, str]]) -> tuple[dict[tuple[int, str], str], dict[int, set[str]]]:
+    """De los comentarios de CUENTAS_G4: el commit que vio cada revisor (ronda, letra), el último si
+    se repite, y los revisores que salen en cada ronda, por sus hallazgos o por su commit. Una ronda
+    sin hallazgos ni commit sale por su línea «Métricas G4», sin revisores."""
+    vistos, revisores = {}, {}
+    for _, cuerpo in comentarios:
+        lineas, _ = lineas_visibles(cuerpo)
+        for linea, plegada in lineas:
+            m = None if plegada else RE_COMMIT_REVISADO.match(linea)
+            if m:
+                vistos[(int(m.group(2)), m.group(3))] = m.group(4)
+                revisores.setdefault(int(m.group(2)), set()).add(m.group(3))
+            elif (r := RE_RONDA_METRICAS.match(linea)):
+                revisores.setdefault(int(r.group(1)), set())
+            # Como en `check_hallazgos`: en un comentario, toda línea que empieza por un ID es un hallazgo.
+            elif (h := RE_RESPUESTA_PLEGADA.match(linea)):
+                ronda, letra = h.group(1).split("-")[1:3]
+                revisores.setdefault(int(ronda), set()).add(letra)
+    return vistos, revisores
+
+
+def texto_del_resumen(texto: str) -> str:
+    """Un título de commit o un nombre de fichero como texto del resumen: un `<!--` o un `<details>`
+    de quien escribe el commit no puede esconder lo que sigue, ni una comilla invertida abrir código."""
+    return html.escape(texto, quote=False).replace("`", "\\`")
+
+
+def check_cambios(inf: Informe, base: str, cabeza: str, comentarios: list[tuple[str, str]],
+                  cuerpo_pr: str = "") -> None:
+    # La lista no se escribe a mano (VIC-39): lo que se ve en la descripción, también lo plegado.
+    lineas, _ = lineas_visibles(cuerpo_pr)
+    if any(RE_LISTA_A_MANO.match(linea) for linea, _ in lineas):
+        inf.error("cambios", "la descripción del PR trae una lista de «Cambios tras la última ronda» escrita a mano. Quítala: "
+                             "esa lista la calcula la CI desde el commit que vio cada revisor y está en el resumen de `checks-sdd`, "
+                             "sección «Cambios tras la última ronda».")
+    vistos, revisores = rondas_de_g4(comentarios)
+    # Sin ninguna ronda (R0, Dependabot, antes de G4) no hay nada que calcular.
+    if not revisores:
+        return
+    ronda = max(revisores)
+    letras = sorted(revisores[ronda])
+    faltan = [l for l in letras if (ronda, l) not in vistos]
+    if not letras or faltan:
+        quien = ", ".join(f"`G4-{ronda}-{l}`" for l in faltan) or f"ningún revisor de la ronda {ronda}"
+        inf.error("cambios", f"falta el commit que vio {quien}: sin él no se pueden calcular los cambios tras la última ronda. "
+                             f"Añade al comentario de cada revisor, fuera de `<details>`, la línea `Commit revisado: G4-{ronda}-<letra> · <sha de 40>` (`sdd-review`).")
+        return
+    nuevos: dict[str, str] = {}
+    for letra in letras:
+        sha = vistos[(ronda, letra)]
+        # Sin el commit en la historia de la cabeza (un rebase o un push forzado) no hay diff fiable.
+        if git("merge-base", "--is-ancestor", sha, cabeza) is None:
+            inf.error("cambios", f"el commit `{sha[:12]}` que vio `G4-{ronda}-{letra}` no está en la historia del PR o Git no lo encuentra: "
+                                 "¿se reescribió la rama? Repite la ronda sobre la cabeza actual (`sdd-review`).")
+            return
+        salida = git("log", "--topo-order", "--reverse", "--format=%H%x1f%s", cabeza, f"^{sha}", f"^{base}")
+        if salida is None:
+            inf.error("cambios", f"no he podido leer con Git los commits desde `{sha[:12]}`.")
+            return
+        for linea in salida.splitlines():
+            h, _, titulo = linea.partition("\x1f")
+            nuevos.setdefault(h, titulo)
+    vio = ", ".join(f"{l} en `{vistos[(ronda, l)][:7]}`" for l in letras)
+    lineas = [f"Ronda {ronda}; cada revisor vio: {vio}.", ""]
+    if not nuevos:
+        lineas.append("Ninguno: la cabeza del PR es lo que vieron los revisores.")
+    else:
+        # Del más antiguo al más nuevo, en el orden de la historia de la cabeza; los ficheros, los del
+        # PR que cambian desde lo que vio cada revisor.
+        orden = (git("rev-list", "--topo-order", "--reverse", cabeza, f"^{base}") or "").split()
+        lineas += [f"- `{h[:7]}` {texto_del_resumen(nuevos[h])}" for h in orden if h in nuevos]
+        del_pr = set((git("diff", "--name-only", "--no-renames", f"{base}...{cabeza}") or "").splitlines())
+        ficheros = sorted({f for l in letras
+                           for f in (git("diff", "--name-only", "--no-renames", vistos[(ronda, l)], cabeza) or "").splitlines()} & del_pr)
+        if ficheros:
+            lineas += ["", "Ficheros: " + ", ".join(texto_del_resumen(f) for f in ficheros)]
+    inf.secciones.append("### Cambios tras la última ronda\n\n" + "\n".join(lineas))
+
+
 # --- Programa -------------------------------------------------------------
 
 def main() -> int:
@@ -888,6 +1199,12 @@ def main() -> int:
     texto_lefthook = git("show", f":{LEFTHOOK_CONFIG}") if normal else None
     en_base = git("ls-tree", "--name-only", args.base, "--", LEFTHOOK_CONFIG)
     check_lefthook(inf, versionados, texto_lefthook, None if en_base is None else bool(en_base.strip()))
+    ruta_comentarios = os.environ.get("PR_COMENTARIOS")
+    comentarios = comentarios_de_g4(ruta_comentarios) if ruta_comentarios else []
+    if comentarios is None:
+        inf.error("hallazgos", "no he podido leer los comentarios del PR (PR_COMENTARIOS): sin ellos no se comprueban las respuestas de los revisores.")
+    check_hallazgos(inf, cuerpo_pr, comentarios or [])
+    check_cambios(inf, args.base, os.environ.get("PR_HEAD_SHA") or "HEAD", comentarios or [], cuerpo_pr)
 
     partes = ["## Checks SDD", ""]
     partes += ["### Errores", ""] + [f"- {e}" for e in inf.errores] + [""] if inf.errores else ["Sin errores.", ""]
