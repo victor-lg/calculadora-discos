@@ -694,6 +694,10 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
 - **Qué lo vigila:** osv-scanner lee `package-lock.json`, donde está three 0.170.0, en cada
   PR y en la tarea mensual (`osv-mensual.yml`).
 
+## Checks `hallazgos` y `cambios` en CI real (VIC-46)
+
+Pendiente: resultado de los cinco casos de VIC-46.
+
 ## Exclusiones de los escáneres
 
 osv-scanner: seis avisos medios en `osv-scanner.toml` (#49 y #50, VIC-27), todos de
