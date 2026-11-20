@@ -738,12 +738,12 @@ sección de cambios, porque ya no hay ninguna ronda
   «Comentarios del PR» terminó bien (`gh run view`, estado de cada paso) en las seis
   ejecuciones del #74 hasta aquí: las cinco enlazadas y la de su apertura,
   [44744783174](https://github.com/victor-lg/calculadora-discos/actions/runs/44744783174/job/136317184720).
-- **Tiempo:** de lo que corre en la CI, el #73 solo cambió `sdd.yml` y `checks.py`, así que lo que puede cambiar la
-  espera por push es la duración del job `checks-sdd` (de su inicio a su fin, con
-  `gh run view`). Fue de 5 a 14 s en esas seis ejecuciones (mediana 6,5 s), frente a 3 a
-  14 s (mediana 6 s) en las 35 ejecuciones `pull_request` de `sdd` anteriores al #73 que
-  devolvía `gh run list --workflow sdd.yml --limit 40`, de los PR del 2026-11-19 y
-  2026-11-20. Sin cambio apreciable.
+- **Tiempo:** de lo que corre en la CI, el #73 solo cambió `sdd.yml` y `checks.py`, así
+  que lo que puede cambiar la espera por push es la duración del job `checks-sdd` (de su
+  inicio a su fin, con `gh run view`). Fue de 5 a 14 s en esas seis ejecuciones (mediana
+  6,5 s), frente a 3 a 14 s (mediana 6 s) en las 35 ejecuciones `pull_request` de `sdd`
+  anteriores al #73 que devolvía `gh run list --workflow sdd.yml --limit 40`, de los PR
+  del 2026-11-19 y 2026-11-20. Sin cambio apreciable.
 
 **Límites que la prueba dejó a la vista** (de la plantilla; cambiarlos queda fuera de
 VIC-46 y va primero en sdd-workflow):
