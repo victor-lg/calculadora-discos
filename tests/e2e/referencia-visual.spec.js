@@ -3,14 +3,11 @@
 // tras la prueba en el iPhone de AC-24. Lo que solo fija la referencia visual
 // cita AC-24, que es donde se acepta; la prueba manual sigue haciendo falta.
 import { test, expect } from './sin-dibujo.js';
-import { trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, deslizar, botonQuitar } from './pantalla.js';
+import { trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, cargarFuentes, deslizar, botonQuitar, tarjeta } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
 const GRIS = 'rgb(166, 171, 179)';
 const ROJO = 'rgb(229, 72, 77)';
-
-const series = (page) => page.locator('#series > li');
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 
 // El número del peso de trabajo y su "kg", con sus estilos calculados.
 const medirPeso = (page) => page.evaluate(() => {

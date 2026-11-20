@@ -2,8 +2,8 @@
 // arranque de cero, vuelta de segundo plano y fallo al guardar.
 import { test, expect } from './sin-dibujo.js';
 import {
-  trabajo, pesoBarra, barra, desplegarPaneles, recargar, discosDeSeries,
-  porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas,
+  trabajo, pesoBarra, barra, recargar, discosDeSeries, porcentajesDeSeries,
+  anadirPorcentaje, quitarSerie, quitarTodas, series, disco, abrirConPaneles,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
@@ -13,8 +13,6 @@ const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
 const AVISO_GUARDAR = 'No se ha podido guardar: se mantendrá hasta cerrar la app';
 const NOMBRES = ['25 kg', '20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg', '1,25 kg'];
 
-const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
-const series = (page) => page.locator('#series > li');
 // SPEC-CALC-003 FR-01: la lista de porcentajes son las tarjetas.
 const porcentajes = porcentajesDeSeries;
 const indicacionDiscos = (page) => page.locator('#indicacion-discos');
@@ -26,12 +24,7 @@ async function soloPorcentaje(page, valor) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
-  // Cada test parte de un almacenamiento vacío: Playwright le da un contexto propio.
-  expect(await page.evaluate(() => localStorage.length)).toBe(0);
-  await analizarConAxe(page);
-  await desplegarPaneles(page);
-  await analizarConAxe(page);
+  await abrirConPaneles(page);
 });
 
 test('SPEC-CALC-002/AC-01 los 7 tipos con su peso y su estado; tocar uno lo alterna', async ({ page }) => {

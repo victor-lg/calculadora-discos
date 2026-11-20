@@ -1,8 +1,9 @@
 // Recorridos de la interfaz que necesitan un navegador real.
 import { test, expect } from './sin-dibujo.js';
 import {
-  trabajo, pesoBarra, barra, desplegarPaneles, recargar, copiar, pegar, discosDeSeries,
-  porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas, deslizar,
+  trabajo, pesoBarra, barra, recargar, copiar, pegar, discosDeSeries,
+  porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas, deslizar, series, tarjeta,
+  abrirConPaneles,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
@@ -12,22 +13,14 @@ const CLAVE_RECTA = 'calculadora-discos:v1:peso-recta';
 const CLAVE_Z = 'calculadora-discos:v1:peso-z';
 const CLAVE_COLLARINES = 'calculadora-discos:v1:collarines';
 
-const series = (page) => page.locator('#series > li');
 // SPEC-CALC-003: la lista de porcentajes son las tarjetas (FR-01), se añade
 // con su campo (FR-09) y se quita con su botón o su gesto (FR-08).
 const porcentajes = porcentajesDeSeries;
 const anadir = anadirPorcentaje;
 const quitarTodos = quitarTodas;
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
-  // Cada test parte de un almacenamiento vacío (contexto propio de Playwright):
-  // así ningún test hereda tipos de disco deshabilitados de otro.
-  expect(await page.evaluate(() => localStorage.length)).toBe(0);
-  await analizarConAxe(page);
-  await desplegarPaneles(page);
-  await analizarConAxe(page);
+  await abrirConPaneles(page);
 });
 
 test('SPEC-CALC-001/AC-04 las olímpicas de 20 y 15 kg no permiten cambiar su peso', async ({ page }) => {

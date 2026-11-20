@@ -3,17 +3,14 @@
 // comprueban antes y fallan si no lo está, para no pasar en falso por la vista
 // de FR-14 (SPEC-CALC-003 §11, ADR-0003 §4).
 import { test, expect as esperar } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar, vigilarEntradas, entradas } from './pantalla.js';
+import { trabajo, pesoBarra, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar, vigilarEntradas, entradas, series, tarjeta, aviso } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
 // En la CI, sin GPU, cada dibujo se pinta por software, y con varios tests a la
 // vez puede tardar más de los 5 s de espera por defecto.
 const expect = esperar.configure({ timeout: 20_000 });
 
-const series = (page) => page.locator('#series > li');
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 const dibujo = (page, porcentaje) => tarjeta(page, porcentaje).locator('.dibujo');
-const aviso = (page) => page.locator('#aviso-borrado');
 
 // Cuenta los contextos WebGL que crea la página, y los guarda para poder
 // retirarlos (WEBGL_lose_context).

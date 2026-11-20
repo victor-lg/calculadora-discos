@@ -5,16 +5,9 @@ import { test, expect } from '@playwright/test';
 import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, anadirPorcentaje,
   botonQuitar, quitarSerie, deslizar, porcentajesDeSeries, cargarFuentes, FUENTES_CARGADAS,
+  tarjeta, abrirAnadir as abrir, campoAnadir as campo, aviso, deshacer, disco, arrastrarSinSoltar,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
-
-const series = (page) => page.locator('#series > li');
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
-const abrir = (page) => page.getByRole('button', { name: 'Añadir porcentaje' });
-const campo = (page) => page.getByLabel('Nuevo porcentaje');
-const aviso = (page) => page.locator('#aviso-borrado');
-const deshacer = (page) => page.getByRole('button', { name: 'Deshacer' });
-const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 
 // Contraste de WCAG 2.x, compartido por las medidas de AC-21. Un color con
 // transparencia se compone con lo que tiene debajo, también el fondo: se
@@ -239,13 +232,7 @@ test('SPEC-CALC-003/AC-21 contraste de los textos e indicadores en los estados d
 
 test('SPEC-CALC-003/AC-21 contraste del fondo de borrar antes y después del 35 %', async ({ page }) => {
   const t = tarjeta(page, 70);
-  await t.scrollIntoViewIfNeeded();
-  const caja = await t.boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
+  const { caja, x, y } = await arrastrarSinSoltar(page, t, 0.2);
   await expect(t.locator('.fondo-borrar')).toBeVisible();
   await expect(t).not.toHaveClass(/listo/);
   let r = await medirContraste(page);

@@ -4,19 +4,16 @@
 import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar, discosDeSeries,
-  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar, vigilarEntradas, entradas,
+  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar, vigilarEntradas,
+  entradas, series, tarjeta, abrirAnadir as abrir, campoAnadir as campo, aviso, deshacer,
+  abrirSinDatos, arrastrarSinSoltar,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
+import { instalarContraste } from './contraste.js';
 
-const series = (page) => page.locator('#series > li');
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
-const abrir = (page) => page.getByRole('button', { name: 'Añadir porcentaje' });
-const campo = (page) => page.getByLabel('Nuevo porcentaje');
 const confirmar = (page) => page.getByRole('button', { name: 'Añadir', exact: true });
 const cancelar = (page) => page.getByRole('button', { name: 'Cancelar' });
 const error = (page) => page.locator('#error-porcentaje');
-const aviso = (page) => page.locator('#aviso-borrado');
-const deshacer = (page) => page.getByRole('button', { name: 'Deshacer' });
 const ROJO = 'rgb(229, 72, 77)';
 
 // Mantiene pulsada la tarjeta sin mover el puntero y la suelta.
@@ -45,9 +42,7 @@ async function segundoPlano(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
-  expect(await page.evaluate(() => localStorage.length)).toBe(0);
-  await analizarConAxe(page);
+  await abrirSinDatos(page);
 });
 
 test('SPEC-CALC-003/AC-01 de arriba abajo: peso, Carga y Mis discos plegados, las tarjetas y "+ Añadir porcentaje"', async ({ page }) => {
@@ -92,13 +87,7 @@ test('SPEC-CALC-003/AC-11 el fondo "Borrar" aparece al arrastrar y cambia pasado
   const t = tarjeta(page, 70);
   const fondo = t.locator('.fondo-borrar');
   await expect(fondo).toBeHidden();
-  await t.scrollIntoViewIfNeeded();
-  const caja = await t.boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - caja.width * 0.1, y, { steps: 5 });
+  const { caja, x, y } = await arrastrarSinSoltar(page, t, 0.1);
   await expect(fondo).toBeVisible();
   await expect(fondo).toHaveText('Borrar');
   await expect(fondo).toHaveCSS('background-color', 'rgb(59, 28, 30)');
@@ -795,50 +784,26 @@ test('SPEC-CALC-003 NFR-01 añadir, "Quitar" con el foco y "Deshacer" miden al m
 
 // Contraste de los textos visibles dentro de `raices` frente a su fondo, con el
 // mismo cálculo que los tests de contraste de presentacion.spec.js.
-const contraste = (page, raices) => page.evaluate((selectores) => {
-  const rgb = (c) => c.match(/[\d.]+/g).map(Number);
-  const lum = ([r, g, b]) => {
-    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const razon = (a, b) => {
-    const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((m, n) => n - m);
-    return (x + 0.05) / (y + 0.05);
-  };
-  const fondo = (el) => {
-    for (let e = el; e; e = e.parentElement) {
-      const c = getComputedStyle(e).backgroundColor;
-      if (rgb(c)[3] !== 0) return c;
+async function contraste(page, raices) {
+  await instalarContraste(page);
+  return page.evaluate((selectores) => {
+    const { razon, visible, textos, conDescendientes } = window.medidasContraste;
+    const opciones = { sinOcultos: true, anchoMinimo: true };
+    const { fallos, medidos } = textos(conDescendientes(selectores), opciones);
+    let bordes = 0;
+    // Bordes de los campos y del botón de añadir (3:1 frente al fondo de la página).
+    const pagina = getComputedStyle(document.body).backgroundColor;
+    for (const sel of ['.abrir-anadir', '.campo-anadir']) {
+      const el = document.querySelector(sel);
+      if (el && visible(el, opciones) && selectores.some((s) => el.closest(s))) {
+        const r = razon(getComputedStyle(el).borderTopColor, pagina);
+        bordes++;
+        if (r < 3) fallos.push(`borde de ${sel}: ${r.toFixed(2)}`);
+      }
     }
-    return getComputedStyle(document.body).backgroundColor;
-  };
-  const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
-    && !el.closest('.oculto') && el.getBoundingClientRect().width > 1;
-  const fallos = [];
-  let medidos = 0;
-  for (const raiz of selectores.flatMap((s) => [...document.querySelectorAll(s)])) {
-    for (const el of [raiz, ...raiz.querySelectorAll('*')]) {
-      const propio = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-      if (!propio || !visible(el)) continue;
-      const s = getComputedStyle(el);
-      const grande = parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.66 && Number(s.fontWeight) >= 700);
-      const r = razon(s.color, fondo(el));
-      medidos++;
-      if (r < (grande ? 3 : 4.5)) fallos.push(`${el.textContent.trim()}: ${r.toFixed(2)}`);
-    }
-  }
-  // Bordes de los campos y del botón de añadir (3:1 frente al fondo de la página).
-  const pagina = getComputedStyle(document.body).backgroundColor;
-  for (const sel of ['.abrir-anadir', '.campo-anadir']) {
-    const el = document.querySelector(sel);
-    if (el && visible(el) && selectores.some((s) => el.closest(s))) {
-      const r = razon(getComputedStyle(el).borderTopColor, pagina);
-      medidos++;
-      if (r < 3) fallos.push(`borde de ${sel}: ${r.toFixed(2)}`);
-    }
-  }
-  return { fallos, medidos };
-}, raices);
+    return { fallos, medidos: medidos + bordes };
+  }, raices);
+}
 
 test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y el aviso de "Deshacer"', async ({ page }) => {
   let r = await contraste(page, ['.anadir']);
@@ -858,13 +823,7 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
 
   // El fondo de borrar antes y después del 35 %.
   const t = tarjeta(page, 70);
-  await t.scrollIntoViewIfNeeded();
-  const caja = await t.boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
+  const { caja, x, y } = await arrastrarSinSoltar(page, t, 0.2);
   r = await contraste(page, ['.arrastra .fondo-borrar']);
   expect(r).toEqual({ fallos: [], medidos: 1 });
   await analizarConAxe(page);
@@ -897,13 +856,7 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
 test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta no tienen transición', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const t = tarjeta(page, 70);
-  await t.scrollIntoViewIfNeeded();
-  const caja = await t.boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
+  const { caja, x, y } = await arrastrarSinSoltar(page, t, 0.2);
   expect((await t.locator('.serie').boundingBox()).x).toBeLessThan(caja.x);
   await analizarConAxe(page);
   await page.mouse.up();
