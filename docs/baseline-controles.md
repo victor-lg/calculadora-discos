@@ -148,8 +148,8 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   y 92,68 o 92,93: en cinco de los ocho jobs, exactamente lo de local (728, 6, 58). Los
   jobs posteriores al corte duran entre 6 min 53 s y 10 min 55 s; los ocho anteriores de
   la tabla, entre 9 min 47 s y 15 min 10 s (en VIC-27 se llegó a 20 min 29 s).
-- **Causa** (VIC-44: `nproc` confirma 4 vCPU hoy; las 2 del periodo privado son las que
-  documenta GitHub, no una medición): el repo de la calculadora pasó a público el
+- **Causa más probable** (VIC-44: `nproc` confirma 4 vCPU hoy; las 2 del periodo privado
+  son las que documenta GitHub, no una medición): el repo de la calculadora pasó a público el
   2026-11-19 (la API de GitHub lo da como `public`; la hora del cambio es del
   coordinador). En los repos públicos el runner `ubuntu-latest` tiene 4 vCPU; en los
   privados, 2. Con 3 procesos de Stryker más el principal sobre 2 vCPU, la CPU iba
@@ -163,10 +163,10 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   135952584002, de 5 min 39 s; duraciones comprobadas con la API de GitHub). Las dos dan
   `nproc` 4, 92,68 y los mismos 6 mutantes por tiempo que en local (medición del
   coordinador desde los logs de Actions, VIC-44). Que con 2 vCPU los mutantes por tiempo
-  suban a decenas o cientos es una inferencia que encaja con todo lo anterior: no hay
-  `nproc` del periodo privado. Con 4 vCPU el número no es fijo: en los ocho jobs
-  posteriores al corte, entre 6 y 16 (7, 13 y 16 en tres de ellos); en las dos
-  ejecuciones del #65, 6.
+  suban a decenas (hasta 135) es una inferencia que encaja con todo lo anterior: no hay
+  `nproc` del periodo privado. Después del corte el número no es fijo: en los ocho jobs
+  posteriores, entre 6 y 16 (7, 13 y 16 en tres de ellos), sin `nproc`; en las dos
+  ejecuciones del #65, con `nproc` 4, 6.
 - **Los 6 mutantes por tiempo** (los de local y los de las dos ejecuciones del #65), todos
   en `app/js/calculo.js`. Cada uno se aplicó a mano y se lanzaron los 7 ficheros de test que
   lo cubren según el informe de Stryker (`series`, `presentacion`, `porcentajes`,
@@ -184,14 +184,16 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
 
   Los cuatro primeros los detecta bien el tiempo. El 37 y el 49 se quedan como
   **supervivientes conocidos**: ningún test ve que falte la caché, que no está en ninguna
-  spec, y Stryker los da por detectados solo porque se pasan de tiempo. Un test que
-  contara las escrituras en la caché los mata con `node --test`, pero no con Stryker: el
-  runner `tap` lanza los ficheros de cada mutante uno detrás de otro, el nuevo iría el
-  último, y los anteriores, más lentos con el mutante, agotan antes el tiempo. Por eso no
-  se añade (decisión de Víctor, 2026-11-20).
+  spec, y Stryker los da por detectados solo porque se pasan de tiempo. Se probó en local
+  un test que cuenta las escrituras en la caché: con `node --test` falla con cada uno de
+  los dos mutantes, pero en una ejecución completa de Stryker los dos siguen en `Timeout`
+  (729 muertos, 6 por tiempo, 57 supervivientes). El informe JSON pone el fichero nuevo el
+  último de los 8 que cubren esas líneas, y el runner `tap` los lanza uno detrás de otro y
+  para en el primero que falla: los anteriores, más lentos con el mutante, agotan antes el
+  tiempo. Por eso no se añade (decisión de Víctor, 2026-11-20).
 - **Aviso** (para VIC-34 y cualquier cambio de runner): **con 2 vCPU el problema vuelve.**
   Si el repo vuelve a ser privado o `mutaciones` pasa a un runner propio o de 2 vCPU,
-  hay que esperar otra vez cientos de mutantes por tiempo y una puntuación inflada. Como
+  hay que esperar otra vez decenas de mutantes por tiempo y una puntuación inflada. Como
   los mutantes por tiempo solo suben la puntuación, Stryker no se pondrá rojo por ello;
   lo pondrá en rojo la alarma de abajo, cuando el #65 esté en `main`. Antes de ese
   cambio, mide de nuevo y valora `concurrency` 1 o 2.
@@ -201,17 +203,23 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   Falla cerrado: si no puede leer el informe JSON, o si Stryker termina bien sin dejarlo,
   el paso también falla. El paso «CPU del runner» anota `nproc` en el log, para ver la
   causa más probable cuando salte.
-  - **Por qué 20:** con 4 vCPU se han medido entre 6 y 16, y con 2 vCPU entre 32 y 135. El
-    20 salta con cualquiera de las mediciones de 2 vCPU, pero sobre el máximo medido con
-    4 vCPU solo deja 4 de margen: un runner algo más cargado puede hacerlo saltar sin
-    que haya un problema de fondo.
-  - **Lo que deja pasar en el peor caso**, con los 734 detectados de hoy: con 20 por
-    tiempo, de los que 4 son los bucles de arriba, hasta 16 podrían ser supervivientes que
-    Stryker cuenta como detectados, y la puntuación real bajaría a 718/792 = 90,66 sin
-    que el check lo note. Si se cuentan como supervivientes los 20, 714/792 = 90,15. Es
-    menos de lo que protege el `break` 92, que salta con 6 supervivientes más: es un
-    **límite aceptado** (decisión de Víctor, 2026-11-20). La alarma separa un runner
-    corto de CPU de uno normal; no sustituye al umbral.
+  - **Por qué 20:** después del corte (4 vCPU; `nproc` solo en las dos ejecuciones del
+    #65) se han medido entre 6 y 16; antes del corte (repo privado, 2 vCPU según GitHub),
+    entre 32 y 135. El 20 salta con cualquiera de las mediciones de antes del corte, pero
+    sobre el máximo de después solo deja 4 de margen: un runner algo más cargado puede
+    hacerlo saltar sin que haya un problema de fondo.
+  - **Lo que deja pasar.** Con 20 por tiempo, de los que 4 son los bucles de arriba, hasta
+    16 podrían ser supervivientes que Stryker cuenta como detectados, sin que el check lo
+    note:
+    - **Partiendo de hoy** (734 detectados): la puntuación real bajaría a 718/792 = 90,66;
+      contando como supervivientes los 20, a 714/792 = 90,15.
+    - **En el peor caso que deja pasar el check:** el `break` 92 admite hasta 729
+      detectados (92,05), y la puntuación real bajaría a 713/792 = 90,03; contando como
+      supervivientes los 20, a 709/792 = 89,52, por debajo de 90. Para quedarse en 90 o
+      más contando todos, el límite tendría que ser 16.
+    - En los dos casos queda por debajo de 92 sin que el `break` lo vea: la alarma separa
+      un runner corto de CPU de uno normal, no sustituye al umbral. El límite de 20 lo
+      decidió Víctor el 2026-11-20 con la cifra de hoy (unos 90,6).
   - **Se revisa el límite** si los mutantes por tiempo pasan de 10 de forma habitual. En
     los ocho jobs posteriores al corte pasaron de 10 en dos (13 y 16); en las dos
     ejecuciones del #65, no.
@@ -243,7 +251,7 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   job casi 6 minutos; bajar a 3 procesos deja 122. Solo con 2 procesos bajan a 41, pero
   el job tarda más de 20 minutos. Que más espera no los recupere apunta a que no son
   ejecuciones algo más lentas, sino procesos que en el runner no terminan. La pista del
-  G4 del #48 (2 vCPU en los repos privados) es la causa que recoge VIC-44, arriba.
+  G4 del #48 (2 vCPU en los repos privados) es la causa más probable que recoge VIC-44, arriba.
 - **Decisión de VIC-27** (Víctor, 2026-11-16; el umbral lo cambia VIC-29, arriba): se
   quedó con 3 procesos, la espera por defecto y `break` 90, sabiendo que en la CI el check
   estaba casi ciego. `mutaciones` corre en cada PR pero **no pasa a check requerido** en
