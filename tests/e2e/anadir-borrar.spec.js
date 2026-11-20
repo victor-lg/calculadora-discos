@@ -9,6 +9,7 @@ import {
   abrirSinDatos, arrastrarSinSoltar,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
+import { instalarContraste } from './contraste.js';
 
 const confirmar = (page) => page.getByRole('button', { name: 'Añadir', exact: true });
 const cancelar = (page) => page.getByRole('button', { name: 'Cancelar' });
@@ -783,50 +784,26 @@ test('SPEC-CALC-003 NFR-01 añadir, "Quitar" con el foco y "Deshacer" miden al m
 
 // Contraste de los textos visibles dentro de `raices` frente a su fondo, con el
 // mismo cálculo que los tests de contraste de presentacion.spec.js.
-const contraste = (page, raices) => page.evaluate((selectores) => {
-  const rgb = (c) => c.match(/[\d.]+/g).map(Number);
-  const lum = ([r, g, b]) => {
-    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const razon = (a, b) => {
-    const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((m, n) => n - m);
-    return (x + 0.05) / (y + 0.05);
-  };
-  const fondo = (el) => {
-    for (let e = el; e; e = e.parentElement) {
-      const c = getComputedStyle(e).backgroundColor;
-      if (rgb(c)[3] !== 0) return c;
+async function contraste(page, raices) {
+  await instalarContraste(page);
+  return page.evaluate((selectores) => {
+    const { razon, visible, textos, conDescendientes } = window.medidasContraste;
+    const opciones = { sinOcultos: true, anchoMinimo: true };
+    const { fallos, medidos } = textos(conDescendientes(selectores), opciones);
+    let bordes = 0;
+    // Bordes de los campos y del botón de añadir (3:1 frente al fondo de la página).
+    const pagina = getComputedStyle(document.body).backgroundColor;
+    for (const sel of ['.abrir-anadir', '.campo-anadir']) {
+      const el = document.querySelector(sel);
+      if (el && visible(el, opciones) && selectores.some((s) => el.closest(s))) {
+        const r = razon(getComputedStyle(el).borderTopColor, pagina);
+        bordes++;
+        if (r < 3) fallos.push(`borde de ${sel}: ${r.toFixed(2)}`);
+      }
     }
-    return getComputedStyle(document.body).backgroundColor;
-  };
-  const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
-    && !el.closest('.oculto') && el.getBoundingClientRect().width > 1;
-  const fallos = [];
-  let medidos = 0;
-  for (const raiz of selectores.flatMap((s) => [...document.querySelectorAll(s)])) {
-    for (const el of [raiz, ...raiz.querySelectorAll('*')]) {
-      const propio = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-      if (!propio || !visible(el)) continue;
-      const s = getComputedStyle(el);
-      const grande = parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.66 && Number(s.fontWeight) >= 700);
-      const r = razon(s.color, fondo(el));
-      medidos++;
-      if (r < (grande ? 3 : 4.5)) fallos.push(`${el.textContent.trim()}: ${r.toFixed(2)}`);
-    }
-  }
-  // Bordes de los campos y del botón de añadir (3:1 frente al fondo de la página).
-  const pagina = getComputedStyle(document.body).backgroundColor;
-  for (const sel of ['.abrir-anadir', '.campo-anadir']) {
-    const el = document.querySelector(sel);
-    if (el && visible(el) && selectores.some((s) => el.closest(s))) {
-      const r = razon(getComputedStyle(el).borderTopColor, pagina);
-      medidos++;
-      if (r < 3) fallos.push(`borde de ${sel}: ${r.toFixed(2)}`);
-    }
-  }
-  return { fallos, medidos };
-}, raices);
+    return { fallos, medidos: medidos + bordes };
+  }, raices);
+}
 
 test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y el aviso de "Deshacer"', async ({ page }) => {
   let r = await contraste(page, ['.anadir']);

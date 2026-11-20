@@ -8,6 +8,7 @@ import {
   tarjeta, disco, abrirSinDatos,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
+import { instalarContraste } from './contraste.js';
 
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
 const CLAVE_RECTA = 'calculadora-discos:v1:peso-recta';
@@ -346,36 +347,10 @@ test('SPEC-CALC-003 NFR-02 contraste de los textos, bordes de campo, interruptor
   await disco(page, '25 kg').click();
   await trabajo(page).focus();
 
+  await instalarContraste(page);
   const fallos = await page.evaluate(() => {
-    const rgb = (c) => c.match(/[\d.]+/g).map(Number);
-    const lum = ([r, g, b]) => {
-      const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-    };
-    const contraste = (a, b) => {
-      const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((m, n) => n - m);
-      return (x + 0.05) / (y + 0.05);
-    };
-    const fondo = (el) => {
-      for (let e = el; e; e = e.parentElement) {
-        const c = getComputedStyle(e).backgroundColor;
-        if (rgb(c)[3] !== 0) return c;
-      }
-      return getComputedStyle(document.body).backgroundColor;
-    };
-    const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-    const fallos = [];
-    const zona = ['.peso', '.plegable', '#avisos'].flatMap((s) => [...document.querySelectorAll(s)]);
-    for (const raiz of zona) {
-      for (const el of [raiz, ...raiz.querySelectorAll('*')]) {
-        const propio = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-        if (!propio || !visible(el)) continue;
-        const s = getComputedStyle(el);
-        const grande = parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.66 && Number(s.fontWeight) >= 700);
-        const r = contraste(s.color, fondo(el));
-        if (r < (grande ? 3 : 4.5)) fallos.push(`${el.textContent.trim()}: ${r.toFixed(2)}`);
-      }
-    }
+    const { razon: contraste, fondo, textos, conDescendientes } = window.medidasContraste;
+    const { fallos } = textos(conDescendientes(['.peso', '.plegable', '#avisos']));
     const borde = (el, lado, pseudo) => {
       const s = getComputedStyle(el, pseudo);
       return contraste(s[`border${lado}Color`], fondo(el.parentElement));
@@ -507,38 +482,10 @@ test('SPEC-CALC-003 NFR-01 las marcas de diferencia miden al menos 44 × 44 px',
 // Mide el contraste de cada texto visible de las tarjetas frente a su fondo,
 // con el mismo cálculo que el test de contraste de arriba. AC-21 mide la
 // pantalla entera en accesibilidad.spec.js.
-const contrasteTarjetas = (page) => page.evaluate(() => {
-  const rgb = (c) => c.match(/[\d.]+/g).map(Number);
-  const lum = ([r, g, b]) => {
-    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const contraste = (a, b) => {
-    const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((m, n) => n - m);
-    return (x + 0.05) / (y + 0.05);
-  };
-  const fondo = (el) => {
-    for (let e = el; e; e = e.parentElement) {
-      const c = getComputedStyle(e).backgroundColor;
-      if (rgb(c)[3] !== 0) return c;
-    }
-    return getComputedStyle(document.body).backgroundColor;
-  };
-  const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
-    && !el.closest('.oculto');
-  const fallos = [];
-  let medidos = 0;
-  for (const el of document.querySelectorAll('#series *')) {
-    const propio = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-    if (!propio || !visible(el)) continue;
-    const s = getComputedStyle(el);
-    const grande = parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.66 && Number(s.fontWeight) >= 700);
-    const r = contraste(s.color, fondo(el));
-    medidos++;
-    if (r < (grande ? 3 : 4.5)) fallos.push(`${el.textContent.trim()}: ${r.toFixed(2)}`);
-  }
-  return { fallos, medidos };
-});
+async function contrasteTarjetas(page) {
+  await instalarContraste(page);
+  return page.evaluate(() => window.medidasContraste.textos(document.querySelectorAll('#series *'), { sinOcultos: true }));
+}
 
 test('SPEC-CALC-003 NFR-02 contraste de las tarjetas: marca plegada y desplegada, explicación, collarín y "Solo la barra"', async ({ page }) => {
   await desplegarPaneles(page);
