@@ -698,8 +698,17 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
 
 El #73 trajo de `main` de sdd-workflow (`92a2b89`) `.github/sdd/checks.py`,
 `.github/workflows/sdd.yml` y `.github/pull_request_template.md`, y el #74 trae
-`AGENTS.md` de la misma versión. Los cuatro coinciden por blob con los de
-`plantilla-proyecto/`. En sdd-workflow no corren los workflows de la plantilla: estos son
+`AGENTS.md` de la misma versión. Los cuatro coinciden con los de `plantilla-proyecto/` por
+blob de Git y por SHA-256:
+
+| Fichero | SHA-256 |
+| --- | --- |
+| `.github/sdd/checks.py` | `e9387ba4a5c1eeccb7355036715d2e1203f2a04ba94c14dd82ecdbbd0d2b0538` |
+| `.github/workflows/sdd.yml` | `2d58b56cb29f8b1e075ddafa1bc65e57ab9f0951708a5602477d7b274c8a4233` |
+| `.github/pull_request_template.md` | `3502b51d1ebdb09aaf4bc795f9b0ffcae000109f1a6d1d21ec80a81e81821bd8` |
+| `AGENTS.md` | `6425404f2b77fb439609390803cbb259c0bbb9a95c522fdc54400a70d87d2e53` |
+
+En sdd-workflow no corren los workflows de la plantilla: estos son
 los primeros `hallazgos` (VIC-38) y `cambios` (VIC-39) en una CI real.
 
 Se provocaron el 2026-11-20 en el #74 con un comentario de prueba de `victor-lg-bot`
@@ -726,11 +735,32 @@ sección de cambios, porque ya no hay ninguna ronda
   `TestHallazgosEnComentarios.test_solo_las_cuentas_autorizadas` en `tests/test_checks.py`
   de sdd-workflow (`92a2b89`): descarta `intruso`, `victor-lg-bot2`, `Victor-LG-bot` y los
   comentarios sin usuario. En la CI real solo se vio la parte de leerlos: el paso
-  «Comentarios del PR» terminó bien en las seis ejecuciones del #74 hasta aquí
-  (las cinco enlazadas y la de su apertura, [44744783174](https://github.com/victor-lg/calculadora-discos/actions/runs/44744783174/job/136317184720)).
-- **Tiempo de `checks-sdd`:** de 5 a 14 s en esas seis ejecuciones (mediana
-  6,5 s), frente a 3 a 14 s (mediana 6 s) en las 35 de los PR del 2026-11-19 y 2026-11-20
-  anteriores al #73. Sin cambio apreciable.
+  «Comentarios del PR» terminó bien (`gh run view`, estado de cada paso) en las seis
+  ejecuciones del #74 hasta aquí: las cinco enlazadas y la de su apertura,
+  [44744783174](https://github.com/victor-lg/calculadora-discos/actions/runs/44744783174/job/136317184720).
+- **Tiempo:** de lo que corre en la CI, el #73 solo cambió `sdd.yml` y `checks.py`, así que lo que puede cambiar la
+  espera por push es la duración del job `checks-sdd` (de su inicio a su fin, con
+  `gh run view`). Fue de 5 a 14 s en esas seis ejecuciones (mediana 6,5 s), frente a 3 a
+  14 s (mediana 6 s) en las 35 ejecuciones `pull_request` de `sdd` anteriores al #73 que
+  devolvía `gh run list --workflow sdd.yml --limit 40`, de los PR del 2026-11-19 y
+  2026-11-20. Sin cambio apreciable.
+
+**Límites que la prueba dejó a la vista** (de la plantilla; cambiarlos queda fuera de
+VIC-46 y va primero en sdd-workflow):
+
+- **Los comentarios de G4 se pueden neutralizar.** Cuentan los de `victor-lg-bot`, que
+  es también la cuenta con la que el agente hace commits y edita el PR, y los checks no
+  leen lo que va en un bloque de código. Si esa cuenta edita la respuesta de un revisor
+  para meterla en un bloque, o la borra, sus hallazgos y su `Commit revisado` dejan de
+  contar sin que lo note ningún control. Es lo que hizo aquí, de forma declarada, el
+  comentario de prueba. GitHub marca como editado un comentario editado y guarda sus
+  versiones: quien fusiona puede comprobar que las respuestas de los revisores no se
+  tocaron después de publicarse.
+- **El veredicto puede quedar desfasado.** Un comentario nuevo, editado o borrado no
+  lanza `sdd`: el `checks-sdd` en verde corresponde a la última edición de la descripción
+  o al último push. El workflow cuenta con que la reconciliación edite después la
+  descripción, pero nada lo exige. Quien fusiona comprueba que la última ejecución de
+  `sdd` es posterior al último comentario de G4.
 
 ## Exclusiones de los escáneres
 
