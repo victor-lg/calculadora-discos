@@ -169,3 +169,26 @@ export const vigilarEntradas = (page) => page.addInitScript(() => {
   };
 });
 export const entradas = (page) => page.evaluate(() => window.entradas.splice(0));
+
+// SPEC-CALC-002 FR-02: toca el tipo `nombre`, comprueba que queda
+// deshabilitado y analiza con axe.
+export async function deshabilitarDisco(page, nombre) {
+  await disco(page, nombre).click();
+  await expect(disco(page, nombre)).not.toBeChecked();
+  await analizarConAxe(page);
+}
+
+// SPEC-CALC-003 FR-06: despliega la marca de diferencia de la tarjeta del P %
+// y comprueba que se ve su explicación.
+export async function desplegarMarca(page, porcentaje) {
+  await tarjeta(page, porcentaje).locator('.diferencia').click();
+  await expect(tarjeta(page, porcentaje).locator('.detalle')).toBeVisible();
+}
+
+// SPEC-CALC-001 FR-01, FR-04 y FR-16: un punto con el 100 % de 500 kg, una
+// carga que no cabe en la manga.
+export async function cargaQueNoCabe(page) {
+  await page.getByLabel('Un punto').check();
+  await anadirPorcentaje(page, '100');
+  await trabajo(page).fill('500');
+}
