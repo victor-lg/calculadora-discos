@@ -655,6 +655,38 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
 - **Decisión pendiente** (la persona): exceptuarlo en `osv-scanner.toml`, como los de
   Stryker, u otra salida. `osv-scanner.toml` es R2 y no está entre los ficheros de VIC-31.
 
+## three.js se queda en 0.170.0 (VIC-30)
+
+- **Hallazgo:** desde la 0.171, el paquete `three` parte su build en dos ficheros
+  (`three.module.min.js` importa `./three.core.min.js`), y desde la 0.186 no publica
+  versión minificada. ADR-0003 §3.3 manda copiar un solo fichero,
+  `build/three.module.min.js`, y sobre esa ruta trabajan `tests/unit/three.test.js` y la
+  excepción de URL de `tests/unit/sw.test.js`. Comprobado el 2026-11-20 con
+  `npm pack --dry-run` y midiendo con las expresiones regulares de `sw.test.js`:
+
+  | Versión | `build/` | Peso de la copia | Regla de red de AC-13 | URL absolutas |
+  | --- | --- | --- | --- | --- |
+  | 0.170.0 (la de hoy) | `three.module.min.js` | 692 KB, 172 KB con gzip | 0 | 1 |
+  | 0.171.0 a 0.185.0 | `three.module.min.js` y `three.core.min.js` | 751 KB, 189 KB con gzip (0.185.0) | 0 | 1 y 1 |
+  | 0.186.0 a 0.187.0 | solo `three.module.js` y `three.core.js`, sin minificar | 2,13 MB, 421 KB con gzip (0.187.0) | 4, en comentarios de `FileLoader` de `three.core.js` | 6 y 118 |
+
+  Con la 0.187.0 fallarían el test de SPEC-CALC-001/AC-13 y la regla de URL, y ninguna
+  versión posterior a la 0.170.0 cabe en ADR-0003 §3.3 sin cambiarlo.
+- **Decisión** (Víctor, 2026-11-20): three se queda en 0.170.0, sin ADR, porque ADR-0003
+  no cambia. Dependabot deja de proponerlo (`ignore` de `three` en
+  `.github/dependabot.yml`, en un PR aparte) y se sube a mano.
+- **Se revisa,** con un ADR que modifique ADR-0003 §3.2 y §3.3, si osv-scanner encuentra
+  una vulnerabilidad en three 0.170.0 o si hace falta algo de una versión posterior. Ese ADR
+  parte de la tabla de arriba y de estas opciones:
+  - **A.** Fijar la 0.185.0, la última minificada, y copiar sus dos ficheros: la excepción
+    de URL y el test de identidad pasan a cubrir dos rutas exactas.
+  - **B.** Copiar la 0.187.0 (o posterior) sin minificar: triplica el peso y exige eximir
+    los comentarios de la regla de AC-13, es decir, relajar un control.
+  - **C.** Minificar en el repositorio o en la CI: es un paso de compilación, que ADR-0001
+    §3.1 descarta.
+- **Qué lo vigila:** osv-scanner lee `package-lock.json`, donde está three 0.170.0, en cada
+  PR y en la tarea mensual (`osv-mensual.yml`).
+
 ## Exclusiones de los escáneres
 
 osv-scanner: seis avisos medios en `osv-scanner.toml` (#49 y #50, VIC-27), todos de
@@ -690,7 +722,7 @@ CI usa el de `main`.
 - **Qué lo cubre:** la versión exacta está en `package.json`; ADR-0003 §3.2 hace de
   cada cambio de versión un PR R2 propio, y el test de identidad de
   `tests/unit/three.test.js` comprueba que la copia es la del paquete (§3.3). Dependabot
-  propone `three` en un PR aparte (`.github/dependabot.yml`).
+  no propone `three`: se sube a mano (ver «three.js se queda en 0.170.0»).
 
 ### `tests/e2e/pantalla.js`
 
