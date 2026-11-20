@@ -6,7 +6,7 @@ import {
   trabajo, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar, discosDeSeries,
   porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar, vigilarEntradas,
   entradas, series, tarjeta, abrirAnadir as abrir, campoAnadir as campo, aviso, deshacer,
-  abrirSinDatos, arrastrarSinSoltar,
+  abrirSinDatos, arrastrarSinSoltar, cargaQueNoCabe,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 import { instalarContraste } from './contraste.js';
@@ -741,9 +741,7 @@ test.describe('sin dibujo 3D', () => {
     await page.getByLabel('25 kg', { exact: true }).click();
 
     // Cambiar de modo: Un punto, 500 kg y el 100 %.
-    await page.getByLabel('Un punto').check();
-    await anadirPorcentaje(page, '100');
-    await trabajo(page).fill('500');
+    await cargaQueNoCabe(page);
     await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm.');
     await analizarConAxe(page);
   });

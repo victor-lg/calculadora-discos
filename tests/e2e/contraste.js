@@ -4,7 +4,8 @@
 // componer transparencias (eso lo hace el de accesibilidad.spec.js, AC-21).
 
 // Se ejecuta en la página: deja las funciones en window.medidasContraste.
-function instalar() {
+// accesibilidad.spec.js la carga como init script para usar `lum`.
+export function medidasContraste() {
   const rgb = (c) => c.match(/[\d.]+/g).map(Number);
   const lum = ([r, g, b]) => {
     const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
@@ -45,9 +46,9 @@ function instalar() {
   // Cada raíz de los selectores seguida de todos sus descendientes.
   const conDescendientes = (selectores) => selectores.flatMap((s) => [...document.querySelectorAll(s)])
     .flatMap((raiz) => [raiz, ...raiz.querySelectorAll('*')]);
-  window.medidasContraste = { razon, fondo, visible, textos, conDescendientes };
+  window.medidasContraste = { lum, razon, fondo, visible, textos, conDescendientes };
 }
 
 // Hay que llamarla antes de cada page.evaluate que use window.medidasContraste:
 // una recarga la borra.
-export const instalarContraste = (page) => page.evaluate(instalar);
+export const instalarContraste = (page) => page.evaluate(medidasContraste);

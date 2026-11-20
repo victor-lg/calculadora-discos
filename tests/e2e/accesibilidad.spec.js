@@ -6,8 +6,10 @@ import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, anadirPorcentaje,
   botonQuitar, quitarSerie, deslizar, porcentajesDeSeries, cargarFuentes, FUENTES_CARGADAS,
   tarjeta, abrirAnadir as abrir, campoAnadir as campo, aviso, deshacer, disco, arrastrarSinSoltar,
+  deshabilitarDisco, desplegarMarca,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
+import { medidasContraste } from './contraste.js';
 
 // Contraste de WCAG 2.x, compartido por las medidas de AC-21. Un color con
 // transparencia se compone con lo que tiene debajo, también el fondo: se
@@ -18,10 +20,8 @@ function instalarContraste() {
     return n.length === 3 ? [...n, 1] : n;
   };
   const sobre = ([r, g, b, a], [fr, fg, fb]) => [r * a + fr * (1 - a), g * a + fg * (1 - a), b * a + fb * (1 - a), 1];
-  const lum = ([r, g, b]) => {
-    const f = (x) => { const v = x / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
+  // La luminancia, la de contraste.js (medidasContraste, cargada antes).
+  const { lum } = window.medidasContraste;
   // El fondo que se ve detrás de `el`, como [r, g, b, 1].
   const fondo = (el) => {
     const capas = [];
@@ -45,6 +45,7 @@ function instalarContraste() {
 }
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(medidasContraste);
   await page.addInitScript(instalarContraste);
   await page.goto('./');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
@@ -256,8 +257,7 @@ test('SPEC-CALC-003/AC-21 contraste con campos con error, marcas, explicación, 
   await expect(disco(page, '25 kg')).not.toBeChecked();
   await trabajo(page).fill('105');
   // El 70 % con la marca desplegada (su explicación) y otra plegada.
-  await tarjeta(page, 70).locator('.diferencia').click();
-  await expect(tarjeta(page, 70).locator('.detalle')).toBeVisible();
+  await desplegarMarca(page, 70);
   await expect(page.locator('.diferencia[aria-expanded="false"]')).not.toHaveCount(0);
   await expect(page.locator('.collarin').first()).toHaveText('+ collarín de 2,5 kg');
   let r = await medirContraste(page);
@@ -463,9 +463,7 @@ test('SPEC-CALC-003/AC-22 al 200 % (195 px) se abren los paneles y se añaden, b
   await botonDiscos(page).click();
   await expect(page.locator('#panel-discos')).toBeVisible();
   await analizarConAxe(page);
-  await disco(page, '25 kg').click();
-  await expect(disco(page, '25 kg')).not.toBeChecked();
-  await analizarConAxe(page);
+  await deshabilitarDisco(page, '25 kg');
   await disco(page, '25 kg').click();
 
   await anadirPorcentaje(page, '55');

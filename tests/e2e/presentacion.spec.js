@@ -5,7 +5,7 @@ import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar,
   porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, quitarTodas, deslizar, series,
-  tarjeta, disco, abrirSinDatos,
+  tarjeta, disco, abrirSinDatos, desplegarMarca,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 import { instalarContraste } from './contraste.js';
@@ -494,8 +494,7 @@ test('SPEC-CALC-003 NFR-02 contraste de las tarjetas: marca plegada y desplegada
   await page.getByRole('switch', { name: /Collarines/ }).check();
   await trabajo(page).fill('105');
   // El 70 % con la marca desplegada y el 90 % con la suya plegada.
-  await tarjeta(page, 70).locator('.diferencia').click();
-  await expect(tarjeta(page, 70).locator('.detalle')).toBeVisible();
+  await desplegarMarca(page, 70);
   await expect(tarjeta(page, 90).locator('.diferencia')).toHaveAttribute('aria-expanded', 'false');
   await expect(series(page).locator('.collarin')).not.toHaveCount(0);
   let r = await contrasteTarjetas(page);

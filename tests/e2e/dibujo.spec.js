@@ -3,7 +3,7 @@
 // comprueban antes y fallan si no lo está, para no pasar en falso por la vista
 // de FR-14 (SPEC-CALC-003 §11, ADR-0003 §4).
 import { test, expect as esperar } from '@playwright/test';
-import { trabajo, pesoBarra, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar, vigilarEntradas, entradas, series, tarjeta, aviso } from './pantalla.js';
+import { trabajo, pesoBarra, barra, desplegarPaneles, anadirPorcentaje, porcentajesDeSeries, deslizar, vigilarEntradas, entradas, series, tarjeta, aviso, cargaQueNoCabe } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
 // En la CI, sin GPU, cada dibujo se pinta por software, y con varios tests a la
@@ -87,9 +87,7 @@ test('SPEC-CALC-003/AC-09 cada tarjeta tiene un dibujo con su etiqueta accesible
 
 test('SPEC-CALC-003/AC-10 en Un punto solo se dibujan los discos que caben en 310 mm', async ({ page }) => {
   await desplegarPaneles(page);
-  await page.getByLabel('Un punto').check();
-  await anadirPorcentaje(page, '100');
-  await trabajo(page).fill('500');
+  await cargaQueNoCabe(page);
   await expect(dibujo(page, 100)).toHaveAttribute('aria-label', 'Carga: 11 de 25 kg');
   // SPEC-CALC-001 FR-16: con el dibujo, el aviso dice que se dibujan los que caben.
   const capacidad = tarjeta(page, 100).locator('.capacidad');
@@ -341,9 +339,7 @@ test('SPEC-CALC-003/AC-19 sin contexto los dibujos siguen; los que cambian se oc
 test('SPEC-CALC-003/AC-19 si al volver a primer plano el contexto no se recupera, la app pasa a la vista sin dibujo', async ({ page }) => {
   test.setTimeout(TIEMPO_CONTEXTO);
   await desplegarPaneles(page);
-  await page.getByLabel('Un punto').check();
-  await anadirPorcentaje(page, '100');
-  await trabajo(page).fill('500');
+  await cargaQueNoCabe(page);
   await expect(tarjeta(page, 100).locator('.capacidad')).toHaveText('No caben en la manga: faltan 23 cm. Se dibujan los que caben.');
   await expect(dibujo(page, 100)).toHaveAttribute('aria-label', 'Carga: 11 de 25 kg');
   await expect(dibujo(page, 100)).toHaveAttribute('data-animando', 'false');

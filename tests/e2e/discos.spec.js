@@ -3,7 +3,7 @@
 import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, pesoBarra, barra, recargar, discosDeSeries, porcentajesDeSeries,
-  anadirPorcentaje, quitarSerie, quitarTodas, series, disco, abrirConPaneles,
+  anadirPorcentaje, quitarSerie, quitarTodas, series, disco, abrirConPaneles, deshabilitarDisco,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 import { segundoPlano, volverDeOtraApp, romperAlmacen } from './ciclo-de-vida.js';
@@ -31,9 +31,7 @@ test.beforeEach(async ({ page }) => {
 test('SPEC-CALC-002/AC-01 los 7 tipos con su peso y su estado; tocar uno lo alterna', async ({ page }) => {
   await expect(page.locator('#lista-discos label')).toHaveText(NOMBRES);
   for (const nombre of NOMBRES) await expect(disco(page, nombre)).toBeChecked();
-  await disco(page, '25 kg').click();
-  await expect(disco(page, '25 kg')).not.toBeChecked();
-  await analizarConAxe(page);
+  await deshabilitarDisco(page, '25 kg');
   await disco(page, '25 kg').click();
   await expect(disco(page, '25 kg')).toBeChecked();
   await analizarConAxe(page);
