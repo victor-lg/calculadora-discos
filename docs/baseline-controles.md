@@ -157,7 +157,7 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   solo con 2 procesos bajaban a 41. En el intervalo del corte solo entró en `main` el #59
   (e2e y `mutaciones` solo fuera del borrador), que no cambia Stryker, y el primer job
   posterior solo trae cambios de `playwright.config.js` y `tests/e2e/axe.js`, que
-  Stryker no ejecuta. Lo medido: el #65 (commit `914446f`, sin fusionar) añade al job un
+  Stryker no ejecuta. Lo medido: el #65 (en su commit `914446f`; en `main`, 11bdb86) añade al job un
   paso con `nproc` y otro que lista los mutantes por tiempo; se ejecutó dos veces sobre el
   mismo commit (run 44630529530, intentos 1 y 2; jobs 135935677140, de 8 min 6 s, y
   135952584002, de 5 min 39 s; duraciones comprobadas con la API de GitHub). Las dos dan
@@ -195,10 +195,10 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   Si el repo vuelve a ser privado o `mutaciones` pasa a un runner propio o de 2 vCPU,
   hay que esperar otra vez decenas de mutantes por tiempo y una puntuación inflada. Como
   los mutantes por tiempo solo suben la puntuación, Stryker no se pondrá rojo por ello;
-  lo pondrá en rojo la alarma de abajo, cuando el #65 esté en `main`. Antes de ese
+  lo pone en rojo la alarma de abajo. Antes de ese
   cambio, mide de nuevo y valora `concurrency` 1 o 2.
-- **Alarma de mutantes por tiempo** (VIC-44; llega con el #65, todavía sin fusionar: hasta
-  entonces, `calidad.yml` en `main` no la tiene). Es el paso «Mutantes por tiempo» del job
+- **Alarma de mutantes por tiempo** (VIC-44, en `main` desde el #65, commit 11bdb86). Es el
+  paso «Mutantes por tiempo» del job
   `mutaciones`. Lista cada mutante que acaba por tiempo y calcula la puntuación
   **contándolos todos como supervivientes**: muertos / (muertos + por tiempo +
   supervivientes + sin cobertura). El job falla si esa puntuación **baja de 90**
@@ -211,7 +211,10 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     con los detectados de hoy: con 729 detectados, lo mínimo que admite el `break` 92,
     20 por tiempo daban 709/792 = 89,52. Calculado sobre el informe de cada ejecución, el
     criterio se cumple con cualquier número de detectados.
-  - **Hoy:** 728/792 = 91,92 (6 por tiempo). Salta en cuanto los muertos bajan de 713
+  - **Hoy:** 728/792 = 91,92 (6 por tiempo), en local y en la última ejecución del #65 con
+    la alarma (run 44650758617, job 136004746062, de 7 min 46 s, comprobado con la API de
+    GitHub; la puntuación, los 6 por tiempo y `nproc` 4 son medición del coordinador desde
+    los logs de Actions, VIC-44). Salta en cuanto los muertos bajan de 713
     (713/792 = 90,03 pasa; 712/792 = 89,90 falla), sea porque los mutantes acaban por
     tiempo o porque sobreviven.
   - **Con las mediciones de las tablas de arriba**, contando muertos sobre 792:
@@ -269,8 +272,8 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   - **Confirmar la causa con `nproc`.** Cumplida a medias: `nproc` da 4 hoy, en dos
     ejecuciones iguales sobre el mismo commit, pero no hay medición del periodo con 2
     vCPU.
-  - **Una alarma de mutantes por tiempo.** Se cumple cuando el #65 esté en `main` con el
-    mínimo de 90 y los nombres de paso de arriba.
+  - **Una alarma de mutantes por tiempo.** Cumplida: está en `main` desde el #65, con el
+    mínimo de 90 y los pasos «CPU del runner» y «Mutantes por tiempo».
 
   La persona decide si con eso basta.
 - **Ficheros de test:** Stryker lanza `tests/unit/**/!(sw).test.js`, los mismos que
