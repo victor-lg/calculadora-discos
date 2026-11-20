@@ -4,19 +4,15 @@
 import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar, discosDeSeries,
-  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar, vigilarEntradas, entradas,
+  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, deslizar, vigilarEntradas,
+  entradas, series, tarjeta, abrirAnadir as abrir, campoAnadir as campo, aviso, deshacer,
+  abrirSinDatos, arrastrarSinSoltar,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
-const series = (page) => page.locator('#series > li');
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
-const abrir = (page) => page.getByRole('button', { name: 'Añadir porcentaje' });
-const campo = (page) => page.getByLabel('Nuevo porcentaje');
 const confirmar = (page) => page.getByRole('button', { name: 'Añadir', exact: true });
 const cancelar = (page) => page.getByRole('button', { name: 'Cancelar' });
 const error = (page) => page.locator('#error-porcentaje');
-const aviso = (page) => page.locator('#aviso-borrado');
-const deshacer = (page) => page.getByRole('button', { name: 'Deshacer' });
 const ROJO = 'rgb(229, 72, 77)';
 
 // Mantiene pulsada la tarjeta sin mover el puntero y la suelta.
@@ -45,9 +41,7 @@ async function segundoPlano(page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
-  expect(await page.evaluate(() => localStorage.length)).toBe(0);
-  await analizarConAxe(page);
+  await abrirSinDatos(page);
 });
 
 test('SPEC-CALC-003/AC-01 de arriba abajo: peso, Carga y Mis discos plegados, las tarjetas y "+ Añadir porcentaje"', async ({ page }) => {
@@ -92,13 +86,7 @@ test('SPEC-CALC-003/AC-11 el fondo "Borrar" aparece al arrastrar y cambia pasado
   const t = tarjeta(page, 70);
   const fondo = t.locator('.fondo-borrar');
   await expect(fondo).toBeHidden();
-  await t.scrollIntoViewIfNeeded();
-  const caja = await t.boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - caja.width * 0.1, y, { steps: 5 });
+  const { caja, x, y } = await arrastrarSinSoltar(page, t, 0.1);
   await expect(fondo).toBeVisible();
   await expect(fondo).toHaveText('Borrar');
   await expect(fondo).toHaveCSS('background-color', 'rgb(59, 28, 30)');
@@ -858,13 +846,7 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
 
   // El fondo de borrar antes y después del 35 %.
   const t = tarjeta(page, 70);
-  await t.scrollIntoViewIfNeeded();
-  const caja = await t.boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
+  const { caja, x, y } = await arrastrarSinSoltar(page, t, 0.2);
   r = await contraste(page, ['.arrastra .fondo-borrar']);
   expect(r).toEqual({ fallos: [], medidos: 1 });
   await analizarConAxe(page);
@@ -897,13 +879,7 @@ test('SPEC-CALC-003 NFR-02 contraste de añadir, el fondo de borrar, "Quitar" y 
 test('SPEC-CALC-003/AC-11 con "Reducir movimiento", borrar y devolver la tarjeta no tienen transición', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const t = tarjeta(page, 70);
-  await t.scrollIntoViewIfNeeded();
-  const caja = await t.boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x - caja.width * 0.2, y, { steps: 5 });
+  const { caja, x, y } = await arrastrarSinSoltar(page, t, 0.2);
   expect((await t.locator('.serie').boundingBox()).x).toBeLessThan(caja.x);
   await analizarConAxe(page);
   await page.mouse.up();

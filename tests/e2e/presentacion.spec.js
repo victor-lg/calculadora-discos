@@ -4,7 +4,8 @@
 import { test, expect } from './sin-dibujo.js';
 import {
   trabajo, pesoBarra, barra, botonCarga, botonDiscos, desplegarPaneles, copiar, pegar,
-  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, quitarTodas, deslizar,
+  porcentajesDeSeries, anadirPorcentaje, botonQuitar, quitarSerie, quitarTodas, deslizar, series,
+  tarjeta, disco, abrirSinDatos,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 
@@ -13,13 +14,10 @@ const CLAVE_RECTA = 'calculadora-discos:v1:peso-recta';
 const NOMBRES = ['25 kg', '20 kg', '15 kg', '10 kg', '5 kg', '2,5 kg', '1,25 kg'];
 const REVISAR_BARRA = 'Revisa el peso de la barra en Carga.';
 
-const series = (page) => page.locator('#series > li');
 const resumenCarga = (page) => page.locator('#resumen-carga');
 const avisos = (page) => page.locator('#avisos > .aviso:not([hidden])');
-const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
 const guardado = (page, clave) => page.evaluate((c) => localStorage.getItem(c), clave);
 const pesosFichas = (page) => page.locator('#lista-barras .ficha');
-const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
 
 // Pliega el panel Carga sin quitar el foco del campo que lo tenga, como pasa a
 // veces en iOS al tocar otro control (ADR-0005 §3).
@@ -31,9 +29,7 @@ const romperAlmacen = (page) => page.evaluate(() => {
 });
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
-  expect(await page.evaluate(() => localStorage.length)).toBe(0);
-  await analizarConAxe(page);
+  await abrirSinDatos(page);
 });
 
 test('SPEC-CALC-003/AC-02 el peso de trabajo: etiqueta, "kg", 6 caracteres, teclado decimal y crece con el texto', async ({ page }) => {

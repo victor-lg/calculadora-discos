@@ -1,5 +1,6 @@
 // Localizadores de la pantalla de SPEC-CALC-003 que comparten los E2E.
 import { expect } from '@playwright/test';
+import { analizarConAxe } from './axe.js';
 
 export const trabajo = (page) => page.getByLabel('Peso de trabajo', { exact: true });
 export const pesoBarra = (page) => page.getByLabel('Peso de la barra', { exact: true });
@@ -7,6 +8,32 @@ export const pesoBarra = (page) => page.getByLabel('Peso de la barra', { exact: 
 export const barra = (page, nombre) => page.getByRole('radio', { name: new RegExp(`^${nombre}( |$)`) });
 export const botonCarga = (page) => page.getByRole('button', { name: /^Carga/ });
 export const botonDiscos = (page) => page.getByRole('button', { name: /^Mis discos/ });
+export const disco = (page, nombre) => page.getByLabel(nombre, { exact: true });
+// FR-01: las tarjetas de las series, y la del porcentaje P.
+export const series = (page) => page.locator('#series > li');
+export const tarjeta = (page, porcentaje) => series(page).filter({ has: page.locator('.porcentaje', { hasText: `${porcentaje} %` }) });
+// FR-09: el botón "+ Añadir porcentaje" y el campo que abre.
+export const abrirAnadir = (page) => page.getByRole('button', { name: 'Añadir porcentaje' });
+export const campoAnadir = (page) => page.getByLabel('Nuevo porcentaje');
+// FR-08: el aviso de la serie borrada y su botón.
+export const aviso = (page) => page.locator('#aviso-borrado');
+export const deshacer = (page) => page.getByRole('button', { name: 'Deshacer' });
+
+// Abre la app y comprueba que no hay nada guardado: Playwright da a cada test
+// un contexto propio, así que ningún test hereda lo que guardó otro (por
+// ejemplo, tipos de disco deshabilitados). Analiza con axe lo que se ve.
+export async function abrirSinDatos(page) {
+  await page.goto('./');
+  expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  await analizarConAxe(page);
+}
+
+// abrirSinDatos y, después, los paneles desplegados, también analizados.
+export async function abrirConPaneles(page) {
+  await abrirSinDatos(page);
+  await desplegarPaneles(page);
+  await analizarConAxe(page);
+}
 
 // FR-01: los paneles arrancan plegados. Los recorridos que usan sus controles
 // los despliegan primero.
@@ -68,9 +95,9 @@ export const porcentajesDeSeries = (page) => page.locator('#series > li .porcent
 
 // FR-09: añade un porcentaje con el campo de añadir, que abre si está cerrado.
 export async function anadirPorcentaje(page, texto) {
-  const abrir = page.getByRole('button', { name: 'Añadir porcentaje' });
+  const abrir = abrirAnadir(page);
   if (await abrir.isVisible()) await abrir.click();
-  await page.getByLabel('Nuevo porcentaje').fill(texto);
+  await campoAnadir(page).fill(texto);
   await page.getByRole('button', { name: 'Añadir', exact: true }).click();
 }
 
@@ -96,15 +123,33 @@ export async function quitarTodas(page) {
   }
 }
 
+// FR-08: pone el puntero sobre la caja de una tarjeta, a media altura y al
+// 80 % de su ancho, y lo pulsa sin soltarlo. Devuelve ese punto.
+async function pulsarParaArrastrar(page, caja) {
+  const y = caja.y + caja.height / 2;
+  const x = caja.x + caja.width * 0.8;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  return { x, y };
+}
+
+// FR-08: pulsa sobre `objetivo` y lo arrastra hacia la izquierda una fracción
+// de su ancho, en 5 pasos y sin soltarlo. Devuelve su caja y el punto de
+// partida, para seguir moviendo.
+export async function arrastrarSinSoltar(page, objetivo, fraccion) {
+  await objetivo.scrollIntoViewIfNeeded();
+  const caja = await objetivo.boundingBox();
+  const { x, y } = await pulsarParaArrastrar(page, caja);
+  await page.mouse.move(x - caja.width * fraccion, y, { steps: 5 });
+  return { caja, x, y };
+}
+
 // FR-08: desliza con el puntero la tarjeta hacia la izquierda una fracción de
 // su ancho y la suelta.
 export async function deslizar(page, tarjeta, fraccion) {
   await tarjeta.scrollIntoViewIfNeeded();
   const caja = await tarjeta.locator('.serie').boundingBox();
-  const y = caja.y + caja.height / 2;
-  const x = caja.x + caja.width * 0.8;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
+  const { x, y } = await pulsarParaArrastrar(page, caja);
   const pasos = 10;
   for (let i = 1; i <= pasos; i++) await page.mouse.move(x - (caja.width * fraccion * i) / pasos, y);
   await page.mouse.up();
