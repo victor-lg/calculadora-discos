@@ -6,6 +6,7 @@ import {
   porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
+import { segundoPlano, volverDeOtraApp, romperAlmacen } from './ciclo-de-vida.js';
 
 const CLAVE_DISCOS = 'calculadora-discos:v1:discos';
 const CLAVE_PORCENTAJES = 'calculadora-discos:v1:porcentajes';
@@ -156,21 +157,9 @@ test('SPEC-CALC-002/AC-13 volver de otra app conserva los tipos sin recargar', a
   await disco(page, '25 kg').click();
   await expect.poll(() => discosDeSeries(page)).toEqual(['20 + 15']);
   await analizarConAxe(page);
-  await page.evaluate(() => { window.marcaSinRecarga = true; });
 
-  const otra = await context.newPage();
-  await otra.bringToFront();
-  await page.bringToFront();
-  await otra.close();
-  await page.evaluate(() => {
-    for (const tipo of ['visibilitychange', 'pagehide', 'pageshow', 'freeze', 'resume']) {
-      const destino = tipo === 'visibilitychange' || tipo === 'freeze' || tipo === 'resume'
-        ? document : window;
-      destino.dispatchEvent(new Event(tipo));
-    }
-  });
+  await volverDeOtraApp(page, context);
 
-  expect(await page.evaluate(() => window.marcaSinRecarga)).toBe(true);
   await expect(disco(page, '25 kg')).not.toBeChecked();
   await expect.poll(() => discosDeSeries(page)).toEqual(['20 + 15']);
   await analizarConAxe(page);
@@ -182,15 +171,7 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
   await expect(avisoGuardado(page)).toBeHidden();
   await analizarConAxe(page);
   // El almacenamiento deja de poder guardar (como con la cuota llena).
-  await page.evaluate(() => {
-    const original = Storage.prototype.setItem;
-    window.romperAlmacen = (roto) => {
-      Storage.prototype.setItem = roto
-        ? () => { throw new DOMException('Lleno', 'QuotaExceededError'); }
-        : original;
-    };
-    window.romperAlmacen(true);
-  });
+  await romperAlmacen(page);
 
   await disco(page, '25 kg').click();
   await expect(disco(page, '25 kg')).not.toBeChecked();
@@ -219,17 +200,6 @@ test('SPEC-CALC-002/AC-14 si no se puede guardar, la app sigue y avisa hasta que
   await analizarConAxe(page);
 });
 
-// SPEC-CALC-001 FR-11: la app pasa a segundo plano y vuelve.
-async function segundoPlano(page) {
-  await page.evaluate(() => {
-    for (const estado of ['hidden', 'visible']) {
-      Object.defineProperty(document, 'visibilityState', { value: estado, configurable: true });
-      document.dispatchEvent(new Event('visibilitychange'));
-    }
-    delete document.visibilityState;
-  });
-}
-
 test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: el aviso compara lo confirmado', async ({ page }) => {
   // Peso de trabajo guardado "100".
   await trabajo(page).fill('101');
@@ -240,15 +210,7 @@ test('SPEC-CALC-002/AC-15 peso de trabajo, collarines y peso de la Z: el aviso c
   await recargar(page);
   await expect(avisoGuardado(page)).toBeHidden();
   await analizarConAxe(page);
-  await page.evaluate(() => {
-    const original = Storage.prototype.setItem;
-    window.romperAlmacen = (roto) => {
-      Storage.prototype.setItem = roto
-        ? () => { throw new DOMException('Lleno', 'QuotaExceededError'); }
-        : original;
-    };
-    window.romperAlmacen(true);
-  });
+  await romperAlmacen(page);
 
   // Mientras se escribe, el aviso no aparece; al salir del campo, sí.
   await trabajo(page).fill('');

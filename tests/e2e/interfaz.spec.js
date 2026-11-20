@@ -5,6 +5,7 @@ import {
   porcentajesDeSeries, anadirPorcentaje, quitarSerie, quitarTodas, deslizar,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
+import { segundoPlano, volverDeOtraApp } from './ciclo-de-vida.js';
 
 const CLAVE = 'calculadora-discos:v1:porcentajes';
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
@@ -191,17 +192,6 @@ test('SPEC-CALC-001/AC-33 datos guardados que faltan, rotos o no válidos: cada 
   await expect(page.getByLabel('Collarines de competición')).toBeChecked();
   await analizarConAxe(page);
 });
-
-// FR-11: la app pasa a segundo plano y vuelve, con el foco donde estuviera.
-async function segundoPlano(page) {
-  await page.evaluate(() => {
-    for (const estado of ['hidden', 'visible']) {
-      Object.defineProperty(document, 'visibilityState', { value: estado, configurable: true });
-      document.dispatchEvent(new Event('visibilitychange'));
-    }
-    delete document.visibilityState;
-  });
-}
 
 // "Cierra la app y la vuelve a abrir" (SPEC-CALC-001 §5): pasa antes a
 // segundo plano, y vuelve en un arranque de cero.
@@ -438,22 +428,11 @@ test('SPEC-CALC-001/AC-22 volver de otra app conserva todo el estado sin recarga
   await trabajo(page).fill('50');
   const antes = await series(page).allTextContents();
   expect(antes).toHaveLength(3);
-  await page.evaluate(() => { window.marcaSinRecarga = true; });
 
-  // Pasar a otra pestaña y volver, y los eventos de ciclo de vida de iOS.
-  const otra = await context.newPage();
-  await otra.bringToFront();
-  await page.bringToFront();
-  await otra.close();
-  await page.evaluate(() => {
-    for (const tipo of ['visibilitychange', 'pagehide', 'pageshow', 'freeze', 'resume']) {
-      const destino = tipo === 'visibilitychange' || tipo === 'freeze' || tipo === 'resume'
-        ? document : window;
-      destino.dispatchEvent(new Event(tipo));
-    }
-  });
+  // Pasar a otra pestaña y volver, y los eventos de ciclo de vida de iOS, sin
+  // que la página se recargue.
+  await volverDeOtraApp(page, context);
 
-  expect(await page.evaluate(() => window.marcaSinRecarga)).toBe(true);
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
   await expect(barra(page, 'Z')).toBeChecked();
   await expect(pesoBarra(page)).toHaveValue('8,5');
