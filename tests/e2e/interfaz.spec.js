@@ -102,6 +102,14 @@ test('SPEC-CALC-001/AC-10 las series se actualizan al momento con cada cambio', 
   await analizarConAxe(page);
 });
 
+// SPEC-CALC-001 FR-02: la recta y la Z muestran 7,5 y 8,5 kg al elegirlas.
+async function verPesosRectaYZ(page) {
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+  await barra(page, 'Z').check();
+  await expect(pesoBarra(page)).toHaveValue('8,5');
+}
+
 test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo y la barra no', async ({ page }) => {
   // La primera vez: 40/70/90, "100" con las series de AC-01, Barra, 20 kg, sin collarines y recta y Z de 10 kg.
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
@@ -135,10 +143,7 @@ test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
   await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
   await expect(page.getByLabel('Collarines de competición')).toBeChecked();
-  await barra(page, 'Recta').check();
-  await expect(pesoBarra(page)).toHaveValue('7,5');
-  await barra(page, 'Z').check();
-  await expect(pesoBarra(page)).toHaveValue('8,5');
+  await verPesosRectaYZ(page);
   await expect(page.locator('#aviso-guardado')).toBeHidden();
   await analizarConAxe(page);
 
@@ -485,10 +490,7 @@ test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último pes
   await pesoBarra(page).fill('7,50');
   await barra(page, 'Z').check();
   await pesoBarra(page).fill('8.5');
-  await barra(page, 'Recta').check();
-  await expect(pesoBarra(page)).toHaveValue('7,5');
-  await barra(page, 'Z').check();
-  await expect(pesoBarra(page)).toHaveValue('8,5');
+  await verPesosRectaYZ(page);
   await analizarConAxe(page);
 
   await barra(page, 'Recta').check();
@@ -514,10 +516,7 @@ test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último pes
 
   // Al arrancar de cero, cada barra muestra su último peso válido guardado.
   await recargar(page);
-  await barra(page, 'Recta').check();
-  await expect(pesoBarra(page)).toHaveValue('7,5');
-  await barra(page, 'Z').check();
-  await expect(pesoBarra(page)).toHaveValue('8,5');
+  await verPesosRectaYZ(page);
   await analizarConAxe(page);
 });
 
