@@ -185,8 +185,8 @@ export async function desplegarMarca(page, porcentaje) {
   await expect(tarjeta(page, porcentaje).locator('.detalle')).toBeVisible();
 }
 
-// SPEC-CALC-001 FR-01 y FR-04: un punto con el 100 % de 500 kg, una carga que
-// no cabe en la manga.
+// SPEC-CALC-001 FR-01, FR-04 y FR-16: un punto con el 100 % de 500 kg, una
+// carga que no cabe en la manga.
 export async function cargaQueNoCabe(page) {
   await page.getByLabel('Un punto').check();
   await anadirPorcentaje(page, '100');
