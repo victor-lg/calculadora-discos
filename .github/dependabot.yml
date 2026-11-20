@@ -30,12 +30,14 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
-    # three va aparte: ADR-0003 §3.2 hace de cada cambio de versión un PR R2 propio, y su
-    # PR falla en tests/unit/three.test.js hasta que se copia la versión nueva a app/vendor.
+    # three se sube a mano: desde la 0.171 su build no cabe en ADR-0003 §3.3 (dos ficheros y,
+    # desde la 0.186, sin minificar). Se queda en 0.170.0 hasta un ADR que lo cambie; ver
+    # «three.js se queda en 0.170.0» en docs/baseline-controles.md (VIC-30).
+    ignore:
+      - dependency-name: "three"
     groups:
       npm:
         patterns: ["*"]
-        exclude-patterns: ["three"]
     commit-message:
       prefix: chore
       prefix-development: chore
