@@ -661,20 +661,27 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
   (`three.module.min.js` importa `./three.core.min.js`), y desde la 0.186 no publica
   versión minificada. ADR-0003 §3.3 manda copiar un solo fichero,
   `build/three.module.min.js`, y sobre esa ruta trabajan `tests/unit/three.test.js` y la
-  excepción de URL de `tests/unit/sw.test.js`. Comprobado el 2026-11-20 con
-  `npm pack --dry-run` y midiendo con las expresiones regulares de `sw.test.js`:
+  excepción de URL de `tests/unit/sw.test.js`. Comprobado el 2026-11-20:
+  - la columna `build/`, con `npm pack --dry-run` en 0.171.0, 0.172.0, 0.175.0, 0.178.0,
+    0.180.0, 0.182.0, 0.184.0, 0.185.0, 0.186.0 y 0.186.1, y en el paquete instalado de
+    0.187.0;
+  - el peso y los recuentos, solo en la copia de hoy, en el paquete de 0.185.0 descargado
+    con `npm pack` y en el instalado de 0.187.0: bytes del fichero, gzip con
+    `zlib.gzipSync` de Node, y las expresiones regulares de `sw.test.js` aplicadas con Node.
+    KB y MB son de 1000 bytes.
 
   | Versión | `build/` | Peso de la copia | Regla de red de AC-13 | URL absolutas |
   | --- | --- | --- | --- | --- |
   | 0.170.0 (la de hoy) | `three.module.min.js` | 692 KB, 172 KB con gzip | 0 | 1 |
-  | 0.171.0 a 0.185.0 | `three.module.min.js` y `three.core.min.js` | 751 KB, 189 KB con gzip (0.185.0) | 0 | 1 y 1 |
-  | 0.186.0 a 0.187.0 | solo `three.module.js` y `three.core.js`, sin minificar | 2,13 MB, 421 KB con gzip (0.187.0) | 4, en comentarios de `FileLoader` de `three.core.js` | 6 y 118 |
+  | 0.171.0 a 0.185.0 | `three.module.min.js` y `three.core.min.js` | medido en 0.185.0: 751 KB, 189 KB con gzip | medido en 0.185.0: 0 | medido en 0.185.0: 1 y 1 |
+  | 0.186.0 a 0.187.0 | solo `three.module.js` y `three.core.js`, sin minificar | medido en 0.187.0: 2,13 MB, 421 KB con gzip | medido en 0.187.0: 4, en comentarios de `FileLoader` de `three.core.js` | medido en 0.187.0: 6 y 118 |
 
   Con la 0.187.0 fallarían el test de SPEC-CALC-001/AC-13 y la regla de URL, y ninguna
   versión posterior a la 0.170.0 cabe en ADR-0003 §3.3 sin cambiarlo.
 - **Decisión** (Víctor, 2026-11-20): three se queda en 0.170.0, sin ADR, porque ADR-0003
-  no cambia. Dependabot deja de proponerlo (`ignore` de `three` en
-  `.github/dependabot.yml`, en un PR aparte) y se sube a mano.
+  no cambia. Se sube a mano: Dependabot deja de proponerlo cuando se fusione el `ignore` de
+  `three` en `.github/dependabot.yml`, que va en un PR aparte (R2). Hasta entonces, su PR
+  de `three` falla en `tests/unit/three.test.js` y se cierra.
 - **Se revisa,** con un ADR que modifique ADR-0003 §3.2 y §3.3, si osv-scanner encuentra
   una vulnerabilidad en three 0.170.0 o si hace falta algo de una versión posterior. Ese ADR
   parte de la tabla de arriba y de estas opciones:
@@ -722,7 +729,7 @@ CI usa el de `main`.
 - **Qué lo cubre:** la versión exacta está en `package.json`; ADR-0003 §3.2 hace de
   cada cambio de versión un PR R2 propio, y el test de identidad de
   `tests/unit/three.test.js` comprueba que la copia es la del paquete (§3.3). Dependabot
-  no propone `three`: se sube a mano (ver «three.js se queda en 0.170.0»).
+  no debe proponer `three`, que se sube a mano (ver «three.js se queda en 0.170.0»).
 
 ### `tests/e2e/pantalla.js`
 
