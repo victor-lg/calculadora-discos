@@ -3,11 +3,9 @@
 // @axe-core/playwright, y el test falla si no sabe leer ese rango.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { leerDeRaiz } from './raiz.js';
 
-const RAIZ = fileURLToPath(new URL('../../', import.meta.url));
-const leer = (ruta) => JSON.parse(readFileSync(`${RAIZ}${ruta}`, 'utf8'));
+const leer = (ruta) => JSON.parse(leerDeRaiz(ruta));
 const EXACTA = /^(\d+)\.(\d+)\.(\d+)$/;
 
 // Solo las formas que usa npm para un paquete así: exacta, ~ y ^, sobre una

@@ -2,11 +2,7 @@
 // la del paquete de la versión fijada en package.json, con su licencia.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-const RAIZ = fileURLToPath(new URL('../../', import.meta.url));
-const leer = (ruta) => readFileSync(`${RAIZ}${ruta}`);
+import { leerDeRaiz as leer } from './raiz.js';
 
 test('three.js tiene una versión exacta y es la instalada', () => {
   const version = JSON.parse(leer('package.json')).dependencies.three;
