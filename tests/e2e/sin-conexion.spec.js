@@ -5,7 +5,7 @@
 import { test, expect } from '@playwright/test';
 import {
   trabajo, pesoBarra, barra, desplegarPaneles, discosDeSeries, anadirPorcentaje, quitarSerie,
-  cargarFuentes, FUENTES_CARGADAS, series,
+  cargarFuentes, FUENTES_CARGADAS,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
 import { readFileSync } from 'node:fs';
@@ -14,6 +14,8 @@ import { arrancar } from './servidor.js';
 test.use({ serviceWorkers: 'allow' });
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'El tráfico del service worker solo se ve en Chromium');
+
+const series = (page) => page.locator('#series > li');
 
 // NFR-02: las únicas peticiones son para descargar o actualizar la app, es
 // decir, los ficheros que precarga el service worker y el propio sw.js.
