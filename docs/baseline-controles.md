@@ -696,7 +696,41 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
 
 ## Checks `hallazgos` y `cambios` en CI real (VIC-46)
 
-Pendiente: resultado de los cinco casos de VIC-46.
+El #73 trajo de `main` de sdd-workflow (`92a2b89`) `.github/sdd/checks.py`,
+`.github/workflows/sdd.yml` y `.github/pull_request_template.md`, y el #74 trae
+`AGENTS.md` de la misma versión. Los cuatro coinciden por blob con los de
+`plantilla-proyecto/`. En sdd-workflow no corren los workflows de la plantilla: estos son
+los primeros `hallazgos` (VIC-38) y `cambios` (VIC-39) en una CI real.
+
+Se provocaron el 2026-11-20 en el #74 con un comentario de prueba de `victor-lg-bot`
+(`issuecomment-7040976878`), con `Commit revisado: G4-1-A · 122a9ca…` y un hallazgo
+`G4-1-A-01`, y con la descripción del PR. Un comentario nuevo no lanza `sdd`: cada caso se
+relanzó editando la descripción (`edited`) o con un push (`synchronize`).
+
+| Caso | Cómo se provocó | Resultado | Ejecución |
+| --- | --- | --- | --- |
+| 1. Un hallazgo sin línea de reconciliación hace fallar `hallazgos` | el comentario, sin la línea de `G4-1-A-01` en la descripción | falla: «los revisores dieron `G4-1-A-01` y la reconciliación no tiene su línea» | [44746270877](https://github.com/victor-lg/calculadora-discos/actions/runs/44746270877/job/136322289301) |
+| 2. El comentario de una cuenta no autorizada se ignora | no se provocó: ver abajo | — | — |
+| 3. Sin `Commit revisado`, falla `cambios` | el comentario, editado sin esa línea | falla: «falta el commit que vio `G4-1-A`» | [44746462100](https://github.com/victor-lg/calculadora-discos/actions/runs/44746462100/job/136322933569) |
+| 4. La lista de cambios sale en el resumen de `checks-sdd` | la línea de reconciliación en la descripción y un push con `4e7829c` | pasa; la sección «Cambios tras la última ronda» lista `4e7829c` y su fichero | [44746359159](https://github.com/victor-lg/calculadora-discos/actions/runs/44746359159/job/136322609304) |
+| 5. Una lista escrita a mano hace fallar `cambios` | `- **Cambios tras la última ronda:** …` en la descripción | falla: «la descripción del PR trae una lista de «Cambios tras la última ronda» escrita a mano» | [44746529391](https://github.com/victor-lg/calculadora-discos/actions/runs/44746529391/job/136323170142) |
+
+Después, el comentario de prueba pasó a un bloque de código, que los checks no leen, y la
+descripción perdió la línea de reconciliación y la lista: `checks-sdd` en verde y sin
+sección de cambios, porque ya no hay ninguna ronda
+([44746606527](https://github.com/victor-lg/calculadora-discos/actions/runs/44746606527/job/136323437744)).
+
+- **Caso 2, solo con los tests de la plantilla:** `checks.py` cuenta los comentarios de
+  `CUENTAS_G4` (`victor-lg-bot` y `victor-lg`), y no hay una tercera cuenta que pueda
+  comentar en el repo (Víctor, 2026-11-20). Lo cubre
+  `TestHallazgosEnComentarios.test_solo_las_cuentas_autorizadas` en `tests/test_checks.py`
+  de sdd-workflow (`92a2b89`): descarta `intruso`, `victor-lg-bot2`, `Victor-LG-bot` y los
+  comentarios sin usuario. En la CI real solo se vio la parte de leerlos: el paso
+  «Comentarios del PR» terminó bien en las seis ejecuciones del #74 hasta aquí
+  (las cinco enlazadas y la de su apertura, [44744783174](https://github.com/victor-lg/calculadora-discos/actions/runs/44744783174/job/136317184720)).
+- **Tiempo de `checks-sdd`:** de 5 a 14 s en esas seis ejecuciones (mediana
+  6,5 s), frente a 3 a 14 s (mediana 6 s) en las 35 de los PR del 2026-11-19 y 2026-11-20
+  anteriores al #73. Sin cambio apreciable.
 
 ## Exclusiones de los escáneres
 
