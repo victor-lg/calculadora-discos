@@ -199,36 +199,41 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   cambio, mide de nuevo y valora `concurrency` 1 o 2.
 - **Alarma de mutantes por tiempo** (VIC-44; llega con el #65, todavía sin fusionar: hasta
   entonces, `calidad.yml` en `main` no la tiene). Es el paso «Mutantes por tiempo» del job
-  `mutaciones`: lista cada mutante que acaba por tiempo y el job falla si pasan de **20**.
-  Falla cerrado: si no puede leer el informe JSON, o si Stryker termina bien sin dejarlo,
-  el paso también falla. El paso «CPU del runner» anota `nproc` en el log, para ver la
-  causa más probable cuando salte.
-  - **Por qué 20:** después del corte (4 vCPU; `nproc` solo en las dos ejecuciones del
-    #65) se han medido entre 6 y 16; antes del corte (repo privado, 2 vCPU según GitHub),
-    entre 32 y 135. El 20 salta con cualquiera de las mediciones de antes del corte, pero
-    sobre el máximo de después solo deja 4 de margen: un runner algo más cargado puede
-    hacerlo saltar sin que haya un problema de fondo.
-  - **Lo que deja pasar.** Con 20 por tiempo, de los que 4 son los bucles de arriba, hasta
-    16 podrían ser supervivientes que Stryker cuenta como detectados, sin que el check lo
-    note:
-    - **Partiendo de hoy** (734 detectados): la puntuación real bajaría a 718/792 = 90,66;
-      contando como supervivientes los 20, a 714/792 = 90,15.
-    - **En el peor caso que deja pasar el check:** el `break` 92 admite hasta 729
-      detectados (92,05), y la puntuación real bajaría a 713/792 = 90,03; contando como
-      supervivientes los 20, a 709/792 = 89,52, por debajo de 90. Para quedarse en 90 o
-      más contando todos, el límite tendría que ser 16.
-    - En los dos casos queda por debajo de 92 sin que el `break` lo vea: la alarma separa
-      un runner corto de CPU de uno normal, no sustituye al umbral. El límite de 20 lo
-      decidió Víctor el 2026-11-20 con la cifra de hoy (unos 90,6).
-  - **Se revisa el límite** si los mutantes por tiempo pasan de 10 de forma habitual. En
-    los ocho jobs posteriores al corte pasaron de 10 en dos (13 y 16); en las dos
-    ejecuciones del #65, no.
-  - **Comprobado en local** contra el informe JSON, con el paso sacado del `calidad.yml`
-    propuesto:
-    - con el límite de 20 o de 6, pasa;
-    - con un límite de 5, falla con el mensaje de la alarma;
-    - con un límite que no es un número, con un informe que no es JSON válido, o con
-      Stryker terminado bien y sin informe, falla;
+  `mutaciones`. Lista cada mutante que acaba por tiempo y calcula la puntuación
+  **contándolos todos como supervivientes**: muertos / (muertos + por tiempo +
+  supervivientes + sin cobertura). El job falla si esa puntuación **baja de 90**
+  (`PUNTUACION_MINIMA_SIN_TIEMPO`). Falla cerrado: si no puede leer el informe JSON o el
+  mínimo, o si Stryker termina bien sin dejar informe, el paso también falla. El paso «CPU
+  del runner» anota `nproc` en el log, para ver la causa más probable cuando salte.
+  - **Por qué así y no un número fijo de mutantes por tiempo** (decisión de Víctor,
+    2026-11-20): el criterio es que la puntuación siga por encima de 90 aunque todos los
+    mutantes por tiempo fueran supervivientes. Un límite fijo (20 o 16) solo lo cumplía
+    con los detectados de hoy: con 729 detectados, lo mínimo que admite el `break` 92,
+    20 por tiempo daban 709/792 = 89,52. Calculado sobre el informe de cada ejecución, el
+    criterio se cumple con cualquier número de detectados.
+  - **Hoy:** 728/792 = 91,92 (6 por tiempo). Salta en cuanto los muertos bajan de 713
+    (713/792 = 90,03 pasa; 712/792 = 89,90 falla), sea porque los mutantes acaban por
+    tiempo o porque sobreviven.
+  - **Con las mediciones de las tablas de arriba**, contando muertos sobre 792:
+    - Después del corte (4 vCPU), entre 720 y 728 muertos: entre 90,91 y 91,92, pasa
+      siempre. El peor, el job con 16 por tiempo, deja 7 muertos de margen.
+    - Antes del corte (repo privado, 2 vCPU según GitHub), entre 643 y 719 muertos: falla
+      en 13 de las 14 ejecuciones. Pasa en el job 134981001116 (719 muertos, 32 por tiempo,
+      90,78), que cumple el criterio aunque la puntuación de Stryker diera 94,82.
+  - **Lo que no cubre:** si la puntuación contando los mutantes por tiempo como
+    supervivientes queda entre 90 y 92 y la de Stryker da 92 o más, no salta ninguno de
+    los dos. La alarma separa un runner corto de CPU de uno normal; no sustituye al umbral.
+  - **Se revisa la alarma** (y el runner) si los mutantes por tiempo pasan de 10 en 3 de
+    los últimos 10 jobs. En los ocho jobs posteriores al corte pasaron de 10 en dos (13 y
+    16); en las dos ejecuciones del #65, no.
+  - **Comprobado en local** con el paso sacado del `calidad.yml` propuesto y ejecutado con
+    `bash -e`, contra el informe JSON de hoy y contra copias en las que se pasaron a
+    `Timeout` 15, 16 y 85 mutantes muertos:
+    - con el informe de hoy, pasa (91,92);
+    - con 713 muertos, pasa (90,03); con 712, falla (89,90); con 643, falla (81,19);
+    - con un mínimo de 92 y el informe de hoy, falla;
+    - con un mínimo que no es un número, vacío, `NaN` o 0, con un informe que no es JSON
+      válido, o con Stryker terminado bien y sin informe, falla;
     - sin informe y con Stryker fallido, sale con 0: el job ya está en rojo por Stryker.
 - **Umbral** (VIC-29): `break` pasa de 90 a 92; `low` 92 y `high` 95 no cambian, así que
   la franja de aviso queda entre 92 y 95 y por debajo rompe. La puntuación real es 92,68
@@ -265,7 +270,7 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     ejecuciones iguales sobre el mismo commit, pero no hay medición del periodo con 2
     vCPU.
   - **Una alarma de mutantes por tiempo.** Se cumple cuando el #65 esté en `main` con el
-    límite de 20 y los nombres de paso de arriba.
+    mínimo de 90 y los nombres de paso de arriba.
 
   La persona decide si con eso basta.
 - **Ficheros de test:** Stryker lanza `tests/unit/**/!(sw).test.js`, los mismos que
