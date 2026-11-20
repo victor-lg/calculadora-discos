@@ -252,11 +252,16 @@ test('SPEC-CALC-001/AC-45 plegar Carga con el foco en el peso de trabajo lo guar
   await analizarConAxe(page);
 });
 
-test('SPEC-CALC-001/AC-45 plegar Carga termina la edición de la barra sin descartar el texto', async ({ page }) => {
+// Despliega Carga y deja la recta confirmada en 7,5 kg (al salir del campo).
+async function rectaEn75(page) {
   await botonCarga(page).click();
   await barra(page, 'Recta').check();
   await pesoBarra(page).fill('7,5');
   await pesoBarra(page).blur();
+}
+
+test('SPEC-CALC-001/AC-45 plegar Carga termina la edición de la barra sin descartar el texto', async ({ page }) => {
+  await rectaEn75(page);
   expect(await guardado(page, CLAVE_RECTA)).toBe('7.5');
   await analizarConAxe(page);
 
@@ -287,10 +292,7 @@ test('SPEC-CALC-001/AC-45 plegar Carga termina la edición de la barra sin desca
 });
 
 test('SPEC-CALC-001/AC-45 con la recta en 8 sin salir del campo, plegar la deja guardada en 8 kg', async ({ page }) => {
-  await botonCarga(page).click();
-  await barra(page, 'Recta').check();
-  await pesoBarra(page).fill('7,5');
-  await pesoBarra(page).blur();
+  await rectaEn75(page);
   await pesoBarra(page).fill('8');
   await plegarCargaSinFoco(page);
   await expect(resumenCarga(page)).toHaveText('Barra · Recta 8 kg');

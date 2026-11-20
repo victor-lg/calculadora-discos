@@ -66,6 +66,13 @@ test('SPEC-CALC-003/AC-01 de arriba abajo: peso, Carga y Mis discos plegados, la
   await analizarConAxe(page);
 });
 
+// FR-08: "Deshacer" recupera las tres series y quita el aviso.
+async function deshacerYRecuperar(page) {
+  await deshacer(page).click();
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
+  await expect(aviso(page)).toBeHidden();
+}
+
 test('SPEC-CALC-003/AC-11 deslizar un 20 % devuelve la tarjeta; un 50 % la borra y "Deshacer" la recupera', async ({ page }) => {
   await deslizar(page, tarjeta(page, 70), 0.2);
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
@@ -77,9 +84,7 @@ test('SPEC-CALC-003/AC-11 deslizar un 20 % devuelve la tarjeta; un 50 % la borra
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
   await expect(aviso(page)).toBeVisible();
   await expect(aviso(page)).toContainText('Serie del 70 % borrada');
-  await deshacer(page).click();
-  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
-  await expect(aviso(page)).toBeHidden();
+  await deshacerYRecuperar(page);
   await analizarConAxe(page);
 });
 
@@ -224,9 +229,7 @@ test('SPEC-CALC-003/AC-13 borrar el 70, añadir 70 y "Deshacer" deja un solo 70'
   await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
   await expect(aviso(page)).toContainText('Serie del 70 % borrada');
   await expect(deshacer(page)).toBeVisible();
-  await deshacer(page).click();
-  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
-  await expect(aviso(page)).toBeHidden();
+  await deshacerYRecuperar(page);
   await analizarConAxe(page);
 });
 
@@ -408,6 +411,17 @@ test.describe('SPEC-CALC-003/AC-13 el plazo de 5 s del aviso', () => {
     else await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   }
 
+  // A los 4999 ms el aviso sigue (con `texto`, si se da) y a los 5000 ms
+  // desaparece, y quedan las series `quedan`.
+  async function caducaALos5s(page, quedan, texto) {
+    await hasta(page, 4999);
+    if (texto) await expect(aviso(page)).toContainText(texto);
+    else await expect(aviso(page)).toBeVisible();
+    await hasta(page, 5000);
+    await expect(aviso(page)).toBeHidden();
+    await expect(porcentajesDeSeries(page)).toHaveText(quedan);
+  }
+
   test('a los 4 s sigue y "Deshacer" recupera; a los 5 s desaparece sin "Deshacer"', async ({ page }) => {
     await borrarConReloj(page, 70);
     await hasta(page, 4000);
@@ -416,11 +430,7 @@ test.describe('SPEC-CALC-003/AC-13 el plazo de 5 s del aviso', () => {
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
 
     await borrarConReloj(page, 70);
-    await hasta(page, 4999);
-    await expect(aviso(page)).toBeVisible();
-    await hasta(page, 5000);
-    await expect(aviso(page)).toBeHidden();
-    await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '90 %']);
+    await caducaALos5s(page, ['40 %', '90 %']);
     await expect(deshacer(page)).toHaveCount(0);
   });
 
@@ -428,22 +438,14 @@ test.describe('SPEC-CALC-003/AC-13 el plazo de 5 s del aviso', () => {
     await borrarConReloj(page, 70);
     await hasta(page, 3000);
     await anadirPorcentaje(page, '50');
-    await hasta(page, 4999);
-    await expect(aviso(page)).toBeVisible();
-    await hasta(page, 5000);
-    await expect(aviso(page)).toBeHidden();
-    await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '90 %']);
+    await caducaALos5s(page, ['40 %', '50 %', '90 %']);
   });
 
   test('borrar el 40 a los 3 s empieza un plazo nuevo', async ({ page }) => {
     await borrarConReloj(page, 70);
     await hasta(page, 3000);
     await borrarConReloj(page, 40);
-    await hasta(page, 4999);
-    await expect(aviso(page)).toContainText('Serie del 40 % borrada');
-    await hasta(page, 5000);
-    await expect(aviso(page)).toBeHidden();
-    await expect(porcentajesDeSeries(page)).toHaveText(['90 %']);
+    await caducaALos5s(page, ['90 %'], 'Serie del 40 % borrada');
   });
 
   test('"Deshacer" a los 2 s anula el plazo: el borrado del 40 1 s después dura 5 s', async ({ page }) => {
@@ -453,11 +455,7 @@ test.describe('SPEC-CALC-003/AC-13 el plazo de 5 s del aviso', () => {
     await expect(aviso(page)).toBeHidden();
     await page.clock.runFor(1000);
     await borrarConReloj(page, 40);
-    await hasta(page, 4999);
-    await expect(aviso(page)).toContainText('Serie del 40 % borrada');
-    await hasta(page, 5000);
-    await expect(aviso(page)).toBeHidden();
-    await expect(porcentajesDeSeries(page)).toHaveText(['70 %', '90 %']);
+    await caducaALos5s(page, ['70 %', '90 %'], 'Serie del 40 % borrada');
   });
 
   for (const regreso of ['visibilitychange', 'pageshow']) {
@@ -471,11 +469,7 @@ test.describe('SPEC-CALC-003/AC-13 el plazo de 5 s del aviso', () => {
       await borrarConReloj(page, 40);
       await segundoPlano(page, 3000, regreso);
       await expect(aviso(page)).toContainText('Serie del 40 % borrada');
-      await hasta(page, 4999);
-      await expect(aviso(page)).toBeVisible();
-      await hasta(page, 5000);
-      await expect(aviso(page)).toBeHidden();
-      await expect(porcentajesDeSeries(page)).toHaveText(['90 %']);
+      await caducaALos5s(page, ['90 %']);
     });
   }
 });
@@ -636,21 +630,24 @@ test.describe('SPEC-CALC-003/AC-14 el campo de añadir', () => {
     await analizarConAxe(page);
   });
 
-  test('30 y Escape: se cierra sin cambiar la lista y el foco vuelve al botón', async ({ page }) => {
-    await campo(page).pressSequentially('30');
-    await page.keyboard.press('Escape');
+  // El campo se cierra sin cambiar la lista y el foco vuelve a "+ Añadir porcentaje".
+  async function cerradoSinCambios(page) {
     await expect(campo(page)).toBeHidden();
     await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
     await expect(abrir(page)).toBeFocused();
+  }
+
+  test('30 y Escape: se cierra sin cambiar la lista y el foco vuelve al botón', async ({ page }) => {
+    await campo(page).pressSequentially('30');
+    await page.keyboard.press('Escape');
+    await cerradoSinCambios(page);
     await analizarConAxe(page);
   });
 
   test('30 y tocar "✕": se cierra sin cambiar la lista', async ({ page }) => {
     await campo(page).pressSequentially('30');
     await cancelar(page).click();
-    await expect(campo(page)).toBeHidden();
-    await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '70 %', '90 %']);
-    await expect(abrir(page)).toBeFocused();
+    await cerradoSinCambios(page);
     await analizarConAxe(page);
   });
 

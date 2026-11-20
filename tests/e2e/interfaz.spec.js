@@ -6,6 +6,7 @@ import {
   abrirConPaneles,
 } from './pantalla.js';
 import { analizarConAxe } from './axe.js';
+import { segundoPlano, volverDeOtraApp } from './ciclo-de-vida.js';
 
 const CLAVE = 'calculadora-discos:v1:porcentajes';
 const CLAVE_TRABAJO = 'calculadora-discos:v1:trabajo';
@@ -94,6 +95,14 @@ test('SPEC-CALC-001/AC-10 las series se actualizan al momento con cada cambio', 
   await analizarConAxe(page);
 });
 
+// SPEC-CALC-001 FR-02: la recta y la Z muestran 7,5 y 8,5 kg al elegirlas.
+async function verPesosRectaYZ(page) {
+  await barra(page, 'Recta').check();
+  await expect(pesoBarra(page)).toHaveValue('7,5');
+  await barra(page, 'Z').check();
+  await expect(pesoBarra(page)).toHaveValue('8,5');
+}
+
 test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo y la barra no', async ({ page }) => {
   // La primera vez: 40/70/90, "100" con las series de AC-01, Barra, 20 kg, sin collarines y recta y Z de 10 kg.
   await expect(porcentajes(page)).toHaveText(['40 %', '70 %', '90 %']);
@@ -127,10 +136,7 @@ test('SPEC-CALC-001/AC-11 al arrancar de cero se recupera lo guardado, y el modo
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
   await expect(barra(page, 'Olímpica 20 kg')).toBeChecked();
   await expect(page.getByLabel('Collarines de competición')).toBeChecked();
-  await barra(page, 'Recta').check();
-  await expect(pesoBarra(page)).toHaveValue('7,5');
-  await barra(page, 'Z').check();
-  await expect(pesoBarra(page)).toHaveValue('8,5');
+  await verPesosRectaYZ(page);
   await expect(page.locator('#aviso-guardado')).toBeHidden();
   await analizarConAxe(page);
 
@@ -184,17 +190,6 @@ test('SPEC-CALC-001/AC-33 datos guardados que faltan, rotos o no válidos: cada 
   await expect(page.getByLabel('Collarines de competición')).toBeChecked();
   await analizarConAxe(page);
 });
-
-// FR-11: la app pasa a segundo plano y vuelve, con el foco donde estuviera.
-async function segundoPlano(page) {
-  await page.evaluate(() => {
-    for (const estado of ['hidden', 'visible']) {
-      Object.defineProperty(document, 'visibilityState', { value: estado, configurable: true });
-      document.dispatchEvent(new Event('visibilitychange'));
-    }
-    delete document.visibilityState;
-  });
-}
 
 // "Cierra la app y la vuelve a abrir" (SPEC-CALC-001 §5): pasa antes a
 // segundo plano, y vuelve en un arranque de cero.
@@ -431,22 +426,11 @@ test('SPEC-CALC-001/AC-22 volver de otra app conserva todo el estado sin recarga
   await trabajo(page).fill('50');
   const antes = await series(page).allTextContents();
   expect(antes).toHaveLength(3);
-  await page.evaluate(() => { window.marcaSinRecarga = true; });
 
-  // Pasar a otra pestaña y volver, y los eventos de ciclo de vida de iOS.
-  const otra = await context.newPage();
-  await otra.bringToFront();
-  await page.bringToFront();
-  await otra.close();
-  await page.evaluate(() => {
-    for (const tipo of ['visibilitychange', 'pagehide', 'pageshow', 'freeze', 'resume']) {
-      const destino = tipo === 'visibilitychange' || tipo === 'freeze' || tipo === 'resume'
-        ? document : window;
-      destino.dispatchEvent(new Event(tipo));
-    }
-  });
+  // Pasar a otra pestaña y volver, y los eventos de ciclo de vida de iOS, sin
+  // que la página se recargue.
+  await volverDeOtraApp(page, context);
 
-  expect(await page.evaluate(() => window.marcaSinRecarga)).toBe(true);
   await expect(page.getByLabel('Barra', { exact: true })).toBeChecked();
   await expect(barra(page, 'Z')).toBeChecked();
   await expect(pesoBarra(page)).toHaveValue('8,5');
@@ -499,10 +483,7 @@ test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último pes
   await pesoBarra(page).fill('7,50');
   await barra(page, 'Z').check();
   await pesoBarra(page).fill('8.5');
-  await barra(page, 'Recta').check();
-  await expect(pesoBarra(page)).toHaveValue('7,5');
-  await barra(page, 'Z').check();
-  await expect(pesoBarra(page)).toHaveValue('8,5');
+  await verPesosRectaYZ(page);
   await analizarConAxe(page);
 
   await barra(page, 'Recta').check();
@@ -528,10 +509,7 @@ test('SPEC-CALC-001/AC-40 al volver a una barra, el campo muestra su último pes
 
   // Al arrancar de cero, cada barra muestra su último peso válido guardado.
   await recargar(page);
-  await barra(page, 'Recta').check();
-  await expect(pesoBarra(page)).toHaveValue('7,5');
-  await barra(page, 'Z').check();
-  await expect(pesoBarra(page)).toHaveValue('8,5');
+  await verPesosRectaYZ(page);
   await analizarConAxe(page);
 });
 

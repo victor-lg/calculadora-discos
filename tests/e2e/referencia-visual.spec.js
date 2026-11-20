@@ -107,11 +107,16 @@ test.describe('SPEC-CALC-003/AC-02 FR-02 el número del peso de trabajo', () => 
   });
 });
 
+// Abre la app a 390 × 844 px, el ancho de SPEC-CALC-003 §5.
+async function abrirA390(page) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./');
+  await analizarConAxe(page);
+}
+
 test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
   test.beforeEach(async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('./');
-    await analizarConAxe(page);
+    await abrirA390(page);
   });
 
   test('(FR-06) el "kg" del total de cada tarjeta, a 16 px, peso 500 y en gris', async ({ page }) => {
@@ -252,9 +257,7 @@ test.describe('SPEC-CALC-003/AC-24 referencia visual de §11', () => {
 // en 260 ms con cubic-bezier(.2,.8,.2,1) y opacidad, sin saltos.
 test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
   test.beforeEach(async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('./');
-    await analizarConAxe(page);
+    await abrirA390(page);
   });
 
   test('la tarjeta sale de lado y su hueco se cierra con transición, sin saltos', async ({ page }) => {
@@ -269,6 +272,13 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
     // navegador.
     await page.evaluate(() => {
       window.registro = { posiciones: [], transiciones: [], muestras: null };
+      // Anota cada transición nueva de `el` y sus descendientes.
+      const anotar = (el) => {
+        for (const a of el.getAnimations({ subtree: true })) {
+          const clave = `${a.transitionProperty} ${a.effect.getTiming().duration} ${a.effect.getTiming().easing}`;
+          if (!window.registro.transiciones.includes(clave)) window.registro.transiciones.push(clave);
+        }
+      };
       const ver = () => {
         const li = [...document.querySelectorAll('#series > li')];
         const t90 = li.find((el) => el.querySelector('.porcentaje').textContent === '90 %');
@@ -283,12 +293,7 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
           });
           animaciones.forEach((a, i) => { a.currentTime = antes[i]; });
         }
-        for (const el of li) {
-          for (const a of el.getAnimations({ subtree: true })) {
-            const clave = `${a.transitionProperty} ${a.effect.getTiming().duration} ${a.effect.getTiming().easing}`;
-            if (!window.registro.transiciones.includes(clave)) window.registro.transiciones.push(clave);
-          }
-        }
+        for (const el of li) anotar(el);
         if (window.registro.posiciones.length < 120) requestAnimationFrame(ver);
       };
       requestAnimationFrame(ver);
@@ -296,12 +301,7 @@ test.describe('SPEC-CALC-003/AC-11 borrar con el gesto', () => {
       // estilo de las tarjetas: WebKit sin pantalla, con carga, pinta pocos
       // fotogramas y la salida de 200 ms podía empezar y acabar entre dos.
       const series = document.getElementById('series');
-      new MutationObserver(() => {
-        for (const a of series.getAnimations({ subtree: true })) {
-          const clave = `${a.transitionProperty} ${a.effect.getTiming().duration} ${a.effect.getTiming().easing}`;
-          if (!window.registro.transiciones.includes(clave)) window.registro.transiciones.push(clave);
-        }
-      }).observe(series, { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+      new MutationObserver(() => anotar(series)).observe(series, { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
     });
     await deslizar(page, t70, 0.5);
     await expect(page.locator('#series .porcentaje')).toHaveText(['40 %', '90 %']);
