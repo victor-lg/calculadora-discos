@@ -227,9 +227,9 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
       probado en local).
 
     Siguen como límites aceptados, igual que `__STRYKER_ACTIVE_MUTANT__`, y los ve la
-    revisión: un proceso que un test deje vivo y reescriba el informe antes de leerlo, y un
-    test que use el `sudo` sin contraseña del runner de GitHub para cambiar
-    `/usr/bin/python3`, `/usr/bin/grep` o el propio Python.
+    revisión: un proceso que un test deje vivo y reescriba el informe antes de leerlo o
+    escriba en el log del paso, y un test que use el `sudo` sin contraseña del runner de
+    GitHub, que con root puede saltarse cualquiera de estas defensas.
   - **Por qué el menor de los dos** (decisión 2 de sdd-workflow #54): con un `break` por
     debajo de 90, la alarma fallaría sin ningún mutante por tiempo, exigiendo más que el
     propio umbral. En la calculadora no cambia nada: el `break` es 92 y el mínimo sigue
