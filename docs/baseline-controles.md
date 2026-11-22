@@ -206,7 +206,17 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   calculadora, 90. Falla cerrado: si no puede leer el informe JSON, `thresholds.break` o el
   mínimo, o si Stryker termina bien sin dejar informe, el paso también falla. Se cuenta
   aunque Stryker haya fallado. El paso «CPU del runner» anota `nproc` en el log, para ver
-  la causa más probable cuando salte.
+  la causa más probable cuando salte, y desde VIC-53 también el modelo de CPU (el
+  `model name` de `/proc/cpuinfo`), antes que el código de la rama.
+  - **Medida en el log** (VIC-53): después de cerrar los stop-commands, el paso «Stryker»
+    deja un aviso `::notice title=MEDIDA::` con `nproc`, los mutantes por tiempo y la
+    puntuación contándolos como supervivientes (`muertos/válidos = puntuación`). Son
+    números que calcula el paso: `nproc` sale de `/usr/bin/nproc` antes de `npm ci`, y la
+    cuenta, del mismo `/usr/bin/python3 -I` de la alarma, que la pasa por un descriptor
+    propio y no por la salida; el paso solo la imprime si son números. Un texto igual que
+    escriba la rama sale entre los stop-commands y GitHub no lo toma como aviso. No sale si
+    no hay informe, si no se puede leer o si no se puede escribir. Sirve para comparar jobs
+    (VIC-53: diez repeticiones sobre el mismo commit, después de fusionar este cambio).
   - **Por qué dentro del paso «Stryker»** (VIC-45, hallazgo G4-1-B-01 de sdd-workflow
     #54): hasta VIC-45 era un paso aparte, «Mutantes por tiempo», el primero que corría
     después del código de la rama. Un test puede escribir en `$GITHUB_PATH` o
@@ -224,7 +234,14 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
       un test puede reescribir el fichero del script mientras corre, y bash leería lo nuevo.
       Con un `exit 0` detrás de la línea de Stryker se saltaban la alarma y también el
       umbral de Stryker: el hueco ya estaba en el paso «Stryker» de VIC-44 (G4 del #76,
-      probado en local).
+      probado en local);
+    - un informe en el que no se puede escribir hace fallar el paso, antes de leerlo
+      (VIC-53, hueco G4-1-B-01 de sdd-workflow #64): un test puede dejar su propio informe
+      en la ruta del JSON sin permiso de escritura. Stryker no puede escribir encima y sale
+      con 0, y el paso contaba el falso, que podía esconder también los Ignored. Probado en
+      local con Stryker 10.1.1: con un `mutation.json` de solo lectura en su sitio, Stryker
+      da `EACCES` en el reporter `json`, sale con 0 y el fichero sigue siendo el falso. Con
+      root (`sudo`), `[ -w ]` es siempre cierto: entra en el límite del `sudo`, abajo.
 
     Siguen como límites aceptados, igual que `__STRYKER_ACTIVE_MUTANT__`, y los ve la
     revisión: un proceso que un test deje vivo y reescriba el informe antes de leerlo o
@@ -285,6 +302,20 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
       sin `break`, falla antes de lanzar Stryker; con un informe que no es JSON válido, o
       con Stryker terminado bien y sin informe, falla;
     - sin informe y con Stryker fallido, sale con el código de Stryker.
+  - **Comprobado en local en VIC-53**, igual que en VIC-45 (21 casos sobre el paso nuevo,
+    detalle en el PR):
+    - con un test que deja su informe falso de solo lectura (el de hoy, 728 muertos) y
+      Stryker terminado bien, el paso «Stryker» de VIC-45 pasa y el nuevo falla, con el
+      error del informe y sin aviso MEDIDA; con 712 muertos y Stryker fallido, los dos
+      fallan, pero el nuevo por el informe y sin contar el falso;
+    - el aviso MEDIDA sale con los números de la cuenta en todos los casos con informe
+      legible (con el de hoy, `nproc 20, mutantes por tiempo 6, puntuación contándolos
+      como supervivientes 728/792 = 91.92`, en el portátil), también cuando la alarma
+      falla; un aviso MEDIDA falso en la salida de Stryker queda entre los stop-commands;
+    - los casos de VIC-45 (713 y 712 muertos, `python3` falso, configuración y script
+      reescritos, Ignored, sin informe, informe roto, `NaN`, `break` 80 y 92, mínimo 92 o
+      `abc`, `break` 0) dan la misma salida que con el paso de VIC-45, más el aviso MEDIDA
+      cuando hay cuenta.
 - **Umbral** (VIC-29): `break` pasa de 90 a 92; `low` 92 y `high` 95 no cambian, así que
   la franja de aviso queda entre 92 y 95 y por debajo rompe. La puntuación real es 92,68
   (local y cinco de ocho jobs de la CI), con 792 mutantes que cuentan (842 menos los 50
