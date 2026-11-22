@@ -212,11 +212,24 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     después del código de la rama. Un test puede escribir en `$GITHUB_PATH` o
     `$GITHUB_ENV`, y lo que escribe vale para los pasos siguientes: un `python3` falso
     delante en el `PATH` daba la alarma por buena. Dentro del paso «Stryker» esos ficheros
-    ya no la alcanzan, y lo que corre después de Stryker usa rutas absolutas
-    (`/usr/bin/python3 -I`, `/usr/bin/grep`), porque un test también puede dejar un
-    ejecutable en una carpeta del `PATH` en la que se pueda escribir. Sigue como límite
-    aceptado, igual que `__STRYKER_ACTIVE_MUTANT__`, un proceso que un test deje vivo y
-    reescriba el informe antes de leerlo.
+    ya no la alcanzan. Además, frente a lo que un test puede hacer con los permisos del
+    runner mientras corre Stryker:
+    - lo que corre después de Stryker usa rutas absolutas (`/usr/bin/python3 -I`,
+      `/usr/bin/grep`): un test puede dejar un ejecutable en una carpeta del `PATH` en la
+      que se pueda escribir;
+    - la ruta del informe y el mínimo se calculan antes de Stryker: un test puede
+      reescribir la configuración de `$RUNNER_TEMP` (con `break` 0,01, el mínimo quedaba en
+      0,01; hallazgo de la G4 del #76);
+    - todo el script del paso va entre llaves, que bash lee enteras antes de ejecutar nada:
+      un test puede reescribir el fichero del script mientras corre, y bash leería lo nuevo.
+      Con un `exit 0` detrás de la línea de Stryker se saltaban la alarma y también el
+      umbral de Stryker: el hueco ya estaba en el paso «Stryker» de VIC-44 (G4 del #76,
+      probado en local).
+
+    Siguen como límites aceptados, igual que `__STRYKER_ACTIVE_MUTANT__`, y los ve la
+    revisión: un proceso que un test deje vivo y reescriba el informe antes de leerlo, y un
+    test que use el `sudo` sin contraseña del runner de GitHub para cambiar
+    `/usr/bin/python3`, `/usr/bin/grep` o el propio Python.
   - **Por qué el menor de los dos** (decisión 2 de sdd-workflow #54): con un `break` por
     debajo de 90, la alarma fallaría sin ningún mutante por tiempo, exigiendo más que el
     propio umbral. En la calculadora no cambia nada: el `break` es 92 y el mínimo sigue
@@ -259,13 +272,18 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     informe y la salida elegidos (detalle en el PR):
     - con el informe de hoy, pasa (91,92); con 713 muertos, pasa; con 712, falla (89,90);
       con Stryker fallido y 712 muertos, falla con el error de la alarma;
-    - con un `python3` falso que un test deja delante en el `PATH` y que da la alarma por
-      buena, la versión anterior pasa con 712 muertos y la nueva falla;
+    - con 712 muertos y un test que deja delante en el `PATH` un `python3` falso que da la
+      alarma por buena, la versión de VIC-44 pasa y la nueva falla; con un test que
+      reescribe la configuración de `$RUNNER_TEMP` con `break` 0,01, la primera versión del
+      #76 pasa y la final falla; con un test que reescribe el script del paso con un
+      `exit 0`, la versión sin llaves pasa y la final falla (y con Stryker fallido, el paso
+      «Stryker» de VIC-44 pasa y el nuevo falla);
+    - con 712 muertos y un mutante Ignored, salen los dos errores;
     - con `break` 80 y 673 muertos sin mutantes por tiempo (84,97), pasa; con `break` 92,
       falla;
     - con un mínimo o un `break` que no es un número, vacío, `NaN`, 0, más de 100, `true` o
-      sin `break`, con un informe que no es JSON válido, o con Stryker terminado bien y sin
-      informe, falla;
+      sin `break`, falla antes de lanzar Stryker; con un informe que no es JSON válido, o
+      con Stryker terminado bien y sin informe, falla;
     - sin informe y con Stryker fallido, sale con el código de Stryker.
 - **Umbral** (VIC-29): `break` pasa de 90 a 92; `low` 92 y `high` 95 no cambian, así que
   la franja de aviso queda entre 92 y 95 y por debajo rompe. La puntuación real es 92,68
