@@ -643,7 +643,7 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
   aviso, 60 veces seguidas en verde (en cada ronda de G4; tras la ronda 3, los tres tests
   con el aviso, 20 veces cada uno). Unos 13 s con 20 tests.
 
-## osv-scanner: `picomatch` 4.0.7 (GHSA-fc5q-39xc-vjpf), pendiente
+## osv-scanner: `picomatch` 4.0.7 (GHSA-fc5q-39xc-vjpf), exceptuado
 
 - **Hallazgo:** ReDoS con extglobs repetidos de una sola rama, alto (8,7), en `picomatch`
   hasta la 4.0.7, que es la última publicada: no hay versión corregida.
@@ -652,8 +652,13 @@ entera (`toHaveScreenshot`, `fullPage`) en cada uno de 10 estados de SPEC-CALC-0
   través de `fdir` y `tinyglobby`. El #42, con el mismo `picomatch` 4.0.7, pasó el job el
   2026-11-16; el aviso es del 2026-10-19, así que lo que cambió es la base de datos de
   osv-scanner. Falla igual en cualquier PR desde ahora.
-- **Decisión pendiente** (la persona): exceptuarlo en `osv-scanner.toml`, como los de
-  Stryker, u otra salida. `osv-scanner.toml` es R2 y no está entre los ficheros de VIC-31.
+- **Decisión** (Víctor, 2026-11-17, segundo comentario de VIC-31): una excepción por ID
+  en `osv-scanner.toml`, como las de Stryker, con `effectiveUntil = 2027-01-17` (más corta
+  que las de Stryker por ser alto) y su motivo: es dependencia de desarrollo y solo corre
+  en la CI, en el job `codigo-sobrante`. Entró en el #54 (R2, `Part of VIC-31`), fusionado
+  antes que el #53; desde entonces el job ya no falla por este aviso.
+- **Se quita** a mano al subir en el lockfile una versión corregida, que cabe en los
+  rangos de `knip` y `tinyglobby`; si no, el 2027-01-17 el aviso vuelve a fallar.
 
 ## three.js se queda en 0.170.0 (VIC-30)
 
