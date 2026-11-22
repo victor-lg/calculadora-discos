@@ -197,14 +197,30 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   los mutantes por tiempo solo suben la puntuación, Stryker no se pondrá rojo por ello;
   lo pone en rojo la alarma de abajo. Antes de ese
   cambio, mide de nuevo y valora `concurrency` 1 o 2.
-- **Alarma de mutantes por tiempo** (VIC-44, en `main` desde el #65, commit 11bdb86). Es el
-  paso «Mutantes por tiempo» del job
-  `mutaciones`. Lista cada mutante que acaba por tiempo y calcula la puntuación
+- **Alarma de mutantes por tiempo** (VIC-44, en `main` desde el #65, commit 11bdb86; desde
+  VIC-45, dentro del paso «Stryker» del job `mutaciones`). Lista cada mutante que acaba por
+  tiempo y calcula la puntuación
   **contándolos todos como supervivientes**: muertos / (muertos + por tiempo +
-  supervivientes + sin cobertura). El job falla si esa puntuación **baja de 90**
-  (`PUNTUACION_MINIMA_SIN_TIEMPO`). Falla cerrado: si no puede leer el informe JSON o el
-  mínimo, o si Stryker termina bien sin dejar informe, el paso también falla. El paso «CPU
-  del runner» anota `nproc` en el log, para ver la causa más probable cuando salte.
+  supervivientes + sin cobertura). El job falla si esa puntuación **baja del mínimo**, el
+  menor de 90 (`PUNTUACION_MINIMA_SIN_TIEMPO`) y `thresholds.break` (92): en la
+  calculadora, 90. Falla cerrado: si no puede leer el informe JSON, `thresholds.break` o el
+  mínimo, o si Stryker termina bien sin dejar informe, el paso también falla. Se cuenta
+  aunque Stryker haya fallado. El paso «CPU del runner» anota `nproc` en el log, para ver
+  la causa más probable cuando salte.
+  - **Por qué dentro del paso «Stryker»** (VIC-45, hallazgo G4-1-B-01 de sdd-workflow
+    #54): hasta VIC-45 era un paso aparte, «Mutantes por tiempo», el primero que corría
+    después del código de la rama. Un test puede escribir en `$GITHUB_PATH` o
+    `$GITHUB_ENV`, y lo que escribe vale para los pasos siguientes: un `python3` falso
+    delante en el `PATH` daba la alarma por buena. Dentro del paso «Stryker» esos ficheros
+    ya no la alcanzan, y lo que corre después de Stryker usa rutas absolutas
+    (`/usr/bin/python3 -I`, `/usr/bin/grep`), porque un test también puede dejar un
+    ejecutable en una carpeta del `PATH` en la que se pueda escribir. Sigue como límite
+    aceptado, igual que `__STRYKER_ACTIVE_MUTANT__`, un proceso que un test deje vivo y
+    reescriba el informe antes de leerlo.
+  - **Por qué el menor de los dos** (decisión 2 de sdd-workflow #54): con un `break` por
+    debajo de 90, la alarma fallaría sin ningún mutante por tiempo, exigiendo más que el
+    propio umbral. En la calculadora no cambia nada: el `break` es 92 y el mínimo sigue
+    siendo 90.
   - **Por qué así y no un número fijo de mutantes por tiempo** (decisión de Víctor,
     2026-11-20): el criterio es que la puntuación siga por encima de 90 aunque todos los
     mutantes por tiempo fueran supervivientes. Un límite fijo (20 o 16) solo lo cumplía
@@ -238,6 +254,19 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     - con un mínimo que no es un número, vacío, `NaN` o 0, con un informe que no es JSON
       válido, o con Stryker terminado bien y sin informe, falla;
     - sin informe y con Stryker fallido, sale con 0: el job ya está en rojo por Stryker.
+  - **Comprobado en local otra vez en VIC-45**, con el paso «Stryker» sacado del
+    `calidad.yml` nuevo y ejecutado con `bash -e`, con un `stryker` falso que deja el
+    informe y la salida elegidos (detalle en el PR):
+    - con el informe de hoy, pasa (91,92); con 713 muertos, pasa; con 712, falla (89,90);
+      con Stryker fallido y 712 muertos, falla con el error de la alarma;
+    - con un `python3` falso que un test deja delante en el `PATH` y que da la alarma por
+      buena, la versión anterior pasa con 712 muertos y la nueva falla;
+    - con `break` 80 y 673 muertos sin mutantes por tiempo (84,97), pasa; con `break` 92,
+      falla;
+    - con un mínimo o un `break` que no es un número, vacío, `NaN`, 0, más de 100, `true` o
+      sin `break`, con un informe que no es JSON válido, o con Stryker terminado bien y sin
+      informe, falla;
+    - sin informe y con Stryker fallido, sale con el código de Stryker.
 - **Umbral** (VIC-29): `break` pasa de 90 a 92; `low` 92 y `high` 95 no cambian, así que
   la franja de aviso queda entre 92 y 95 y por debajo rompe. La puntuación real es 92,68
   (local y cinco de ocho jobs de la CI), con 792 mutantes que cuentan (842 menos los 50
@@ -273,7 +302,8 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     ejecuciones iguales sobre el mismo commit, pero no hay medición del periodo con 2
     vCPU.
   - **Una alarma de mutantes por tiempo.** Cumplida: está en `main` desde el #65, con el
-    mínimo de 90 y los pasos «CPU del runner» y «Mutantes por tiempo».
+    mínimo de 90, el paso «CPU del runner» y, desde VIC-45, la cuenta dentro del paso
+    «Stryker».
 
   La persona decide si con eso basta.
 - **Ficheros de test:** Stryker lanza `tests/unit/**/!(sw).test.js`, los mismos que
