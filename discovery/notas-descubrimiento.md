@@ -111,3 +111,5 @@ Estas notas son contexto, no norma (AGENTS.md). Lo que acabe en la spec lo aprue
 - Para lo de "sin discos", un mensaje que diga algo así como que el peso por lado es demasiado pequeño y que como mínimo requiere 1,25 kg.
 - Aviso genérico, sin especificar que cojan otra barra.
 - **Spec lista para revisión.**
+
+<!-- Prueba de VIC-56: PR desechable, no se fusiona. -->
