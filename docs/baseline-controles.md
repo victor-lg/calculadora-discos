@@ -215,7 +215,8 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     cuenta, del mismo `/usr/bin/python3 -I` de la alarma, que la pasa por un descriptor
     propio y no por la salida; el paso solo la imprime si son números. Un texto igual que
     escriba la rama sale entre los stop-commands y GitHub no lo toma como aviso. No sale si
-    no hay informe, si no se puede leer o si no se puede escribir. Sirve para comparar jobs
+    no hay informe, si no se puede leer o si no se puede escribir, ni si la salida de
+    Stryker trae un error del reporter `json` o el log no se puede leer. Sirve para comparar jobs
     (VIC-53: diez repeticiones sobre el mismo commit, después de fusionar este cambio).
   - **Por qué dentro del paso «Stryker»** (VIC-45, hallazgo G4-1-B-01 de sdd-workflow
     #54): hasta VIC-45 era un paso aparte, «Mutantes por tiempo», el primero que corría
@@ -241,12 +242,33 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
       con 0, y el paso contaba el falso, que podía esconder también los Ignored. Probado en
       local con Stryker 10.1.1: con un `mutation.json` de solo lectura en su sitio, Stryker
       da `EACCES` en el reporter `json`, sale con 0 y el fichero sigue siendo el falso. Con
-      root (`sudo`), `[ -w ]` es siempre cierto: entra en el límite del `sudo`, abajo.
+      root (`sudo`), `[ -w ]` es siempre cierto: entra en el límite del `sudo`, abajo;
+    - un error del reporter `json` en la salida de Stryker hace fallar el paso (VIC-53,
+      sospecha del revisor B del #77, confirmada en sdd-workflow #66): un test puede bajar
+      con `prlimit` el `RLIMIT_NOFILE` del proceso principal de Stryker, otro proceso del
+      mismo usuario, sin root ni ptrace. El reporter da `EMFILE` con un informe falso que
+      sí se puede escribir, Stryker lo anota (`An error occurred during 'wrapUp' on
+      reporter 'json'`) y sale con 0, y `[ -w ]` no lo ve. El paso busca esa línea con
+      cualquier fase y, si está, falla sin contar el informe;
+    - el log de Stryker se abre en el descriptor 5 antes de lanzarlo, y Stryker no lo
+      hereda (`5>&-`): `tee` escribe en `/dev/fd/5` y los dos `grep` (el del reporter
+      `json` y el del `NaN`) leen de ahí, no de la ruta. Un test puede borrar
+      `$RUNNER_TEMP/stryker.log` y dejar otro sin el error; por el descriptor, el paso sigue
+      leyendo el de `tee`. Si `grep` no puede leerlo (un test le quita los permisos con
+      `chmod`, que sí alcanza al mismo fichero), sale con 2 y el paso falla en vez de darlo
+      por limpio (G4-1-B-01 de sdd-workflow #66). Un test que mate a `tee` ya hace fallar el
+      paso: sin `pipefail`, la tubería sale con el estado de `tee` y `bash -e` corta
+      (medido en sdd-workflow #66).
 
-    Siguen como límites aceptados, igual que `__STRYKER_ACTIVE_MUTANT__`, y los ve la
-    revisión: un proceso que un test deje vivo y reescriba el informe antes de leerlo o
-    escriba en el log del paso, y un test que use el `sudo` sin contraseña del runner de
-    GitHub, que con root puede saltarse cualquiera de estas defensas.
+    El paso es el de la plantilla de sdd-workflow #66 (commit dd0550e), salvo el comentario
+    de «CPU del runner» y el error de la alarma, que remite a este documento. **Con estas
+    defensas se cierra la familia** (decisión de Víctor, 2026-11-23, en `docs/herramientas.md`
+    del workflow): no se buscan más variantes. Quedan como límites aceptados, igual que
+    `__STRYKER_ACTIVE_MUTANT__`, en el comentario del paso, y los ve la revisión: un proceso
+    que un test deje vivo y reescriba el informe antes de leerlo o escriba en el log del
+    paso; un test que use el `sudo` sin contraseña del runner de GitHub, que con root puede
+    saltarse cualquiera de estas defensas; y cualquier otra forma de engañar al paso desde
+    el mismo usuario, porque los tests corren con el del runner.
   - **Por qué el menor de los dos** (decisión 2 de sdd-workflow #54): con un `break` por
     debajo de 90, la alarma fallaría sin ningún mutante por tiempo, exigiendo más que el
     propio umbral. En la calculadora no cambia nada: el `break` es 92 y el mínimo sigue
@@ -316,6 +338,17 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
       reescritos, Ignored, sin informe, informe roto, `NaN`, `break` 80 y 92, mínimo 92 o
       `abc`, `break` 0) dan la misma salida que con el paso de VIC-45, más el aviso MEDIDA
       cuando hay cuenta.
+  - **Comprobado en local en el segundo PR de VIC-53 de la calculadora**, con el paso de la
+    plantilla: los 21 casos anteriores dan la misma salida que con el paso del #77; con el
+    informe de hoy y la línea `An error occurred during 'wrapUp' on reporter 'json'.
+    Error: EMFILE` en la salida de Stryker, falla con el error del reporter `json`, también
+    si un test borra el log de la ruta y deja otro limpio; con el log sin permisos
+    (`chmod 000`), falla porque no se puede leer (`grep` sale con 2); con el log de la ruta
+    sustituido y sin error, pasa con la cuenta de siempre. En la plantilla lo cubren
+    `test_sin_descriptores_el_informe_falso_no_cuenta`,
+    `test_un_log_limpio_en_la_ruta_no_esconde_el_error` y
+    `test_un_log_que_no_se_puede_leer_hace_fallar_el_paso` (`tests/test_calidad_plantilla.py`
+    de sdd-workflow).
 - **Umbral** (VIC-29): `break` pasa de 90 a 92; `low` 92 y `high` 95 no cambian, así que
   la franja de aviso queda entre 92 y 95 y por debajo rompe. La puntuación real es 92,68
   (local y cinco de ocho jobs de la CI), con 792 mutantes que cuentan (842 menos los 50
