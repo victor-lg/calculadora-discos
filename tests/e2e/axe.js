@@ -10,7 +10,8 @@ import { iso } from 'playwright-core/lib/coreBundle';
 import { sinExcepcion, yaNoAparecen } from './excepciones-axe.js';
 
 // ADR-0009 §3, primer tiempo: lo que puede tardar en volver la primera lectura.
-// Una elección que ningún dato acota; se revisa si una pasa de 5 s (§6).
+// Una elección que ningún dato acota; se revisa si una pasa de 5 s, o de 7,5 s
+// en SPEC-CALC-001/AC-13 (ADR-0009 §6, con ADR-0010).
 const LECTURA_MAXIMA_MS = 10_000;
 // ADR-0008 §3, punto 1, con ADR-0009: el tiempo máximo de las animaciones, más
 // del doble de la cadena más larga de la app (unos 850 ms), contado desde que
