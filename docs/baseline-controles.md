@@ -338,7 +338,7 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
       reescritos, Ignored, sin informe, informe roto, `NaN`, `break` 80 y 92, mínimo 92 o
       `abc`, `break` 0) dan la misma salida que con el paso de VIC-45, más el aviso MEDIDA
       cuando hay cuenta.
-  - **Comprobado en local en el segundo PR de VIC-53 de la calculadora**, con el paso de la
+  - **Comprobado en local en el tercer PR de VIC-53** (el #78), con el paso de la
     plantilla: los 21 casos anteriores dan la misma salida que con el paso del #77; con el
     informe de hoy y la línea `An error occurred during 'wrapUp' on reporter 'json'.
     Error: EMFILE` en la salida de Stryker, falla con el error del reporter `json`, también
