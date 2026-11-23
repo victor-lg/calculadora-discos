@@ -377,7 +377,7 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
   la regla de `main` hasta cerrar VIC-29. Mientras, sus fallos se miran, pero su verde no
   prueba que los tests detecten los mutantes. La cabecera de `calidad.yml` dice que el
   nombre de cada job es el check que se marca como requerido: en la calculadora, para
-  `mutaciones`, todavía no.
+  `mutaciones`, todavía no (desde VIC-53, sí: abajo).
 - **Para hacerlo requerido** (lo decide y lo marca la persona): desde VIC-29 la CI mide
   como local. La G4 del #64 dejó dos condiciones:
   - **Confirmar la causa con `nproc`.** Cumplida a medias: `nproc` da 4 hoy, en dos
@@ -388,6 +388,31 @@ Para `mutaciones`, VIC-29 añade 16 jobs de la CI alrededor del paso del repo a 
     «Stryker».
 
   La persona decide si con eso basta.
+- **Diez repeticiones del job** (VIC-53, 22 y 23 de noviembre de 2026, con la medida en el
+  log): todas con 4 vCPU y en verde, con el mínimo de 90. Las 1 a 4 son intentos del run
+  45059448329 (commit 7849ff3); las 5 a 10, del run 45141784312 (commit c3ce253). La
+  puntuación cuenta los mutantes por tiempo como supervivientes, sobre 792 válidos.
+
+  | # | CPU | Por tiempo | Muertos | Puntuación | Duración |
+  |---|---|---|---|---|---|
+  | 1 | Xeon Platinum 8370C | 16 | 720 | 90,91 | 10,5 min |
+  | 2 | Xeon 6975P-C | 6 | 728 | 91,92 | 7,0 min |
+  | 3 | EPYC 7763 | 16 | 722 | 91,16 | 10,5 min |
+  | 4 | EPYC 7763 | 16 | 720 | 90,91 | 10,6 min |
+  | 5 | EPYC 7763 | 16 | 720 | 90,91 | 10,7 min |
+  | 6 | EPYC 7763 | 23 | 720 | 90,91 | 10,5 min |
+  | 7 | Xeon 6975P-C | 6 | 728 | 91,92 | 7,0 min |
+  | 8 | EPYC 9V74 | 6 | 728 | 91,92 | 9,9 min |
+  | 9 | EPYC 9V45 | 6 | 728 | 91,92 | 5,8 min |
+  | 10 | EPYC 7763 | 6 | 728 | 91,92 | 10,5 min |
+
+  De 6 a 23 mutantes por tiempo y de 90,91 a 91,92 de puntuación. La peor conocida es la
+  del #76, antes de la medida: 23 por tiempo y 716/792 = 90,40. El mínimo de 90 pide 713
+  muertos; el peor caso visto tiene 716. **El modelo de CPU influye, pero no lo explica
+  todo:** el EPYC 7763 dio 6, 16 y 23 mutantes por tiempo.
+- **Decisión de VIC-53** (Víctor, 2026-11-23): **el mínimo se queda en 90** y
+  **`mutaciones` pasa a check requerido** en la regla de `main`. Si la alarma salta con un
+  job lento, **se relanza el job una vez** antes de mirar nada más.
 - **Ficheros de test:** Stryker lanza `tests/unit/**/!(sw).test.js`, los mismos que
   `npm test` salvo `sw.test.js`, también en subcarpetas.
 - **Los 50 con error:** el proceso de `tests/unit/series.test.js` sale con el código 7 en
