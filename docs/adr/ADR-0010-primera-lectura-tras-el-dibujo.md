@@ -5,7 +5,7 @@ estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
 fecha: 2026-11-23
 sustituye: null
 sustituido_por: null
-modifica: ["ADR-0009 (§6, primer criterio, entero, con su paréntesis y su frase final: el aviso por la primera lectura más larga pasa a 7,5 s en SPEC-CALC-001/AC-13 y sigue en 5 s en los demás tests; «se agota alguna vez» no cambia. §4, tabla de riesgos, primera fila: «§6 pide revisar a la mitad» pasa a «a la mitad, o a tres cuartos en AC-13»)"]
+modifica: ["ADR-0009 (§6, primer criterio, entero, con su paréntesis y su frase final: el aviso por la primera lectura más larga pasa a 7,5 s en SPEC-CALC-001/AC-13 y sigue en 5 s en los demás tests; «se agota alguna vez» no cambia. §4, tabla de riesgos, primera fila: «§6 pide revisar a la mitad» pasa a «§6 pide revisar a la mitad, o a tres cuartos en AC-13»)"]
 referencias: ["ADR-0003", "ADR-0008", "ADR-0009", "SPEC-CALC-001", "VIC-35", "VIC-31", "PR #56"]
 ---
 
@@ -62,8 +62,9 @@ Sin frenar la CPU, la más larga es de 117 ms y el test dura 44 s (en la CI, má
 **La causa.** Al arrancar, la app espera a las fuentes y, en un mismo fotograma, ilumina la
 escena (`iluminar()`, 15–55 ms en local) y hace el primer `pintarPendientes()`. Ese primer
 dibujo pinta una sola tarjeta, porque el presupuesto por fotograma (`PRESUPUESTO_MS`) deja
-las demás para los siguientes, pero es el primero con esa escena y compila sus sombreadores
-(sombras suaves y antialias) con SwiftShader, en el hilo principal. Tras el `reload` del
+las demás para los siguientes, pero es el primero con esa escena, con SwiftShader y en el
+hilo principal; la hipótesis es que compila ahí sus sombreadores (sombras suaves y
+antialias). Tras el `reload` del
 recorrido con datos ese fotograma pasa de 0,7–1 s a 2 s. No se ha medido qué parte es la
 compilación y qué parte el pintado. `page.evaluate` se ejecuta en el mismo hilo, así que una
 lectura que llega durante esa tarea queda en cola detrás. No es Playwright ni el protocolo:
@@ -84,7 +85,8 @@ inferencia: ninguna anotación lo dice.
 ### Opción A: aceptarlo como límite y mover el aviso de §6 a 7,5 s solo en AC-13
 
 - **Ventajas:** no cambia la app ni los tests; solo un criterio de revisión. La causa está
-  medida y es un coste del dibujo por software que ya acepta ADR-0009 §4 («una primera
+  medida en local, se infiere en la CI (§1, «Límites de lo medido») y es un coste del
+  dibujo por software que ya acepta ADR-0009 §4 («una primera
   lectura que tarda hasta 10 s pasa sin fallo»). El aviso deja de saltar en 3 de cada 24
   ejecuciones por una causa ya estudiada y sigue saltando antes del fallo. Los demás tests,
   sin causa estudiada, conservan el aviso a 5 s.
@@ -118,7 +120,8 @@ inferencia: ninguna anotación lo dice.
 ### Opción F: aligerar el primer fotograma de la app
 
 El pintado ya se reparte por tarjetas (`PRESUPUESTO_MS`). Quedaría compilar los sombreadores
-antes del primer dibujo, o sacar `iluminar()` de ese fotograma.
+antes del primer dibujo, si la compilación resulta ser la parte cara (no se ha medido), o
+sacar `iluminar()` de ese fotograma.
 
 - **Ventajas:** acortaría la tarea larga, también en dispositivos lentos.
 - **Inconvenientes:** es cambiar la app para la CI, fuera del alcance de VIC-35. En el
@@ -135,11 +138,13 @@ El primer criterio de ADR-0009 §6 queda, entero, así:
 > si la primera lectura más larga medida en la CI pasa de 5 s (la mitad de su tiempo máximo)
 > en cualquier test salvo SPEC-CALC-001/AC-13, o de 7,5 s (tres cuartos) en AC-13, o se
 > agota alguna vez. Es un aviso de fallo cercano, no de deriva: una subida lenta por debajo
-> de esas cifras no lo dispara.
+> de esas cifras no lo dispara;
 
-En la tabla de riesgos de ADR-0009 §4, «§6 pide revisar a la mitad» pasa a «a la mitad, o a
-tres cuartos en AC-13». El resto de §6 no cambia, incluido el criterio que liga un test
-fallido a una primera lectura de más de 2 s en la misma ejecución.
+En la tabla de riesgos de ADR-0009 §4, «§6 pide revisar a la mitad» pasa a «§6 pide revisar
+a la mitad, o a tres cuartos en AC-13». El resto de §6 no cambia, incluido el criterio que liga un test
+fallido a una primera lectura de más de 2 s en la misma ejecución. Aparte, este ADR añade en
+su §6 un criterio propio, no de ADR-0009: el de más de 3 s fuera de AC-13 no es un aviso de
+fallo cercano, sino una señal de que hay lecturas lentas que esta causa no explica.
 
 ## 4. Consecuencias
 
@@ -155,11 +160,12 @@ fallido a una primera lectura de más de 2 s en la misma ejecución.
   | Riesgo | Mitigación |
   | --- | --- |
   | La lectura de AC-13 se acerca a 10 s y falla de forma intermitente | El aviso a 7,5 s; si salta, la Opción F es la siguiente que mirar. |
-  | La causa en la CI no es la medida en local | §6: una primera lectura lenta con animaciones o en otro test no la explica esta causa y se revisa. |
+  | La causa en la CI no es la medida en local | §6 de este ADR: una primera lectura de más de 2 s con animaciones, o de más de 3 s en un test que no sea AC-13, no la explica esta causa y se revisa. |
 
 - **Impacto:** ningún fichero de la app ni de los tests en este PR. El comentario de
   `LECTURA_MAXIMA_MS` en `tests/e2e/axe.js` dice «se revisa si una pasa de 5 s (§6)»; se
-  actualiza a las cifras de este ADR en un PR de código aparte.
+  actualiza a las cifras de este ADR en un PR de código aparte, que necesita su propia
+  issue; hasta entonces, manda este ADR.
 
 ## 5. Validación
 
