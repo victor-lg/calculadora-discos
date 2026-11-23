@@ -1,7 +1,7 @@
 ---
 id: ADR-0010
 titulo: la primera lectura lenta antes de axe en AC-13 es un límite aceptado del dibujo 3D por software
-estado: Propuesto         # Propuesto | Aceptado | Rechazado | Sustituido
+estado: Aceptado          # Propuesto | Aceptado | Rechazado | Sustituido · opción A, decisión de Víctor del 2026-11-23
 fecha: 2026-11-23
 sustituye: null
 sustituido_por: null
