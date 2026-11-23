@@ -114,3 +114,4 @@ Estas notas son contexto, no norma (AGENTS.md). Lo que acabe en la spec lo aprue
 
 <!-- Segunda prueba de VIC-56 (sdd-relanzar): PR desechable, no se fusiona. -->
 <!-- Segundo commit de la segunda prueba de VIC-56. -->
+<!-- Tercer commit de la segunda prueba de VIC-56. -->
