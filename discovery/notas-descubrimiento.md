@@ -114,3 +114,4 @@ Estas notas son contexto, no norma (AGENTS.md). Lo que acabe en la spec lo aprue
 
 <!-- Tercera prueba de VIC-56 (sdd-relanzar): PR desechable, no se fusiona. -->
 <!-- Carrera 2 de la tercera prueba de VIC-56: push justo después de una review. -->
+<!-- Push tras aprobar en la tercera prueba de VIC-56, justo después de una review. -->
