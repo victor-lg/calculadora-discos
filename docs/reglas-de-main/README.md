@@ -83,6 +83,8 @@ Según los comentarios de VIC-56 (Done), sus reglas 1 y 3 quedaron para después
 
 Con 0 aprobaciones, un R1 sin rutas de CODEOWNERS y con la CI en verde se puede fusionar en cuanto el ruleset se aplique, con auto-merge o con el botón (la cuenta del agente tiene `write`). Por eso la persona decidió (2026-11-24) no aplicar nada hasta que las reglas 1 y 3 de VIC-56 estén en `main`. Esta propuesta no cambia `checks.py`.
 
+- **Desbloqueo por aprobación en R0 y R1 (VIC-56, regla 3):** si tras la última ronda de G4 entra algo que no es documentación, un R0 o R1 también pasa con el «Approve» de victor-lg sobre la cabeza. Si la persona aprueba y después pide cambios o retira la aprobación, vale el mismo límite de `sdd-relanzar` que en R2 (puede quedar el verde anterior), pero aquí el agente podría fusionar solo. Condición de la persona (2026-11-24): si el caso D1 muestra que un «Request changes» de victor-lg no frena por sí solo el auto-merge, se quita ese desbloqueo (en R0 y R1, siempre otra ronda) antes de que el agente active el auto-merge en ningún R0 o R1.
+
 ## 4. Plan de prueba (ADR-0009 §5)
 
 Se ejecuta después de que apliques el ruleset, CODEOWNERS y el auto-merge, y por tanto con las reglas 1 y 3 de VIC-56 ya en `main`. Sustituye a N4; N5 se mantiene (C7).
