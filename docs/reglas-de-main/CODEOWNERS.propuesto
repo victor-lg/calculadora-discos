@@ -1,0 +1,97 @@
+# Workflow SDD + IA v1.1 (ADR-0009 del workflow, VIC-57).
+# Propietario: victor-lg (tu cuenta, nunca la cuenta de máquina del agente).
+#
+# Sin la línea `*`: con 0 aprobaciones generales en el ruleset de `main` y "Require review
+# from Code Owners" activo, solo piden tu aprobación las rutas de aquí. Son las rutas
+# sensibles de ADR-0009 §3.3 (specs, ADR, dependencias, .github/, configuración del agente),
+# toda la lista de controles de .github/sdd/checks.py (R2_CONTROLES, capturas incluidas) y
+# las rutas sensibles del proyecto (.github/sdd/rutas-sensibles.txt).
+#
+# Diferencias con checks.py, que nunca dejan menos protegido un R2: checks-sdd falla en
+# todo R2 sin tu aprobación (check `aprobacion`), esté o no la ruta aquí.
+#   - CODEOWNERS distingue mayúsculas y checks.py no: `ESLint.config.js` es R2 para la CI,
+#     pero no está aquí.
+#   - CODEOWNERS no admite `[jt]`: `knip.[jt]s` va en dos líneas.
+#   - Un nombre sin `/` vale en cualquier carpeta; en checks.py, algunos solo en la raíz
+#     (`lefthook.json`, `.gitmodules`): aquí cubren más, nunca menos.
+#   - Las migraciones (R2_RUTAS) no están: no son de §3.3 ni de la lista de controles, y la
+#     calculadora no tiene. Las frena checks-sdd.
+# Si cambian R2_CONTROLES, MANIFIESTOS o rutas-sensibles.txt, este fichero cambia con ellos.
+
+# --- ADR-0009 §3.3: normas y configuración del agente ---
+/docs/specs/                    @victor-lg
+/docs/adr/                      @victor-lg
+# Incluye .github/sdd/checks.py y .github/sdd/rutas-sensibles.txt.
+/.github/                       @victor-lg
+/.claude/                       @victor-lg
+/AGENTS.md                      @victor-lg
+/CLAUDE.md                      @victor-lg
+
+# --- ADR-0009 §3.3: dependencias (MANIFIESTOS de checks.py) ---
+package.json                    @victor-lg
+package-lock.json               @victor-lg
+npm-shrinkwrap.json             @victor-lg
+pnpm-lock.yaml                  @victor-lg
+yarn.lock                       @victor-lg
+bun.lockb                       @victor-lg
+requirements*.txt               @victor-lg
+pyproject.toml                  @victor-lg
+poetry.lock                     @victor-lg
+uv.lock                         @victor-lg
+Pipfile                         @victor-lg
+Pipfile.lock                    @victor-lg
+go.mod                          @victor-lg
+go.sum                          @victor-lg
+Cargo.toml                      @victor-lg
+Cargo.lock                      @victor-lg
+Gemfile                         @victor-lg
+Gemfile.lock                    @victor-lg
+composer.json                   @victor-lg
+composer.lock                   @victor-lg
+pom.xml                         @victor-lg
+build.gradle                    @victor-lg
+build.gradle.kts                @victor-lg
+Package.swift                   @victor-lg
+Package.resolved                @victor-lg
+Podfile                         @victor-lg
+Podfile.lock                    @victor-lg
+*.csproj                        @victor-lg
+
+# --- Lista de controles de checks.py (R2_CONTROLES) ---
+lefthook.json                   @victor-lg
+/.lefthook/                     @victor-lg
+/.lefthook-local/               @victor-lg
+.gitleaks.toml                  @victor-lg
+.gitleaksignore                 @victor-lg
+.gitattributes                  @victor-lg
+.semgrepignore                  @victor-lg
+osv-scanner.toml                @victor-lg
+eslint.config.*                 @victor-lg
+stryker.conf.*                  @victor-lg
+stryker.config.*                @victor-lg
+.stryker.conf.*                 @victor-lg
+.stryker.config.*               @victor-lg
+knip.json                       @victor-lg
+knip.jsonc                      @victor-lg
+.knip.json                      @victor-lg
+.knip.jsonc                     @victor-lg
+knip.js                         @victor-lg
+knip.ts                         @victor-lg
+knip.config.js                  @victor-lg
+knip.config.ts                  @victor-lg
+.jscpd.json                     @victor-lg
+**/.config/jscpd.json           @victor-lg
+.jscpd-baseline.json            @victor-lg
+# Capturas de referencia de la regresión visual (M27) y configuración de Playwright.
+*-snapshots/                    @victor-lg
+__screenshots__/                @victor-lg
+playwright.config.*             @victor-lg
+playwright-ct.config.*          @victor-lg
+.npmrc                          @victor-lg
+.gitmodules                     @victor-lg
+
+# --- Rutas sensibles del proyecto (.github/sdd/rutas-sensibles.txt) ---
+/app/sw.js                      @victor-lg
+/app/index.html                 @victor-lg
+/tests/unit/sw.test.js          @victor-lg
+/tests/e2e/sin-conexion.spec.js @victor-lg
