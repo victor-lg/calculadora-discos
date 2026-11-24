@@ -4,7 +4,7 @@ Propuesta para aplicar en la calculadora el ADR-0009 del workflow (`victor-lg/sd
 
 Lo aplica la persona. El agente no tiene permiso para cambiar el ruleset ni los ajustes del repo, y `.github/CODEOWNERS` lo sube la persona.
 
-> **Antes de aplicar nada, lee §3.** Con `checks.py` de hoy, el ruleset propuesto deja que el agente fusione solo dos tipos de PR que ADR-0009 §5 prohíbe (un R1 sin G4 y uno con commits tras la última ronda) y abre un límite aceptado de `sdd-relanzar.yml`. Aplicar ya o después de cerrar esos huecos lo decides tú.
+> **No se aplica todavía** (decisión de la persona, 2026-11-24): primero las reglas 1 y 3 de VIC-56 (§3); el ruleset, CODEOWNERS y el auto-merge se aplican cuando estén en `main`.
 
 | Fichero | Qué es | SHA-256 |
 |---|---|---|
@@ -13,13 +13,15 @@ Lo aplica la persona. El agente no tiene permiso para cambiar el ruleset ni los 
 
 ## 1. Ruleset de `main`
 
+> **No apliques nada de este documento hasta que las reglas 1 y 3 de VIC-56 estén en `main`** (decisión de la persona, 2026-11-24). Con `checks.py` de hoy, este ruleset dejaría que el agente fusionara solo un R1 sin G4 o con commits tras la última ronda de G4, que ADR-0009 §5 prohíbe (§3). Cuando estén, comprueba que `checks.py` de `main` falla en esos dos casos y aplica en este orden: CODEOWNERS, ruleset, auto-merge.
+
 Ruleset `main-protegida`, sobre la rama por defecto. Cada opción con su valor; «cambia» marca lo que es distinto de hoy (leído con `gh api repos/victor-lg/calculadora-discos/rulesets/25460562` el 2026-11-24).
 
 | Opción (en la web) | Clave en la API | Valor | ¿Cambia? |
 |---|---|---|---|
 | Enforcement status | `enforcement` | `active` | no |
 | Target branches | `conditions.ref_name.include` | `~DEFAULT_BRANCH` | no |
-| Bypass list | `bypass_actors` | Repository admin (`RepositoryRole` 5), solo victor-lg; modo «For pull requests only» (`pull_request`) | puede; compruébalo y, si hace falta, edita el JSON antes del `PUT` (nota 1) |
+| Bypass list | `bypass_actors` | Repository admin (`RepositoryRole` 5), solo victor-lg; modo «For pull requests only» (`pull_request`) | decidido por la persona (nota 1) |
 | Restrict deletions | `deletion` | activo | no |
 | Block force pushes | `non_fast_forward` | activo | no |
 | Require a pull request before merging | `pull_request` | activo | no |
@@ -39,11 +41,11 @@ Ruleset `main-protegida`, sobre la rama por defecto. Cada opción con su valor; 
 
 Notas:
 
-1. **Bypass.** La cuenta del agente no ve la lista actual (`current_user_can_bypass: never`). En un repo personal, «solo victor-lg» es el rol *Repository admin*: victor-lg es la única cuenta admin y `victor-lg-bot` tiene `write`. Propongo el modo *For pull requests only*, que basta para que tus PR R2 sigan entrando con bypass (no puedes aprobar un PR tuyo) y no permite el push directo a `main`. Si hoy está en *Always* y quieres conservar el push directo, deja *Always*: no cambia nada de lo que se prueba en §4 (el bypass es de tu cuenta). Antes de aplicar, compara con `gh api repos/victor-lg/calculadora-discos/rulesets/25460562 --jq .bypass_actors` desde tu cuenta.
+1. **Bypass.** La cuenta del agente no ve la lista actual (`current_user_can_bypass: never`). En un repo personal, «solo victor-lg» es el rol *Repository admin*: victor-lg es la única cuenta admin y `victor-lg-bot` tiene `write`. Modo *For pull requests only* (decisión de la persona, 2026-11-24): basta para que los PR R2 de la persona sigan entrando con bypass (no puede aprobar un PR suyo) y no permite el push directo a `main`. El JSON ya lo lleva así.
 2. **Aprobación del último push.** Esa opción exige que el último push lo apruebe alguien distinto de quien lo hizo. El último push de un PR del agente es siempre del agente, así que, activa, previsiblemente seguiría pidiendo una aprobación en todo PR y el auto-merge no fusionaría ningún R1. Lo que protegía ya lo cubren el *dismiss* de aprobaciones al hacer push (rutas de CODEOWNERS) y el check `aprobacion` de `checks-sdd`, que en R2 exige tu aprobación sobre el commit de la cabeza. Se comprueba en C0 y en C2 (§4).
 3. **`require_extra_approval_for_unattributed_changes`.** Está activa hoy y la web no la muestra con ese nombre; no conozco su efecto exacto, así que se queda como está y C0 comprueba que no bloquea un R1.
 
-Para aplicarlo, desde tu cuenta, con la decisión de §3 tomada y desde el commit de este PR que aprobaste (`docs/reglas-de-main/` no está en CODEOWNERS: un PR posterior del agente podría cambiar estos ficheros sin tu aprobación, así que no los tomes de `main` sin más):
+Para aplicarlo, desde tu cuenta, con las reglas 1 y 3 de VIC-56 ya en `main` y desde el commit de este PR que aprobaste (`docs/reglas-de-main/` no está en CODEOWNERS: un PR posterior del agente podría cambiar estos ficheros sin tu aprobación, así que no los tomes de `main` sin más):
 
 ```sh
 git show <commit aprobado>:docs/reglas-de-main/ruleset-main.json > ruleset-main.json
@@ -75,13 +77,15 @@ Según los comentarios de VIC-56 (Done), sus reglas 1 y 3 quedaron para después
 - **Un PR sin G4 no falla** (`check_hallazgos`: «un PR sin G4 (R0, Dependabot) no falla aquí»), y un R0 que toca código solo da un aviso (`check_riesgo`).
 - **Los commits posteriores a la última ronda de G4 no fallan:** `check_cambios` los publica en el resumen, pero solo falla si falta el commit revisado, si ese commit ya no está en la historia de la cabeza (rebase o push forzado) o si la lista está escrita a mano.
 - **El límite aceptado de `sdd-relanzar.yml`:** si la persona aprueba un R2 y luego pide cambios o retira la aprobación, y el relanzamiento no llega a ejecutarse, `checks-sdd` conserva el verde anterior. No es solo cuestión de tiempo: la cuenta del agente tiene `write` y puede cancelar la ejecución de `sdd-relanzar` (y, si D2 sale que sí, también descartar la review y cancelar el relanzamiento del `dismissed`). El propio fichero pide revisarlo «antes de que el agente pueda fusionar algún PR con aprobación previa de la persona». Hoy lo frena la regla de 1 aprobación; con 0, solo lo frenaría GitHub si un «Request changes» bloquea (D1). Afecta seguro a los R2 sin rutas de CODEOWNERS (migraciones, código de una spec R2); en los que tienen rutas de CODEOWNERS se espera que el «Request changes» de la persona deje sin su aprobación, pero no está comprobado (C2, último paso). Lo prueban D1-R2 y D3.
-- **Checks verdes contra un `main` anterior:** con `strict_required_status_checks_policy` inactivo (como hoy), el verde de `checks-sdd` puede venir de una ejecución anterior a un cambio en `main`. Si la persona fusiona una spec que sube a R2, o añade una ruta a `rutas-sensibles.txt`, mientras un PR R1 del agente ya está en verde con auto-merge activo, ese PR se fusiona como R1 sin volver a evaluarse. Activarlo («Require branches to be up to date») lo cierra a cambio de relanzar toda la CI, Stryker incluido, en cada PR abierto tras cada merge. La propuesta lo deja como hoy porque así lo pediste («checks requeridos los de hoy»); si prefieres cerrarlo, cambia ese valor a `true` en el JSON.
+  **Aceptado por ahora** (decisión de la persona, 2026-11-24), con una regla para el agente: **nunca activa el auto-merge en un R2 ni cancela ejecuciones de la CI.** La única excepción son los casos C6c y D3 de §4, que cancelan una ejecución a propósito en un PR desechable y con la persona avisada. Es una regla del agente, no un control: irá a las skills en VIC-60 y, hasta entonces, solo la recoge este documento.
+- **Checks verdes contra un `main` anterior:** con `strict_required_status_checks_policy` inactivo (como hoy), el verde de `checks-sdd` puede venir de una ejecución anterior a un cambio en `main`. Si la persona fusiona una spec que sube a R2, o añade una ruta a `rutas-sensibles.txt`, mientras un PR R1 del agente ya está en verde con auto-merge activo, ese PR se fusiona como R1 sin volver a evaluarse. Activarlo («Require branches to be up to date») lo cierra a cambio de relanzar toda la CI, Stryker incluido, en cada PR abierto tras cada merge.
+  **Riesgo aceptado** (decisión de la persona, 2026-11-24): se queda inactivo, como hoy. Se acepta que un PR del agente en verde con auto-merge activo puede fusionarse con el nivel de riesgo calculado contra el `main` anterior a un cambio de specs o de `rutas-sensibles.txt`. Hace falta que coincidan ese cambio y un PR del agente pendiente; lo recogería la segunda mirada (ADR-0009 §3.10).
 
-Con 0 aprobaciones, un R1 sin rutas de CODEOWNERS y con la CI en verde se puede fusionar en cuanto el ruleset se aplique, con auto-merge o con el botón (la cuenta del agente tiene `write`). Los casos C4a, C4b y C5 de §4 **se espera que fallen** hasta que se hagan las reglas 1 y 3 de VIC-56, y D1-R2 depende de D1. Decides tú: aplicar ya y aceptar esos huecos hasta entonces (ADR-0009 §4 atribuye su control a esta issue), o hacer antes las reglas 1 y 3. Esta propuesta no cambia `checks.py`.
+Con 0 aprobaciones, un R1 sin rutas de CODEOWNERS y con la CI en verde se puede fusionar en cuanto el ruleset se aplique, con auto-merge o con el botón (la cuenta del agente tiene `write`). Por eso la persona decidió (2026-11-24) no aplicar nada hasta que las reglas 1 y 3 de VIC-56 estén en `main`. Esta propuesta no cambia `checks.py`.
 
 ## 4. Plan de prueba (ADR-0009 §5)
 
-Se ejecuta después de que apliques el ruleset, CODEOWNERS y el auto-merge. Sustituye a N4; N5 se mantiene (C7).
+Se ejecuta después de que apliques el ruleset, CODEOWNERS y el auto-merge, y por tanto con las reglas 1 y 3 de VIC-56 ya en `main`. Sustituye a N4; N5 se mantiene (C7).
 
 ### Cómo se hace cada prueba
 
@@ -102,10 +106,10 @@ Se ejecuta después de que apliques el ruleset, CODEOWNERS y el auto-merge. Sust
 | C1 | 1 | R1 que añade `docs/adr/_prueba-vic-57.md` (de CODEOWNERS; no cuenta como ADR por el `_`) | Intento sin review | `BLOCKED`, `reviewDecision: REVIEW_REQUIRED`; review pedida a victor-lg; los dos intentos, rechazados |
 | C2 | 2 | El de C1, que además añade `app/_prueba-vic-57.txt` (sin propietario) | (a) La persona aprueba (→ `CLEAN`, sin fusionar); el agente hace un push que cambia **solo** `app/_prueba-vic-57.txt`; intento. (b) Nueva aprobación; push que cambia `docs/adr/_prueba-vic-57.md`; intento. (c) Nueva aprobación y «Update branch» (merge de `main` sin cambios propios). (d) Nueva aprobación y luego «Request changes» de la persona | (a) y (b): la aprobación queda descartada (`dismissed`), `BLOCKED`, intentos rechazados; si en (a) sigue `CLEAN`, falla el caso (nota 2: habría que volver a activar `require_last_push_approval`). (c): se anota si la aprobación sigue. (d): `BLOCKED`; si sale `CLEAN`, falla el caso |
 | C3 | 3 | R2 que no toca CODEOWNERS: `migrations/_prueba-vic-57.txt` (R2 por `R2_RUTAS`) | Intento sin review | `checks-sdd` en rojo (`aprobacion`), `BLOCKED`, intentos rechazados |
-| C4a | 4 | R1 sin rutas de CODEOWNERS y sin G4 | Leer el estado | **Hoy se espera `CLEAN` (falla el caso):** falta la regla 1 de VIC-56 (§3). No se fusiona |
-| C4b | 4 | R0 marcado que toca código (un comentario en un `.js` de `app/` que no esté en rutas sensibles) | Leer el estado | **Hoy se espera `CLEAN` con aviso (falla el caso):** `checks.py` no comprueba que un R0 sea solo documentación |
+| C4a | 4 | R1 sin rutas de CODEOWNERS y sin G4 | Intento | `checks-sdd` en rojo (regla 1 de VIC-56), `BLOCKED`, intentos rechazados. Si sale `CLEAN`, falla el caso y no se fusiona |
+| C4b | 4 | R0 marcado que toca código (un comentario en un `.js` de `app/` que no esté en rutas sensibles) | Intento | `checks-sdd` en rojo (regla 1 de VIC-56: un R0 que `checks.py` no comprueba como solo documentación lleva G4), `BLOCKED`, intentos rechazados. Si sale `CLEAN`, falla el caso y no se fusiona |
 | C4c | 4 | R1 con una línea de reconciliación `resolución: pregunta a la persona` | Intento | `checks-sdd` en rojo (`hallazgos`), `BLOCKED`, intentos rechazados |
-| C5 | 5 | R1 con una ronda de G4 (`Commit revisado:` sobre la cabeza) y después un push | Intento | **Hoy se espera `CLEAN` (falla el caso):** falta la regla 3 de VIC-56 (§3). No se fusiona |
+| C5 | 5 | R1 con una ronda de G4 (`Commit revisado:` sobre la cabeza) y después un push | Intento | `checks-sdd` en rojo (regla 3 de VIC-56), `BLOCKED`, intentos rechazados. Si sale `CLEAN`, falla el caso y no se fusiona |
 | C6a | 6 | — | Desde la cuenta del agente, un commit sobre `main` que solo añade `_prueba-vic-57-c6a.txt` (una línea de texto), empujado con `git push origin <ese commit>:main` | Rechazado por GitHub (`GH013`). Si GitHub lo aceptara, la persona lo revierte con un PR suyo y se para la prueba. Si el hook del plugin lo para antes de llegar a GitHub, se anota así y no se repite por otra vía; la persona decide si lo intenta ella sin bypass o si basta |
 | C6b | 6 | R1 como C0 con `checks-sdd` en rojo (título fuera de formato) | Intento | `BLOCKED`, intentos rechazados |
 | C6c | 6 | El de C6b, con el título corregido | Pendiente: con los checks en curso, solo `gh pr merge N --squash` (debe fallar), **sin** `--auto`. Cancelado: se cancela la ejecución de `sdd` (`gh run cancel`, `checks-sdd`) y, con el resto de checks terminados y el PR `BLOCKED` por ese cancelado, el intento normal | Pendiente: rechazado. Cancelado: `BLOCKED`, intentos rechazados. Tras el intento, `--disable-auto` sin ningún evento entre medias (un evento relanzaría `checks-sdd`) |
