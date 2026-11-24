@@ -7,3 +7,4 @@ export function formatearKg(cent) {
   const decimales = String(abs % 100).padStart(2, '0').replace(/0+$/, '');
   return signo + entero + (decimales ? ',' + decimales : '');
 }
+// Prueba de VIC-56 (PR desechable): R0 que toca código.
