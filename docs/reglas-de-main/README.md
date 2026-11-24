@@ -4,6 +4,8 @@ Propuesta para aplicar en la calculadora el ADR-0009 del workflow (`victor-lg/sd
 
 Lo aplica la persona. El agente no tiene permiso para cambiar el ruleset ni los ajustes del repo, y `.github/CODEOWNERS` lo sube la persona.
 
+> **Antes de aplicar nada, lee §3.** Con `checks.py` de hoy, el ruleset propuesto deja que el agente fusione solo dos tipos de PR que ADR-0009 §5 prohíbe (un R1 sin G4 y uno con commits tras la última ronda) y abre un límite aceptado de `sdd-relanzar.yml`. Aplicar ya o después de cerrar esos huecos lo decides tú.
+
 | Fichero | Qué es | SHA-256 |
 |---|---|---|
 | [`CODEOWNERS.propuesto`](CODEOWNERS.propuesto) | El `.github/CODEOWNERS` completo | `25c9e0ed490a404dde35a475431832307b3a98c87fc422d654436e4fa682a4f3` |
@@ -17,7 +19,7 @@ Ruleset `main-protegida`, sobre la rama por defecto. Cada opción con su valor; 
 |---|---|---|---|
 | Enforcement status | `enforcement` | `active` | no |
 | Target branches | `conditions.ref_name.include` | `~DEFAULT_BRANCH` | no |
-| Bypass list | `bypass_actors` | Repository admin (`RepositoryRole` 5), solo victor-lg; modo «For pull requests only» (`pull_request`) | ver nota 1 |
+| Bypass list | `bypass_actors` | Repository admin (`RepositoryRole` 5), solo victor-lg; modo «For pull requests only» (`pull_request`) | puede; compruébalo y, si hace falta, edita el JSON antes del `PUT` (nota 1) |
 | Restrict deletions | `deletion` | activo | no |
 | Block force pushes | `non_fast_forward` | activo | no |
 | Require a pull request before merging | `pull_request` | activo | no |
@@ -41,12 +43,16 @@ Notas:
 2. **Aprobación del último push.** Esa opción exige que el último push lo apruebe alguien distinto de quien lo hizo. El último push de un PR del agente es siempre del agente, así que, activa, previsiblemente seguiría pidiendo una aprobación en todo PR y el auto-merge no fusionaría ningún R1. Lo que protegía ya lo cubren el *dismiss* de aprobaciones al hacer push (rutas de CODEOWNERS) y el check `aprobacion` de `checks-sdd`, que en R2 exige tu aprobación sobre el commit de la cabeza. Se comprueba en C0 y en C2 (§4).
 3. **`require_extra_approval_for_unattributed_changes`.** Está activa hoy y la web no la muestra con ese nombre; no conozco su efecto exacto, así que se queda como está y C0 comprueba que no bloquea un R1.
 
-Para aplicarlo, desde tu cuenta y con este PR ya en `main`:
+Para aplicarlo, desde tu cuenta, con la decisión de §3 tomada y desde el commit de este PR que aprobaste (`docs/reglas-de-main/` no está en CODEOWNERS: un PR posterior del agente podría cambiar estos ficheros sin tu aprobación, así que no los tomes de `main` sin más):
 
 ```sh
-gh api -X PUT repos/victor-lg/calculadora-discos/rulesets/25460562 --input docs/reglas-de-main/ruleset-main.json
+git show <commit aprobado>:docs/reglas-de-main/ruleset-main.json > ruleset-main.json
+sha256sum ruleset-main.json   # debe dar el de la tabla de arriba, que leíste al aprobar
+gh api -X PUT repos/victor-lg/calculadora-discos/rulesets/25460562 --input ruleset-main.json
 gh api -X PATCH repos/victor-lg/calculadora-discos -F allow_auto_merge=true
 ```
+
+Lo mismo con `CODEOWNERS.propuesto` antes de copiarlo a `.github/CODEOWNERS`.
 
 ## 2. CODEOWNERS
 
@@ -67,9 +73,10 @@ gh api -X PATCH repos/victor-lg/calculadora-discos -F allow_auto_merge=true
 Según los comentarios de VIC-56 (Done), sus reglas 1 y 3 quedaron para después de esta issue. Con `checks.py` de `main` hoy:
 
 - **Un PR sin G4 no falla** (`check_hallazgos`: «un PR sin G4 (R0, Dependabot) no falla aquí»), y un R0 que toca código solo da un aviso (`check_riesgo`).
-- **Los commits posteriores a la última ronda de G4 no fallan:** `check_cambios` los publica en el resumen, pero solo falla si falta el commit revisado o si la lista está escrita a mano.
+- **Los commits posteriores a la última ronda de G4 no fallan:** `check_cambios` los publica en el resumen, pero solo falla si falta el commit revisado, si ese commit ya no está en la historia de la cabeza (rebase o push forzado) o si la lista está escrita a mano.
+- **El límite aceptado de `sdd-relanzar.yml`:** si la persona aprueba un R2 y luego pide cambios o retira la aprobación, y el relanzamiento llega tarde, `checks-sdd` conserva el verde anterior. El propio fichero pide revisarlo «antes de que el agente pueda fusionar algún PR con aprobación previa de la persona». Hoy lo frena la regla de 1 aprobación; con 0, solo lo frenaría GitHub si un «Request changes» bloquea (D1). En un R2 con rutas de CODEOWNERS no aplica: el *dismiss* o el «Request changes» de la persona deja sin aprobación de CODEOWNERS. Afecta a los R2 sin rutas de CODEOWNERS (migraciones, código de una spec R2).
 
-Con 0 aprobaciones, un R1 sin rutas de CODEOWNERS y con la CI en verde se puede fusionar en cuanto el ruleset se aplique, con auto-merge o con el botón (la cuenta del agente tiene `write`). Esos dos casos de §5 (C4a y C5) **se espera que fallen** hasta que se hagan las reglas 1 y 3. Decides tú: aplicar ya y aceptar ese hueco hasta entonces, o hacer antes las reglas 1 y 3. Esta propuesta no cambia `checks.py`.
+Con 0 aprobaciones, un R1 sin rutas de CODEOWNERS y con la CI en verde se puede fusionar en cuanto el ruleset se aplique, con auto-merge o con el botón (la cuenta del agente tiene `write`). Los casos C4a, C4b y C5 de §4 **se espera que fallen** hasta que se hagan las reglas 1 y 3 de VIC-56, y D1-R2 depende de D1. Decides tú: aplicar ya y aceptar esos huecos hasta entonces (ADR-0009 §4 atribuye su control a esta issue), o hacer antes las reglas 1 y 3. Esta propuesta no cambia `checks.py`.
 
 ## 4. Plan de prueba (ADR-0009 §5)
 
@@ -77,11 +84,12 @@ Se ejecuta después de que apliques el ruleset, CODEOWNERS y el auto-merge. Sust
 
 ### Cómo se hace cada prueba
 
-- **PR desechables:** rama `test/vic-57-prueba-<caso>` desde `main`, título `test(reglas): prueba desechable <caso>`, descripción con `Refs VIC-57` y la plantilla. Contenido inofensivo (ficheros nuevos de texto con el prefijo `_prueba-vic-57`), nunca en `.github/workflows/` salvo C7. Se cierran sin fusionar y se borra la rama.
-- **El intento:** con todos los checks terminados, se lee `gh pr view N --json mergeStateStatus,reviewDecision,statusCheckRollup`. Con `BLOCKED`, se intenta `gh pr merge N --squash` (debe fallar) y `gh pr merge N --squash --auto`; tras el siguiente evento (o 5 minutos), el PR debe seguir abierto. Luego `gh pr merge N --disable-auto`.
+- **PR desechables:** rama `test/vic-57-prueba-<caso>` desde `main`, título `test(reglas): prueba desechable <caso>`, descripción con `Refs VIC-57`, la plantilla y `AC cubiertos: no aplica (prueba desechable de VIC-57)` (un fichero fuera de `docs/` cuenta como código, y sin esa línea `trazabilidad` fallaría por otro motivo). Contenido inofensivo (ficheros nuevos de texto con el prefijo `_prueba-vic-57`), nunca en `.github/workflows/` salvo C7. Se cierran sin fusionar y se borra la rama.
+- **Fuera de borrador.** Un borrador no se fusiona y en él los checks requeridos `tests` y `mutaciones` no existen (se llaman «(borrador)»): un caso probado en borrador se rechazaría por eso y no por la regla. Cada PR desechable sale de borrador antes del intento. El hook del plugin solo deja al agente hacerlo con la CI en verde; en los casos con un check en rojo a propósito (C3, C4c, C6b, C6e), lo hace la persona desde su cuenta (`gh pr ready N`), sin aprobar. Cada salida de borrador lanza `tests` completo y Stryker (hasta unos 30 minutos por PR); se agrupan los casos en los mismos PR donde se puede (C1 y C2; C0, D1 y D2).
+- **El intento:** con todos los checks terminados y fuera de borrador, se lee `gh pr view N --json isDraft,mergeStateStatus,reviewDecision,statusCheckRollup`. Con `BLOCKED` y por la causa que se prueba, se intenta `gh pr merge N --squash` (debe fallar) y `gh pr merge N --squash --auto`; tras el siguiente evento (o 5 minutos sin eventos), el PR debe seguir abierto. Luego `gh pr merge N --disable-auto`, siempre, antes de cualquier otro paso en ese PR.
 - **Si sale `CLEAN` donde se esperaba `BLOCKED`,** el caso ha fallado: no se intenta fusionar, se anota y se para la prueba, para que no entre nada en `main`.
-- **Antes de que la persona apruebe** cualquier PR de prueba, el auto-merge se desactiva: con él activo, un Approve lo fusionaría.
-- **Comprobaciones previas:** `gh api repos/victor-lg/calculadora-discos/rulesets/25460562` igual a `ruleset-main.json` (salvo `bypass_actors`, que el agente no ve), `.allow_auto_merge` en `true` y `codeowners/errors` vacío.
+- **Nunca hay auto-merge activo** mientras los checks están en curso, ni cuando la persona aprueba, ni cuando el agente descarta una review: cualquiera de esas cosas podría dejar el PR en `CLEAN` y fusionarlo.
+- **Comprobaciones previas:** `gh api repos/victor-lg/calculadora-discos/rulesets/25460562` igual a `ruleset-main.json` (salvo `bypass_actors`, que el agente no ve), `.allow_auto_merge` en `true` y `codeowners/errors` vacío. Si algo no coincide, no se empieza.
 
 ### Casos
 
@@ -89,16 +97,16 @@ Se ejecuta después de que apliques el ruleset, CODEOWNERS y el auto-merge. Sust
 |---|---|---|---|---|
 | C0 | control | R1 sin rutas de CODEOWNERS, con una ronda de G4 sin hallazgos sobre la cabeza | Leer el estado; **no** se fusiona | `CLEAN`: 0 aprobaciones, `require_last_push_approval` desactivada y la nota 3 no bloquean. Si sale `BLOCKED`, el ruleset impide el primer escalón y se revisa antes de seguir |
 | C1 | 1 | R1 que añade `docs/adr/_prueba-vic-57.md` (de CODEOWNERS; no cuenta como ADR por el `_`) | Intento sin review | `BLOCKED`, `reviewDecision: REVIEW_REQUIRED`; review pedida a victor-lg; los dos intentos, rechazados |
-| C2 | 2 | El de C1 | La persona aprueba (→ `CLEAN`, sin fusionar); el agente hace un push; intento | La aprobación queda descartada (`dismissed`), `BLOCKED`, intentos rechazados |
+| C2 | 2 | El de C1 | La persona aprueba (→ `CLEAN`, sin fusionar); el agente hace un push con un cambio en el fichero; intento. Después, observación aparte: nueva aprobación y «Update branch» (merge de `main` sin cambios propios) | La aprobación queda descartada (`dismissed`), `BLOCKED`, intentos rechazados. Del «Update branch» se anota si la aprobación sigue o se descarta |
 | C3 | 3 | R2 que no toca CODEOWNERS: `migrations/_prueba-vic-57.txt` (R2 por `R2_RUTAS`) | Intento sin review | `checks-sdd` en rojo (`aprobacion`), `BLOCKED`, intentos rechazados |
 | C4a | 4 | R1 sin rutas de CODEOWNERS y sin G4 | Leer el estado | **Hoy se espera `CLEAN` (falla el caso):** falta la regla 1 de VIC-56 (§3). No se fusiona |
 | C4b | 4 | R0 marcado que toca código (un comentario en un `.js` de `app/` que no esté en rutas sensibles) | Leer el estado | **Hoy se espera `CLEAN` con aviso (falla el caso):** `checks.py` no comprueba que un R0 sea solo documentación |
 | C4c | 4 | R1 con una línea de reconciliación `resolución: pregunta a la persona` | Intento | `checks-sdd` en rojo (`hallazgos`), `BLOCKED`, intentos rechazados |
 | C5 | 5 | R1 con una ronda de G4 (`Commit revisado:` sobre la cabeza) y después un push | Intento | **Hoy se espera `CLEAN` (falla el caso):** falta la regla 3 de VIC-56 (§3). No se fusiona |
-| C6a | 6 | — | `git push origin <commit>:main` desde la cuenta del agente | Rechazado por GitHub (`GH013`). Si el hook del plugin lo para antes, se anota y decides si se repite |
+| C6a | 6 | — | Desde la cuenta del agente, un commit sobre `main` que solo añade `_prueba-vic-57-c6a.txt` (una línea de texto), empujado con `git push origin <ese commit>:main` | Rechazado por GitHub (`GH013`). Si GitHub lo aceptara, la persona lo revierte con un PR suyo y se para la prueba. Si el hook del plugin lo para antes de llegar a GitHub, se anota así y no se repite por otra vía; la persona decide si lo intenta ella sin bypass o si basta |
 | C6b | 6 | R1 como C0 con `checks-sdd` en rojo (título fuera de formato) | Intento | `BLOCKED`, intentos rechazados |
-| C6c | 6 | El de C6b, con el título corregido | Intento con los checks en curso | Directo rechazado; con `--auto`, espera y no fusiona cuando se cancela la ejecución (`gh run cancel`) |
-| C6d | 6 | — | `gh api -X PUT repos/victor-lg/calculadora-discos/rulesets/25460562 --input docs/reglas-de-main/ruleset-main.json` y `gh api -X PATCH repos/victor-lg/calculadora-discos -F allow_auto_merge=false` desde la cuenta del agente | 403 o 404 en los dos |
+| C6c | 6 | El de C6b, con el título corregido | Pendiente: con los checks en curso, solo `gh pr merge N --squash` (debe fallar), **sin** `--auto`. Cancelado: se cancela la ejecución de `sdd` (`gh run cancel`, `checks-sdd`) y, con el resto de checks terminados y el PR `BLOCKED` por ese cancelado, el intento normal | Pendiente: rechazado. Cancelado: `BLOCKED`, intentos rechazados. Tras el intento, `--disable-auto` sin ningún evento entre medias (un evento relanzaría `checks-sdd`) |
+| C6d | 6 | — | Desde la cuenta del agente, `gh api -X PUT repos/victor-lg/calculadora-discos/rulesets/25460562 --input docs/reglas-de-main/ruleset-main.json` y `gh api -X PATCH repos/victor-lg/calculadora-discos -F allow_auto_merge=true`: los mismos valores ya aplicados, para que un éxito no cambie nada | 403 o 404 en los dos |
 | C6e | 6 | R2 que añade un comentario a `.github/CODEOWNERS` | Intento sin review | `BLOCKED` (CODEOWNERS y `aprobacion`), intentos rechazados |
 | C7 | N5 | — | Push de una rama que añade un comentario a un fichero de `.github/workflows/` | Rechazado por GitHub (el token no tiene `workflow`) |
 
@@ -106,8 +114,9 @@ Se ejecuta después de que apliques el ruleset, CODEOWNERS y el auto-merge. Sust
 
 | Duda | PR | Qué se hace | Qué se anota |
 |---|---|---|---|
-| D1. ¿Un «Request changes» de victor-lg frena el auto-merge con 0 aprobaciones? | El de C0 (R1, `CLEAN`), con el auto-merge **desactivado** | La persona envía «Request changes». Se lee el estado tras la nueva ejecución de `checks-sdd`. Solo si sale `BLOCKED`, se activa `--auto` y se comprueba que no fusiona | `mergeStateStatus` y `reviewDecision`. Se repite en el de C1 (ruta de CODEOWNERS). En R2 ya se sabe que frena: `checks-sdd` falla con «la última review de la persona pide cambios» (VIC-56, calculadora #87 y #89) |
-| D2. ¿La cuenta del agente puede descartar una review de victor-lg? | El de D1, con su «Request changes» | `gh api -X PUT repos/victor-lg/calculadora-discos/pulls/N/reviews/<id>/dismissals -f message="Prueba VIC-57 (D2)" -f event=DISMISS` desde la cuenta del agente | Código HTTP y estado de la review. Si D1 frena y D2 se puede, el agente puede quitar tu freno: los rulesets no tienen «quién puede descartar», así que habría que decidir otro control |
+| D1. ¿Un «Request changes» de victor-lg frena el auto-merge con 0 aprobaciones? | El de C0 (R1, `CLEAN`), con el auto-merge **desactivado** | La persona envía «Request changes». Se lee el estado tras la nueva ejecución de `checks-sdd`. Solo si sale `BLOCKED`, el intento normal, que termina con `--disable-auto` | `mergeStateStatus` y `reviewDecision`. No se repite en un PR con rutas de CODEOWNERS: ya está `BLOCKED` sin ninguna review y no distinguiría nada. En R2, `checks-sdd` falla con «la última review de la persona pide cambios» (VIC-56, calculadora #87 y #89) |
+| D1-R2 | El de C3 (R2 sin rutas de CODEOWNERS), con el auto-merge **desactivado** | La persona aprueba (→ `checks-sdd` en verde y `CLEAN`, sin fusionar) y luego envía «Request changes» | Que `sdd-relanzar` vuelve a poner `checks-sdd` en rojo y el PR en `BLOCKED`, y cuánto tarda. Con D1, dice si el límite de §3 queda frenado por GitHub o solo por el relanzamiento |
+| D2. ¿La cuenta del agente puede descartar una review de victor-lg? | El de D1, con su «Request changes» y el auto-merge **desactivado** | `gh api -X PUT repos/victor-lg/calculadora-discos/pulls/N/reviews/<id>/dismissals -f message="Prueba VIC-57 (D2)" -f event=DISMISS` desde la cuenta del agente | Código HTTP, estado de la review y `mergeStateStatus` después. Si D1 frena y D2 se puede, el agente puede quitar tu freno: los rulesets no tienen «quién puede descartar», así que habría que decidir otro control |
 
 Para D1 y D2 te pediré el «Request changes» en el momento; el dismiss de D2 es sobre una review tuya en un PR desechable, y lo hace el agente solo para esta prueba.
 
@@ -132,6 +141,7 @@ Cada caso se anota con el PR, el commit de la cabeza, la orden, la salida de Git
 | C6e | | | | | |
 | C7 | | | | | |
 | D1 | | | | | |
+| D1-R2 | | | | | |
 | D2 | | | | | |
 
 ## 5. Vuelta atrás
