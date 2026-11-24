@@ -1,3 +1,4 @@
+// Prueba desechable de VIC-61: este PR no se fusiona.
 // Service worker propio (ADR-0001 §3.3). Sirve primero desde la caché de su
 // versión. Sin skipWaiting() ni clients.claim(): una versión nueva solo entra
 // cuando no queda ninguna ventana de la app abierta, así que nunca cambia el
