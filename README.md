@@ -69,17 +69,4 @@ No lo lee la CI: es información para quien abre el repo.
 
 ## Rutas sensibles
 
-<!--
-Todo cambio que toque estas rutas es R2, además de las que ya marca el
-workflow (dependencias, .github/, .claude/, AGENTS.md, migraciones). Es la
-forma de decir que un componente es delicado. Cambiar esta lista es R2.
-
-Formato que lee la CI: una ruta por línea, entre comillas invertidas, por
-ejemplo `src/pagos/` (una carpeta entera) o `src/auth/*.ts`. El `*` también
-cruza carpetas. La CI usa la lista que hay en `main`, no la del PR.
--->
-
-- `app/sw.js`
-- `app/index.html`
-- `tests/unit/sw.test.js`
-- `tests/e2e/sin-conexion.spec.js`
+Las rutas sensibles del proyecto (todo PR que las toque es R2) están en `.github/sdd/rutas-sensibles.txt`.
