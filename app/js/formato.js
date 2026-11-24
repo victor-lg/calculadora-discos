@@ -8,3 +8,4 @@ export function formatearKg(cent) {
   return signo + entero + (decimales ? ',' + decimales : '');
 }
 // Prueba de VIC-56 (PR desechable): cambio de código sin G4.
+// Prueba de VIC-56 (PR desechable): código tras la ronda.
