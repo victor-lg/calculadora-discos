@@ -95,3 +95,5 @@ playwright-ct.config.*          @victor-lg
 /app/index.html                 @victor-lg
 /tests/unit/sw.test.js          @victor-lg
 /tests/e2e/sin-conexion.spec.js @victor-lg
+
+# Prueba de VIC-57 (C6e): comentario desechable.
