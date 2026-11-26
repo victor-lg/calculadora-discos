@@ -652,6 +652,21 @@ input[aria-invalid="true"], .peso-barra input[aria-invalid="true"] { border-colo
 .cancelar { background: none; color: var(--texto-2); display: grid; place-items: center; }
 .cancelar svg { width: 18px; height: 18px; }
 .confirmar { padding: 0 14px; background: var(--acento); color: var(--tinta-acento); font-weight: 600; }
+/* SPEC-CALC-004 FR-01: "Volver a 40, 70 y 90 %", secundario frente a "+ Añadir
+   porcentaje": sin borde discontinuo ni fondo propio. NFR-01: 44 px. */
+.restaurar {
+  align-self: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--texto-2);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 /* FR-08: el aviso de "Deshacer" se queda abajo al desplazarse. Va justo antes
    del botón de añadir: cuando el botón está en pantalla, el sitio del aviso

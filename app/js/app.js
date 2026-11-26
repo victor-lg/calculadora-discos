@@ -16,6 +16,7 @@ import {
   borrarSerie,
   deshacerBorrado,
   cerrarAviso,
+  restaurarPorcentajes,
   alternarDisco,
   modeloVista,
 } from './vista.js';
@@ -213,6 +214,8 @@ function alternarDiferencia(marca, valor) {
 // (FR-11).
 function pintarSerie(s, esperar) {
   const item = crear('li', 'deslizable');
+  // El orden de la lista, también para las tarjetas que desaparecen (pintar).
+  item.dataset.valor = String(s.valor);
   const fondo = $('plantilla-borrar').content.firstElementChild.cloneNode(true);
   const li = crear('div', 'serie');
   const columna = crear('div', 'texto');
@@ -469,12 +472,23 @@ function revisarPlazo() {
   else actualizar(cerrarAviso(estado));
 }
 
+// FR-08 y SPEC-CALC-004 FR-03: muestra el estado `nuevo`, que trae un aviso de
+// "Deshacer", con un plazo nuevo. `opciones` va a pintar.
+function conAviso(nuevo, opciones) {
+  anularPlazo();
+  plazo = { vence: Date.now() + PLAZO_AVISO_MS, reloj: null };
+  actualizar(nuevo, opciones);
+  revisarPlazo();
+}
+
 // FR-08: solo se deshace el último borrado. Cada borrado toma un turno al
 // empezar; como las tarjetas tardan en salir, uno anterior puede terminar
 // después de otro posterior: entonces quita su porcentaje, pero no sustituye
-// el aviso del último.
+// el aviso del último. SPEC-CALC-004 FR-03: restaurar también toma un turno, y
+// un borrado que empezó antes ya no quita nada de la lista restaurada.
 let turnos = 0;
 let ultimoTurno = 0;
+let turnoRestaurado = 0;
 // Las tarjetas que están saliendo, por porcentaje, hasta que se borran.
 const saliendo = new Map();
 const nuevoTurno = () => {
@@ -488,24 +502,58 @@ function borrar(valor, { foco = false, turno, item }) {
   ocultarQuitar();
   if (saliendo.get(valor) === item) saliendo.delete(valor);
   const indice = estado.porcentajes.indexOf(valor);
-  // Si el porcentaje ya no está en la lista, no hay nada que borrar.
-  if (indice === -1) return;
+  // Si el porcentaje ya no está en la lista, o la lista se restauró después de
+  // empezar el borrado, no hay nada que borrar.
+  if (indice === -1 || turno < turnoRestaurado) return;
   if (turno < ultimoTurno) {
     actualizar(quitarPorcentaje(estado, indice));
     return;
   }
   ultimoTurno = turno;
   const nuevo = borrarSerie(estado, valor);
-  anularPlazo();
-  plazo = { vence: Date.now() + PLAZO_AVISO_MS, reloj: null };
   // Mientras la tarjeta salía, el foco quedó en ella o en la página; si la
   // persona lo ha llevado a otro sitio, no se mueve (decisión de Víctor en el
   // PR #32).
   const activo = document.activeElement;
   const sinMover = !activo || activo === document.body || item?.contains(activo);
-  actualizar(nuevo);
-  revisarPlazo();
+  conAviso(nuevo);
   if (foco && sinMover) $('deshacer').focus();
+}
+
+// SPEC-CALC-004 FR-02, FR-03 y FR-04: vuelve al esquema habitual (con el campo
+// de añadir abierto, después de confirmarlo) y el foco pasa a "Deshacer". Si
+// el porcentaje del campo completa el esquema, no hay aviso y el foco pasa a
+// "+ Añadir porcentaje". Las tarjetas que salen se van con un fundido (FR-05).
+function restaurar() {
+  const nuevo = restaurarPorcentajes(estado);
+  if (!nuevo.deshacer?.restaurado || nuevo.deshacer === estado.deshacer) {
+    actualizar(nuevo, { entra: true });
+    $('abrir-anadir').focus();
+    return;
+  }
+  turnoRestaurado = nuevoTurno();
+  ultimoTurno = turnoRestaurado;
+  ocultarQuitar();
+  saliendo.clear();
+  conAviso(nuevo, { entra: true, sale: true });
+  $('deshacer').focus();
+}
+
+// SPEC-CALC-004 FR-03: si el aviso visible es el de restaurar.
+const avisoRestaurar = () => Boolean(estado.deshacer?.restaurado);
+// El elemento es el "Deshacer" del aviso de restaurar.
+const esDeshacerRestaurar = (el) => avisoRestaurar() && Boolean(el?.closest?.('#deshacer'));
+
+// FR-03 y FR-04: "Deshacer" recupera lo borrado o la lista de antes de
+// restaurar. Tras restaurar, si el foco seguía en el aviso o no estaba en
+// ningún sitio (en WebKit, tocar un botón no lo enfoca), pasa a "+ Añadir
+// porcentaje" o al campo de añadir (pintar lo hace si estaba en el aviso).
+function deshacer() {
+  const restaurado = avisoRestaurar();
+  const activo = document.activeElement;
+  const sinFoco = !activo || activo === document.body;
+  actualizar(deshacerBorrado(estado), { entra: true, sale: true });
+  if (restaurado && sinFoco) $(estado.anadiendo ? 'nuevo-porcentaje' : 'abrir-anadir').focus();
 }
 
 // La parte de arriba se actualiza en su sitio, sin reconstruir ningún control:
@@ -548,10 +596,24 @@ function pintarArriba(v) {
   aviso('aviso-guardado', v.avisoGuardado);
 }
 
+// SPEC-CALC-004 FR-05: la tarjeta que sale de la lista al restaurar o al
+// deshacer se queda en su sitio, inerte, mientras se funde y cierra su hueco
+// como una borrada (cerrarHueco), y después se quita. Con "Reducir movimiento",
+// se quita sin más.
+function desaparecer(item) {
+  if (sinMovimiento()) {
+    item.remove();
+    return;
+  }
+  item.dataset.desaparece = '';
+  cerrarHueco(item, () => item.remove());
+}
+
 // `esperar`: el cambio viene de teclear un peso, y el dibujo espera (FR-11).
 // `entra`: el cambio añade una serie o la devuelve con "Deshacer", y su tarjeta
-// entra como añadida (FR-10).
-function pintar({ esperar = false, entra = false } = {}) {
+// entra como añadida (FR-10). `sale`: el cambio sustituye la lista entera, y
+// las tarjetas que dejan de estar desaparecen con un fundido (SPEC-CALC-004 FR-05).
+function pintar({ esperar = false, entra = false, sale = false } = {}) {
   const v = modeloVista(estado);
   pintarArriba(v);
 
@@ -562,6 +624,9 @@ function pintar({ esperar = false, entra = false } = {}) {
   $('porcentaje-auto').dataset.texto = v.textoPorcentaje || $('nuevo-porcentaje').placeholder;
   texto('error-porcentaje', v.errorPorcentaje);
   cambiarAtributo($('nuevo-porcentaje'), 'aria-invalid', String(Boolean(v.errorPorcentaje)));
+  // SPEC-CALC-004 FR-01: el botón de volver al esquema habitual.
+  if (v.restaurar) cambiarTexto($('restaurar'), v.restaurar);
+  mostrar($('restaurar'), Boolean(v.restaurar));
 
   // FR-08: si el foco está en el aviso cuando desaparece, pasa al botón de
   // añadir o, si está abierto, a su campo. Si está en otro sitio, no se mueve.
@@ -590,9 +655,23 @@ function pintar({ esperar = false, entra = false } = {}) {
       const lienzo = nuevas[i].querySelector('.dibujo');
       if (lienzo) lienzos.set(s.valor, lienzo);
     });
-    for (const el of [...lista.children]) if (!nuevas.includes(el)) el.remove();
+    // SPEC-CALC-004 FR-05: las de los porcentajes que salen de la lista siguen
+    // en su sitio, por orden de porcentaje, mientras desaparecen. Las de los
+    // que siguen se sustituyen sin más, igual que una que ya salía de lado
+    // (inerte).
+    const desaparecen = [];
+    const siguen = new Set(v.series.map((s) => String(s.valor)));
+    for (const el of [...lista.children]) {
+      if (nuevas.includes(el)) continue;
+      if ('desaparece' in el.dataset) desaparecen.push(el);
+      else if (sale && !el.inert && !siguen.has(el.dataset.valor) && !sinMovimiento()) {
+        desaparecer(el);
+        desaparecen.push(el);
+      } else el.remove();
+    }
+    const orden = [...nuevas, ...desaparecen].sort((a, b) => Number(a.dataset.valor) - Number(b.dataset.valor));
     let siguiente = lista.firstElementChild;
-    for (const el of nuevas) {
+    for (const el of orden) {
       if (el === siguiente) siguiente = siguiente.nextElementSibling;
       else lista.insertBefore(el, siguiente);
     }
@@ -611,7 +690,7 @@ function actualizar(nuevo, opciones) {
   estado = guardarCambios(almacen, estado, nuevo);
   // SPEC-CALC-003 FR-08: al cerrarse el aviso por cualquier causa, su plazo se
   // anula.
-  if (estado.borrado === null) anularPlazo();
+  if (estado.deshacer === null) anularPlazo();
   pintar(opciones);
 }
 
@@ -674,7 +753,7 @@ function enlazarCampos() {
   $('trabajo').addEventListener('blur', () => terminar('trabajo'));
   $('peso-barra').addEventListener('blur', () => terminar('barra'));
   $('collarines').addEventListener('change', (e) => actualizar(cambiarCollarines(estado, e.target.checked)));
-  $('deshacer').addEventListener('click', () => actualizar(deshacerBorrado(estado), { entra: true }));
+  $('deshacer').addEventListener('click', deshacer);
   // FR-08: el botón "Quitar" que mostró la pulsación larga se oculta al tocar
   // fuera de él.
   document.addEventListener('pointerdown', (e) => {
@@ -728,8 +807,10 @@ function enlazarAnadir() {
   // En iOS, el foco cambia con los eventos de ratón que siguen al pointerup, así
   // que no se olvida al levantar el dedo, sino con el clic o con el teclado.
   let botonPulsado = false;
+  // SPEC-CALC-004 FR-03: tocar el "Deshacer" del aviso de restaurar tampoco
+  // confirma el campo.
   document.addEventListener('pointerdown', (e) => {
-    botonPulsado = Boolean(e.target.closest?.('#form-porcentaje button'));
+    botonPulsado = Boolean(e.target.closest?.('#form-porcentaje button')) || esDeshacerRestaurar(e.target);
   }, { capture: true });
   for (const tipo of ['click', 'keydown']) {
     document.addEventListener(tipo, () => { botonPulsado = false; });
@@ -742,15 +823,47 @@ function enlazarAnadir() {
   // Perder el foco porque la persona toca otra cosa confirma; pasar a segundo
   // plano o bloquear el teléfono, no. Moverse entre el campo y sus botones
   // tampoco.
-  form.addEventListener('focusout', (e) => {
-    if (form.contains(e.relatedTarget) || botonPulsado) return;
+  // SPEC-CALC-004 FR-03: llevar el foco al "Deshacer" del aviso de restaurar
+  // tampoco; si sale de él hacia otro sitio sin activarlo, confirma entonces.
+  const alSalir = (e) => {
+    if (form.contains(e.relatedTarget) || botonPulsado || esDeshacerRestaurar(e.relatedTarget)) return;
     if (document.visibilityState === 'hidden' || !document.hasFocus()) return;
     confirmarAnadir();
+  };
+  form.addEventListener('focusout', alSalir);
+  $('deshacer').addEventListener('blur', (e) => {
+    if (avisoRestaurar()) alSalir(e);
   });
   // En iOS, tocar fuera de un campo no siempre le quita el foco (ADR-0005 §3).
   document.addEventListener('pointerdown', (e) => {
-    if (estado.anadiendo && !form.contains(e.target)) confirmarAnadir();
+    if (estado.anadiendo && !form.contains(e.target) && !esDeshacerRestaurar(e.target)) confirmarAnadir();
   });
+}
+
+// SPEC-CALC-004 FR-01: el botón "Volver a 40, 70 y 90 %", justo debajo de "+
+// Añadir porcentaje" o del campo de añadir. Se crea aquí para no tocar el HTML.
+// FR-02: el toque cuenta desde que empieza sobre el botón: al confirmarse el
+// campo de añadir con ese mismo toque, el botón puede moverse o desaparecer
+// antes de soltar, así que se restaura al soltar, esté donde esté el puntero,
+// y el clic que sigue no llega a nada. Con el teclado o VoiceOver, con el clic.
+function enlazarRestaurar() {
+  const boton = crear('button', 'restaurar');
+  boton.id = 'restaurar';
+  boton.type = 'button';
+  boton.hidden = true;
+  $('error-porcentaje').after(boton);
+  let pulsado = false;
+  boton.addEventListener('pointerdown', (e) => {
+    pulsado = e.isPrimary && e.button === 0;
+  });
+  document.addEventListener('pointerup', () => {
+    if (!pulsado) return;
+    pulsado = false;
+    suprimirClic(document);
+    restaurar();
+  });
+  document.addEventListener('pointercancel', () => { pulsado = false; });
+  boton.addEventListener('click', restaurar);
 }
 
 // FR-11, ADR-0005 §3: pasar a segundo plano termina la edición del peso que
@@ -763,6 +876,7 @@ function terminarAlSalir() {
 montarOpciones();
 enlazarCampos();
 enlazarAnadir();
+enlazarRestaurar();
 enlazarPaneles();
 pintar();
 window.addEventListener('resize', () => ajustarPeso({ forzar: true }));
