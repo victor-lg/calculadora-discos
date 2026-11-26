@@ -1,7 +1,7 @@
 ---
 id: SPEC-CALC-004
 titulo: Volver a los porcentajes habituales
-estado: en-revision
+estado: aprobada
 version: 0.1
 riesgo: R1
 sustituye: null
