@@ -526,7 +526,7 @@ function borrar(valor, { foco = false, turno, item }) {
 // "+ Añadir porcentaje". Las tarjetas que salen se van con un fundido (FR-05).
 function restaurar() {
   const nuevo = restaurarPorcentajes(estado);
-  if (!nuevo.deshacer?.restaurado || nuevo.deshacer === estado.deshacer) {
+  if (!nuevo.deshacer?.restaurado) {
     actualizar(nuevo, { entra: true });
     $('abrir-anadir').focus();
     return;
@@ -598,13 +598,8 @@ function pintarArriba(v) {
 
 // SPEC-CALC-004 FR-05: la tarjeta que sale de la lista al restaurar o al
 // deshacer se queda en su sitio, inerte, mientras se funde y cierra su hueco
-// como una borrada (cerrarHueco), y después se quita. Con "Reducir movimiento",
-// se quita sin más.
+// como una borrada (cerrarHueco), y después se quita.
 function desaparecer(item) {
-  if (sinMovimiento()) {
-    item.remove();
-    return;
-  }
   item.dataset.desaparece = '';
   cerrarHueco(item, () => item.remove());
 }
@@ -656,14 +651,15 @@ function pintar({ esperar = false, entra = false, sale = false } = {}) {
       if (lienzo) lienzos.set(s.valor, lienzo);
     });
     // SPEC-CALC-004 FR-05: las de los porcentajes que salen de la lista siguen
-    // en su sitio, por orden de porcentaje, mientras desaparecen. Las de los
-    // que siguen se sustituyen sin más, igual que una que ya salía de lado
-    // (inerte).
+    // en su sitio, por orden de porcentaje, mientras desaparecen (sin
+    // movimiento, se quitan sin más). Las de los que siguen se sustituyen, igual
+    // que una que ya salía de lado (inerte) o una que se fundía y vuelve con
+    // "Deshacer": así no hay dos tarjetas del mismo porcentaje.
     const desaparecen = [];
     const siguen = new Set(v.series.map((s) => String(s.valor)));
     for (const el of [...lista.children]) {
       if (nuevas.includes(el)) continue;
-      if ('desaparece' in el.dataset) desaparecen.push(el);
+      if ('desaparece' in el.dataset && !siguen.has(el.dataset.valor)) desaparecen.push(el);
       else if (sale && !el.inert && !siguen.has(el.dataset.valor) && !sinMovimiento()) {
         desaparecer(el);
         desaparecen.push(el);

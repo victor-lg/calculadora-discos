@@ -92,6 +92,30 @@ test('SPEC-CALC-004/AC-10 con 40, 50 y 70, el 90 entra, el 50 se funde y cierra 
   await analizarConAxe(page);
 });
 
+// FR-05: la que entra con "Deshacer" entra como añadida, también si la del
+// mismo porcentaje aún se estaba fundiendo: no hay dos tarjetas del 50 %. Con
+// el reloj parado y las transiciones en pausa, el fundido no termina antes de
+// pulsar "Deshacer".
+test('SPEC-CALC-004/AC-10 "Deshacer" mientras el 50 se funde deja una sola tarjeta del 50 %', async ({ page }) => {
+  await abrirCon(page, [40, 50, 70]);
+  await page.clock.install();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dibujo', '3d');
+  // ADR-0008 §3.2: con el reloj parado, analyze() no funciona: se analiza antes.
+  await analizarConAxe(page);
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  await restaurar(page).click();
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.pause()));
+  await expect(page.locator('#series > li[data-desaparece]')).toHaveCount(1);
+  await entradas(page);
+  await deshacer(page).click();
+  await expect(page.locator('#series > li[data-valor="50"]')).toHaveCount(1);
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '50 %', '70 %', '90 %']);
+  expect(await entradas(page)).toEqual(['50 % 0→1']);
+  // La que se funde es la del 90.
+  await expect(page.locator('#series > li[data-desaparece] .porcentaje')).toHaveText(['90 %']);
+});
+
 test('SPEC-CALC-004/AC-10 con "Reducir movimiento", nada se anima al restaurar ni al deshacer', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await abrirCon(page, [40, 50, 70]);
