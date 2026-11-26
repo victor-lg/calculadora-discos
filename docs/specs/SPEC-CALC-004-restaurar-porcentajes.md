@@ -9,18 +9,6 @@ adr: [ADR-0001, ADR-0002, ADR-0004]
 transversales: []
 ---
 
-<!--
-Redactada con sdd-spec el 2026-11-26, en la prueba real de VIC-58 (ADR-0009 §3.6
-del workflow). La idea y sus reglas las decidió Víctor el 2026-11-26: un botón
-bajo "+ Añadir porcentaje", visible solo cuando la lista no es 40, 70 y 90; un
-aviso con "Deshacer" en vez de una confirmación previa; las tarjetas se animan
-como al añadir y al borrar; y añadir un porcentaje cierra el aviso, a diferencia
-del de SPEC-CALC-003 FR-08 (FR-03, con el motivo). Las propuestas eran de Claude
-y Víctor las eligió entre otras opciones.
-Amplía SPEC-CALC-003 (v0.6) sin cambiar su texto: añade un elemento tras el
-bloque 6 de FR-01 y un segundo tipo de aviso con "Deshacer" junto al de FR-08.
--->
-
 # SPEC-CALC-004 — Volver a los porcentajes habituales
 
 ## 1. Objetivo
