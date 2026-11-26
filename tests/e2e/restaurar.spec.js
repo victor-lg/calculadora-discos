@@ -31,14 +31,39 @@ const CLAVE_DISCOS = 'calculadora-discos:v1:discos';
 // AC-05, AC-07 con "150").
 
 // Arranca de cero con la lista `lista` guardada y, si se dan, los discos
-// habilitados `discos` (en kg).
-async function arrancarCon(page, lista, discos) {
+// habilitados `discos` (en kg). Con `reloj`, con el reloj controlado
+// (SPEC-CALC-004 §11): se instala antes de arrancar y se para después; desde
+// entonces los temporizadores solo corren al avanzarlo.
+async function arrancarCon(page, lista, { discos, reloj = false } = {}) {
   await page.evaluate(([cp, l, cd, d]) => {
     localStorage.setItem(cp, JSON.stringify(l));
     if (d) localStorage.setItem(cd, JSON.stringify(d));
   }, [CLAVE_PORCENTAJES, lista, CLAVE_DISCOS, discos]);
+  if (reloj) await page.clock.install();
   await page.reload();
-  await expect(restaurar(page)).toBeVisible();
+  if (!reloj) return;
+  // ADR-0008 §3.2: con el reloj parado, analyze() no funciona: se analiza
+  // antes. El aviso de restaurar y lo que lo cierra los analizan los tests sin
+  // reloj de este fichero.
+  await analizarConAxe(page);
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+}
+
+// Arranca con `lista` y la restaura: aparece el aviso.
+async function restaurarCon(page, lista, opciones) {
+  await arrancarCon(page, lista, opciones);
+  await restaurar(page).click();
+  await expect(aviso(page)).toContainText(RESTAURADOS);
+}
+
+// Con el reloj controlado, el aviso de restaurar sigue a los 4999 ms y a los
+// 5000 ms ha desaparecido, con la lista 40, 70 y 90.
+async function caducaALos5s(page) {
+  await page.clock.runFor(4999);
+  await expect(aviso(page)).toContainText(RESTAURADOS);
+  await page.clock.runFor(1);
+  await expect(aviso(page)).toBeHidden();
+  await expect(porcentajesDeSeries(page)).toHaveText(HABITUAL);
 }
 
 // La lista de porcentajes guardada.
@@ -110,7 +135,7 @@ test('SPEC-CALC-004/AC-02 se ve con 40, 70, 90 y 100', async ({ page }) => {
 });
 
 test('SPEC-CALC-004/AC-02 se ve con 40 y 70 y ningún disco habilitado', async ({ page }) => {
-  await arrancarCon(page, [40, 70], []);
+  await arrancarCon(page, [40, 70], { discos: [] });
   await expect(series(page)).toHaveCount(0);
   await expect(page.getByText('Habilita al menos un disco en Mis discos.')).toBeVisible();
   await expect(restaurarAccesible(page)).toBeVisible();
@@ -175,9 +200,7 @@ test('SPEC-CALC-004/AC-04 con la lista vacía, restaurar y "Deshacer" la dejan v
 
 test.describe('SPEC-CALC-004/AC-05 lo que cierra el aviso y lo que no', () => {
   test.beforeEach(async ({ page }) => {
-    await arrancarCon(page, [50, 80]);
-    await restaurar(page).click();
-    await expect(aviso(page)).toContainText(RESTAURADOS);
+    await restaurarCon(page, [50, 80]);
   });
 
   test('añadir el 50 lo cierra y el 50 se queda', async ({ page }) => {
@@ -236,44 +259,21 @@ test.describe('SPEC-CALC-004/AC-05 lo que cierra el aviso y lo que no', () => {
   }
 });
 
-// El reloj controlado (SPEC-CALC-004 §11), como en anadir-borrar.spec.js: se
-// instala, se recarga la app y se para. Desde entonces los temporizadores solo
-// corren al avanzarlo.
-async function pararReloj(page) {
-  await page.clock.install();
-  await page.reload();
-  // ADR-0008 §3.2: con el reloj parado, analyze() no funciona: se analiza
-  // antes. El aviso de restaurar y lo que lo cierra los analizan los tests sin
-  // reloj de este fichero.
-  await analizarConAxe(page);
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
-}
-
 // La salida de lado y el cierre del hueco de una tarjeta borrada, como mucho
 // (SALIDA_MS + CIERRE_MS de app.js).
 const ANIMACION_MS = 400 + 450;
 
-
 test.describe('SPEC-CALC-004/AC-05 el plazo de 5 s', () => {
   test.beforeEach(async ({ page }) => {
-    await arrancarCon(page, [50, 80]);
-    await pararReloj(page);
+    await restaurarCon(page, [50, 80], { reloj: true });
   });
 
   test('a los 5 s el aviso ha desaparecido y la lista sigue siendo 40, 70 y 90', async ({ page }) => {
-    await restaurar(page).click();
-    await expect(aviso(page)).toContainText(RESTAURADOS);
-    await page.clock.runFor(4999);
-    await expect(aviso(page)).toContainText(RESTAURADOS);
-    await page.clock.runFor(1);
-    await expect(aviso(page)).toBeHidden();
-    await expect(porcentajesDeSeries(page)).toHaveText(HABITUAL);
+    await caducaALos5s(page);
     await expect(deshacer(page)).toHaveCount(0);
   });
 
   test('tras 6 s en segundo plano, al volver el aviso ya no está', async ({ page }) => {
-    await restaurar(page).click();
-    await expect(aviso(page)).toContainText(RESTAURADOS);
     const inicio = await page.evaluate(() => Date.now());
     // En segundo plano, como en iOS, los temporizadores no corren: solo cambia
     // la hora (setSystemTime no dispara ninguno).
@@ -300,18 +300,14 @@ test('SPEC-CALC-004/AC-06 restaurar con el aviso del borrado lo sustituye y "Des
 });
 
 test('SPEC-CALC-004/AC-06 el aviso dura 5 s desde que aparece "Porcentajes restaurados", no desde el borrado', async ({ page }) => {
-  await pararReloj(page);
+  await arrancarCon(page, [40, 70, 90], { reloj: true });
   await botonQuitar(page, 70).press('Enter');
   await page.clock.runFor(ANIMACION_MS);
   await expect(aviso(page)).toContainText('Serie del 70 % borrada');
   await page.clock.runFor(3000);
   await restaurar(page).click();
   await expect(aviso(page)).toContainText(RESTAURADOS);
-  await page.clock.runFor(4999);
-  await expect(aviso(page)).toContainText(RESTAURADOS);
-  await page.clock.runFor(1);
-  await expect(aviso(page)).toBeHidden();
-  await expect(porcentajesDeSeries(page)).toHaveText(HABITUAL);
+  await caducaALos5s(page);
 });
 
 // FR-02: pulsa el botón sin soltarlo, deja que `mientras` compruebe lo que ha
@@ -410,8 +406,7 @@ test('SPEC-CALC-004/AC-09 con el teclado, el foco pasa a "Deshacer" y, al activa
 
 test.describe('SPEC-CALC-004/AC-09 el foco cuando el aviso desaparece', () => {
   test.beforeEach(async ({ page }) => {
-    await arrancarCon(page, [50, 80]);
-    await pararReloj(page);
+    await arrancarCon(page, [50, 80], { reloj: true });
     await restaurar(page).focus();
     await page.keyboard.press('Enter');
     await expect(deshacer(page)).toBeFocused();
@@ -433,9 +428,7 @@ test.describe('SPEC-CALC-004/AC-09 el foco cuando el aviso desaparece', () => {
 
 test.describe('SPEC-CALC-004/AC-12 "Deshacer" con el campo de añadir abierto', () => {
   test.beforeEach(async ({ page }) => {
-    await arrancarCon(page, [50, 80]);
-    await restaurar(page).click();
-    await expect(aviso(page)).toContainText(RESTAURADOS);
+    await restaurarCon(page, [50, 80]);
     await abrir(page).click();
   });
 
