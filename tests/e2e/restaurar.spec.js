@@ -368,6 +368,21 @@ test.describe('SPEC-CALC-004/AC-07 restaurar con el campo de añadir abierto', (
   });
 });
 
+// Si el botón cambia de sitio antes de soltar, el navegador puede no mandar el
+// clic de ese toque. El toque siguiente, en "Deshacer", cuenta aunque llegue
+// enseguida: con el reloj parado no pasa ningún plazo entre los dos.
+test('SPEC-CALC-004/AC-07 tras soltar con el botón ya movido, "Deshacer" cuenta aunque se pulse enseguida', async ({ page }) => {
+  await arrancarCon(page, [40, 70], { reloj: true });
+  await abrir(page).click();
+  await campo(page).pressSequentially('55');
+  await pulsarRestaurar(page, async () => {
+    await expect(campo(page)).toBeHidden();
+  });
+  await expect(aviso(page)).toContainText(RESTAURADOS);
+  await deshacer(page).click();
+  await expect(porcentajesDeSeries(page)).toHaveText(['40 %', '55 %', '70 %']);
+});
+
 // SPEC-CALC-002 FR-09: el aviso de fallo sigue mientras la lista no coincida
 // con la última que se guardó bien. Para que ni la restaurada ni la de antes
 // coincidan, la última guardada es 40, 50, 70 y 90, y 50 y 80 se hacen ya sin

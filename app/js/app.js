@@ -442,14 +442,18 @@ function salir(item, tarjeta, valor, opciones) {
 }
 
 // El clic que sigue al gesto o a la pulsación larga no llega a la tarjeta. En
-// táctil, el clic puede llegar en otra tarea; si no llega, se deja de esperar.
+// táctil, el clic puede llegar en otra tarea; si no llega, se deja de esperar,
+// y nunca pasa del toque siguiente: su clic ya es de otro toque (WebKit no
+// manda clic si se suelta sobre otro elemento).
 function suprimirClic(tarjeta) {
   const parar = (e) => {
     e.stopPropagation();
     e.preventDefault();
   };
+  const dejar = () => tarjeta.removeEventListener('click', parar, { capture: true });
   tarjeta.addEventListener('click', parar, { capture: true, once: true });
-  setTimeout(() => tarjeta.removeEventListener('click', parar, { capture: true }), SALIDA_MS);
+  tarjeta.addEventListener('pointerdown', dejar, { capture: true, once: true });
+  setTimeout(dejar, SALIDA_MS);
 }
 
 // FR-08: el aviso de "Deshacer" desaparece 5 s después de aparecer. Se guarda
